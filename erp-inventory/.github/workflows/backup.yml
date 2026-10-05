@@ -1,0 +1,50 @@
+name: Sauvegarde Nocturne Base de Données
+
+on:
+  schedule:
+    # Tous les soirs à 02:00 UTC (heure creuse magasin)
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Déclenchement manuel possible
+
+jobs:
+  backup:
+    name: Backup PostgreSQL vers Cloudflare R2
+    runs-on: ubuntu-latest
+    steps:
+      - name: Installer PostgreSQL Client & Outils de Chiffrement
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client gnupg
+
+      - name: Exécuter pg_dump et Chiffrer
+        id: dump_step
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+        run: |
+          TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+          BACKUP_FILE="backup_bmmotors_${TIMESTAMP}.sql.gz"
+          ENCRYPTED_FILE="${BACKUP_FILE}.gpg"
+
+          echo "Démarrage de la sauvegarde..."
+          pg_dump "$DATABASE_URL" --format=plain --no-owner --no-acl | gzip > "$BACKUP_FILE"
+
+          echo "Chiffrement symétrique AES-256..."
+          echo "$BACKUP_ENCRYPTION_KEY" | gpg --batch --yes --passphrase-fd 0 --symmetric --cipher-algo AES256 -o "$ENCRYPTED_FILE" "$BACKUP_FILE"
+
+          echo "Taille de l'archive chiffrée :"
+          ls -lh "$ENCRYPTED_FILE"
+          echo "encrypted_file=$ENCRYPTED_FILE" >> $GITHUB_OUTPUT
+
+      - name: Téléverser l'archive chiffrée vers Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_BUCKET: ${{ secrets.R2_BACKUP_BUCKET }}
+          R2_ENDPOINT: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          FILE_TO_UPLOAD: ${{ steps.dump_step.outputs.encrypted_file }}
+        run: |
+          echo "Téléversement de $FILE_TO_UPLOAD vers R2..."
+          aws s3 cp "$FILE_TO_UPLOAD" "s3://$R2_BUCKET/$FILE_TO_UPLOAD" --endpoint-url "$R2_ENDPOINT"
+          echo "Sauvegarde terminée avec succès !"

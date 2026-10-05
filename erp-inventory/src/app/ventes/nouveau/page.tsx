@@ -1,0 +1,581 @@
+"use client";
+
+import React, { useState, useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import {
+  ShoppingCart,
+  Search,
+  Plus,
+  Minus,
+  Trash2,
+  Percent,
+  Check,
+  User,
+  Printer,
+  Boxes,
+  ArrowLeft,
+  AlertCircle,
+  CreditCard,
+  Banknote,
+  FileCheck,
+} from "lucide-react";
+import { getProducts, ProductItem } from "@/lib/actions/products";
+import { createSalesDocument, SalesLineInput, SalesDocumentItem } from "@/lib/actions/sales";
+import { formatMoney, calculateDocumentTotals } from "@/lib/money";
+import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
+
+interface CartLine extends SalesLineInput {
+  currentStock: number;
+}
+
+export default function NouveauBonDeLivraisonPage() {
+  const router = useRouter();
+
+  // Liste des articles du panier
+  const [cart, setCart] = useState<CartLine[]>([]);
+
+  // Informations client
+  const [customerName, setCustomerName] = useState("Client Comptoir Particulier");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerCity, setCustomerCity] = useState("Casablanca");
+  const [customerIce, setCustomerIce] = useState("");
+  const [isClientDetailsOpen, setIsClientDetailsOpen] = useState(false);
+
+  // Recherche d'articles
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<ProductItem[]>([]);
+  const [isSearching, startSearch] = useTransition();
+
+  // Remise personnalisée en %
+  const [discountPercent, setDiscountPercent] = useState<number>(0);
+
+  // Mode de règlement
+  const [paymentMethod, setPaymentMethod] = useState<
+    "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT" | "A_CREDIT"
+  >("ESPECES");
+
+  // Notes
+  const [notes, setNotes] = useState("");
+
+  // État de validation
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [createdDocument, setCreatedDocument] = useState<SalesDocumentItem | null>(null);
+
+  // Recherche instantanée
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      startSearch(async () => {
+        const results = await getProducts({ search: searchTerm });
+        setSearchResults(results.slice(0, 8)); // Top 8 résultats
+      });
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Ajouter un article au panier
+  const handleAddToCart = (product: ProductItem) => {
+    setCart((prevCart) => {
+      const existing = prevCart.find((item) => item.productId === product.id);
+      if (existing) {
+        return prevCart.map((item) =>
+          item.productId === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [
+        ...prevCart,
+        {
+          productId: product.id,
+          productName: product.name,
+          sku: product.sku,
+          oemCode: product.oemCode,
+          unitPriceHTCents: Math.round(product.salePriceRetailCents / 1.1), // Prix HT extrait du TTC à 10%
+          quantity: 1,
+          currentStock: product.currentStock,
+        },
+      ];
+    });
+    setSearchTerm("");
+    setSearchResults([]);
+  };
+
+  // Modifier la quantité
+  const updateQuantity = (productId: number, delta: number) => {
+    setCart((prevCart) =>
+      prevCart
+        .map((item) => {
+          if (item.productId === productId) {
+            const newQty = item.quantity + delta;
+            return newQty > 0 ? { ...item, quantity: newQty } : null;
+          }
+          return item;
+        })
+        .filter(Boolean) as CartLine[]
+    );
+  };
+
+  // Supprimer un article
+  const removeLine = (productId: number) => {
+    setCart((prevCart) => prevCart.filter((item) => item.productId !== productId));
+  };
+
+  // Calcul dynamique des totaux
+  const totals = calculateDocumentTotals(
+    cart.map((c) => ({
+      unitPriceHT: c.unitPriceHTCents,
+      quantity: c.quantity,
+    })),
+    discountPercent,
+    10 // TVA 10% SARL
+  );
+
+  // Validation du BL
+  const handleValidateBL = async () => {
+    if (cart.length === 0) {
+      setErrorMessage("Veuillez ajouter au moins une pièce au Bon de Livraison");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setErrorMessage(null);
+
+      const doc = await createSalesDocument({
+        docType: "BL",
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim() || undefined,
+        customerCity: customerCity.trim() || undefined,
+        customerIce: customerIce.trim() || undefined,
+        lines: cart,
+        discountPercent,
+        paymentMethod,
+        paidAmountCents: paymentMethod === "A_CREDIT" ? 0 : totals.totalTTC,
+        notes: notes.trim() || undefined,
+      });
+
+      setCreatedDocument(doc);
+      setCart([]);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Erreur lors de la validation du BL");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5 pb-8">
+      {/* ======================================================== */}
+      {/* 1. EN-TÊTE DE LA CAISSE COMPTOIR                        */}
+      {/* ======================================================== */}
+      <div className="flex items-center justify-between bg-white p-4 md:p-5 rounded-2xl border border-[#E5E7EB] shadow-xs">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push("/ventes")}
+            className="p-2 text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6] rounded-xl transition-colors"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 className="text-base md:text-xl font-bold text-[#111827] tracking-tight">
+              Nouveau Bon de Livraison (BL)
+            </h1>
+            <p className="text-xs text-[#6B7280]">
+              Saisie rapide au comptoir • Régime SARL 10% TVA
+            </p>
+          </div>
+        </div>
+
+        <div className="text-right hidden sm:block">
+          <span className="text-xs text-[#6B7280] block">Date d&apos;émission</span>
+          <span className="text-xs font-bold text-[#111827]">
+            {new Date().toLocaleDateString("fr-FR")}
+          </span>
+        </div>
+      </div>
+
+      {errorMessage && (
+        <div className="p-3.5 rounded-xl bg-[#FEF2F2] border border-[#FCA5A5] text-[#F7162D] text-xs font-medium flex items-center gap-2">
+          <AlertCircle size={16} />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 2. ZONE DE SAISIE COMPTOIR (GRILLE 2 COLONNES)          */}
+      {/* ======================================================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* COLONNE GAUCHE (7/12) : RECHERCHE PIÈCES & CLIENT */}
+        <div className="lg:col-span-7 space-y-4">
+          {/* Bloc 1 : Client */}
+          <div className="bg-white p-4 rounded-2xl border border-[#E5E7EB] shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
+                <User size={15} className="text-[#F7162D]" />
+                <span>Client Destinataire</span>
+              </label>
+
+              <button
+                type="button"
+                onClick={() => setIsClientDetailsOpen(!isClientDetailsOpen)}
+                className="text-xs font-semibold text-[#F7162D] hover:underline"
+              >
+                {isClientDetailsOpen ? "Masquer détails" : "+ Tél / ICE / Ville"}
+              </button>
+            </div>
+
+            <input
+              type="text"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder="Nom du client ou garage..."
+              className="w-full px-3.5 py-2 text-sm bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl font-semibold text-[#111827] outline-none focus:border-[#F7162D]"
+            />
+
+            {isClientDetailsOpen && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-[#E5E7EB]">
+                <input
+                  type="tel"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  placeholder="Tél (WhatsApp)..."
+                  className="px-3 py-1.5 text-xs bg-[#F8F9FA] border border-[#E5E7EB] rounded-lg outline-none"
+                />
+                <input
+                  type="text"
+                  value={customerCity}
+                  onChange={(e) => setCustomerCity(e.target.value)}
+                  placeholder="Ville (Casablanca)..."
+                  className="px-3 py-1.5 text-xs bg-[#F8F9FA] border border-[#E5E7EB] rounded-lg outline-none"
+                />
+                <input
+                  type="text"
+                  value={customerIce}
+                  onChange={(e) => setCustomerIce(e.target.value)}
+                  placeholder="ICE Client (optionnel)..."
+                  className="px-3 py-1.5 text-xs bg-[#F8F9FA] border border-[#E5E7EB] rounded-lg outline-none font-mono"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Bloc 2 : Recherche rapide des pièces */}
+          <div className="bg-white p-4 rounded-2xl border border-[#E5E7EB] shadow-xs space-y-3">
+            <label className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
+              <Boxes size={15} className="text-[#F7162D]" />
+              <span>Ajouter une Pièce au Comptoir</span>
+            </label>
+
+            <div className="relative">
+              <Search
+                size={18}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]"
+              />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Scanner ou taper Réf SKU, OEM, Nom (ex: BASH, frein, NGK)..."
+                className="w-full pl-10 pr-4 py-2.5 text-sm bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl outline-none focus:border-[#F7162D] focus:ring-2 focus:ring-[#F7162D]/10 font-medium"
+              />
+            </div>
+
+            {/* Résultats de recherche instantanée */}
+            {searchResults.length > 0 && (
+              <div className="border border-[#E5E7EB] rounded-xl overflow-hidden divide-y divide-[#E5E7EB] max-h-64 overflow-y-auto bg-white shadow-lg">
+                {searchResults.map((product) => (
+                  <div
+                    key={product.id}
+                    onClick={() => handleAddToCart(product)}
+                    className="p-3 hover:bg-[#FEF2F2]/60 cursor-pointer flex items-center justify-between transition-colors"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-xs text-[#111827]">
+                          {product.sku}
+                        </span>
+                        {product.brand && (
+                          <span className="text-[10px] bg-[#F3F4F6] text-[#4B5563] px-1.5 py-0.2 rounded font-semibold">
+                            {product.brand}
+                          </span>
+                        )}
+                        {product.currentStock < 0 && (
+                          <span className="text-[9px] bg-[#FEF2F2] text-[#F7162D] px-1.5 py-0.2 rounded font-bold">
+                            Stock négatif ({product.currentStock})
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-[#374151] font-medium line-clamp-1 mt-0.5">
+                        {product.name}
+                      </p>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-xs font-bold text-[#F7162D] block">
+                        {formatMoney(product.salePriceRetailCents)}
+                      </span>
+                      <span className="text-[10px] text-[#6B7280]">
+                        Stock: {product.currentStock}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Bloc 3 : Articles ajoutés au panier */}
+          <div className="bg-white p-4 rounded-2xl border border-[#E5E7EB] shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-[#111827]">
+                Lignes du Bon de Livraison ({cart.length})
+              </span>
+              {cart.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setCart([])}
+                  className="text-xs text-[#6B7280] hover:text-[#F7162D]"
+                >
+                  Vider le panier
+                </button>
+              )}
+            </div>
+
+            {cart.length === 0 ? (
+              <div className="py-8 text-center text-xs text-[#6B7280]">
+                Aucun article ajouté. Utilisez la recherche ci-dessus pour ajouter des pièces.
+              </div>
+            ) : (
+              <div className="divide-y divide-[#E5E7EB]">
+                {cart.map((item) => (
+                  <div key={item.productId} className="py-3 flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-xs text-[#111827]">
+                          {item.sku}
+                        </span>
+                        {item.currentStock < 0 && (
+                          <span className="text-[9px] font-bold text-[#F7162D]">
+                            (Stock négatif toléré)
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-[#374151] truncate mt-0.5">
+                        {item.productName}
+                      </p>
+                      <span className="text-[11px] text-[#6B7280]">
+                        P.U. HT: {formatMoney(item.unitPriceHTCents)}
+                      </span>
+                    </div>
+
+                    {/* Stepper de quantité tactile pour iPhone 17 Pro Max */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(item.productId, -1)}
+                        className="w-7 h-7 rounded-lg bg-[#F3F4F6] text-[#374151] flex items-center justify-center hover:bg-[#E5E7EB] active:scale-90"
+                      >
+                        <Minus size={13} />
+                      </button>
+                      <span className="w-8 text-center font-mono font-bold text-xs">
+                        {item.quantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(item.productId, 1)}
+                        className="w-7 h-7 rounded-lg bg-[#F3F4F6] text-[#374151] flex items-center justify-center hover:bg-[#E5E7EB] active:scale-90"
+                      >
+                        <Plus size={13} />
+                      </button>
+                    </div>
+
+                    {/* Total ligne et suppression */}
+                    <div className="text-right shrink-0 min-w-[70px]">
+                      <span className="font-mono font-bold text-xs text-[#111827] block">
+                        {formatMoney(item.unitPriceHTCents * item.quantity)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeLine(item.productId)}
+                        className="text-[#9CA3AF] hover:text-[#F7162D] mt-1"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* COLONNE DROITE (5/12) : REMISE %, TOTAUX COMPTOIR & VALIDATION */}
+        <div className="lg:col-span-5 space-y-4">
+          <div className="bg-white p-5 rounded-2xl border border-[#E5E7EB] shadow-xs space-y-4 sticky top-20">
+            <h2 className="text-sm font-bold text-[#111827] border-b border-[#E5E7EB] pb-3">
+              Récapitulatif & Remise Commerciale
+            </h2>
+
+            {/* SÉLECTEUR DE REMISE PERSONNALISÉE EN % */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[#374151] flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Percent size={14} className="text-[#059669]" />
+                  <span>Remise accordée sur le BL (%)</span>
+                </span>
+                <span className="text-xs font-mono font-bold text-[#059669]">
+                  {discountPercent}%
+                </span>
+              </label>
+
+              {/* Boutons rapides + Saisie manuelle */}
+              <div className="grid grid-cols-4 gap-1.5">
+                {[0, 5, 10, 15].map((rate) => (
+                  <button
+                    key={rate}
+                    type="button"
+                    onClick={() => setDiscountPercent(rate)}
+                    className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      discountPercent === rate
+                        ? "bg-[#059669] text-white"
+                        : "bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB]"
+                    }`}
+                  >
+                    {rate}%
+                  </button>
+                ))}
+              </div>
+
+              {/* Saisie personnalisée */}
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-xs text-[#6B7280]">Autre % :</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={discountPercent || ""}
+                  onChange={(e) => setDiscountPercent(Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0)))}
+                  placeholder="ex: 8"
+                  className="w-20 px-2 py-1 text-xs bg-[#F8F9FA] border border-[#E5E7EB] rounded-lg font-bold outline-none focus:border-[#059669]"
+                />
+              </div>
+            </div>
+
+            {/* DÉTAIL DES TOTAUX CONFORME À LA DEMANDE UTILISATEUR */}
+            <div className="space-y-2 p-4 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB] text-xs">
+              {/* 1. TOTAL BRUT HT */}
+              <div className="flex justify-between text-[#374151]">
+                <span className="font-semibold">TOTAL BRUT HT :</span>
+                <span className="font-mono font-bold text-[#111827]">
+                  {formatMoney(totals.totalBrutHT)}
+                </span>
+              </div>
+
+              {/* 2. REMISE MENTIONNÉE EXPLICITEMENT SOUS LE TOTAL BRUT HT */}
+              {totals.discountPercent > 0 ? (
+                <div className="flex justify-between text-[#059669] font-bold py-1 border-y border-[#E5E7EB] bg-[#ECFDF5]/80 -mx-4 px-4">
+                  <span>Remise accordée ({totals.discountPercent}%) :</span>
+                  <span className="font-mono">
+                    -{formatMoney(totals.discountAmount)}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex justify-between text-[#9CA3AF]">
+                  <span>Remise (0%) :</span>
+                  <span className="font-mono">0,00 DH</span>
+                </div>
+              )}
+
+              {/* 3. TOTAL NET HT */}
+              <div className="flex justify-between font-bold text-[#111827] pt-0.5">
+                <span>TOTAL NET HT :</span>
+                <span className="font-mono">
+                  {formatMoney(totals.totalNetHT)}
+                </span>
+              </div>
+
+              {/* 4. TVA 10% */}
+              <div className="flex justify-between text-[#4B5563]">
+                <span>TVA (10% SARL) :</span>
+                <span className="font-mono font-bold text-[#111827]">
+                  {formatMoney(totals.tvaAmount)}
+                </span>
+              </div>
+
+              {/* 5. TOTAL TTC */}
+              <div className="flex justify-between text-base font-black text-white bg-[#F7162D] p-3 rounded-xl -mx-2 mt-2 shadow-xs">
+                <span>TOTAL TTC :</span>
+                <span className="font-mono tracking-tight">
+                  {formatMoney(totals.totalTTC)}
+                </span>
+              </div>
+            </div>
+
+            {/* MODE DE RÈGLEMENT */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[#374151] block">
+                Mode d&apos;encaissement
+              </label>
+              <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
+                {[
+                  { id: "ESPECES", label: "Espèces (Caisse)" },
+                  { id: "A_CREDIT", label: "À Crédit (En compte)" },
+                  { id: "CHEQUE", label: "Chèque bancaire" },
+                  { id: "EFFET_LCN", label: "Effet (LCN)" },
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setPaymentMethod(m.id as any)}
+                    className={`py-2 px-2.5 rounded-xl border text-center transition-all ${
+                      paymentMethod === m.id
+                        ? "border-[#111827] bg-[#111827] text-white"
+                        : "border-[#E5E7EB] text-[#4B5563] hover:bg-[#F3F4F6]"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* GRAND BOUTON DE VALIDATION (POUCE SUR IPHONE) */}
+            <button
+              type="button"
+              onClick={handleValidateBL}
+              disabled={isSubmitting || cart.length === 0}
+              className="w-full py-3.5 bg-[#F7162D] hover:bg-[#D90E23] text-white font-bold text-sm rounded-xl shadow-md transition-all active:scale-98 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <FileCheck size={18} />
+              <span>
+                {isSubmitting
+                  ? "Validation en cours..."
+                  : `Valider le Bon de Livraison (${formatMoney(totals.totalTTC)})`}
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ======================================================== */}
+      {/* 3. MODAL D'IMPRESSION A4 APRÈS VALIDATION                */}
+      {/* ======================================================== */}
+      {createdDocument && (
+        <DocumentPrintView
+          document={createdDocument}
+          onClose={() => {
+            setCreatedDocument(null);
+            router.push("/ventes");
+          }}
+        />
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,639 @@
+"use client";
+
+import { useState } from "react";
+import {
+  Building2,
+  Percent,
+  CreditCard,
+  Hash,
+  Database,
+  Save,
+  CheckCircle2,
+  Lock,
+  Fingerprint,
+  RefreshCw,
+  Smartphone,
+  Server,
+  Cloud,
+} from "lucide-react";
+
+export default function ParametresPage() {
+  const [activeTab, setActiveTab] = useState<
+    "SOCIETE" | "FISCAL" | "BANQUE" | "SECURITE" | "NUMEROTATION" | "CLOUD"
+  >("SOCIETE");
+
+  const [savedNotification, setSavedNotification] = useState(false);
+
+  // Formulaire d'information société
+  const [companyInfo, setCompanyInfo] = useState({
+    name: "SARL BM Motors",
+    tradeName: "BM Motors - Pièces Motos & Quads Bashan",
+    legalForm: "SARL (Société à Responsabilité Limitée)",
+    capital: "100 000 DH",
+    ice: "001892345000088", // 15 chiffres
+    identifiantFiscal: "45210982",
+    registreCommerce: "348912 Casablanca",
+    taxeProfessionnelle: "38902145",
+    cnss: "7654321",
+    address: "Rue Al Fourat, Quartier Derb Ghallef, Casablanca",
+    city: "Casablanca",
+    phone: "05 22 20 40 60",
+    mobileWhatsApp: "06 61 12 34 56",
+    email: "contact@bmmotors.ma",
+  });
+
+  // Paramètres fiscaux
+  const [fiscalSettings, setFiscalSettings] = useState({
+    defaultTvaRate: 10,
+    currency: "MAD",
+    enableNegativeStock: true,
+    displayDiscountUnderBrut: true,
+    defaultPaymentDueDays: 30,
+    invoiceFooterNote:
+      "Marchandise vendue agréée conforme aux normes constructeur Bashan. En cas de litige, seul le Tribunal de Commerce de Casablanca est compétent.",
+  });
+
+  // Coordonnées bancaires
+  const [bankSettings, setBankSettings] = useState({
+    bank1Name: "Attijariwafa Bank",
+    bank1Agency: "Agence Derb Ghallef Casablanca",
+    bank1Rib: "007 780 0001234567890123 45",
+    bank2Name: "Bank of Africa (BMCE)",
+    bank2Agency: "Agence Bd Al Qods Ain Chock",
+    bank2Rib: "011 780 0009876543210987 89",
+  });
+
+  // Sécurité et Code PIN
+  const [pinSettings, setPinSettings] = useState({
+    currentPin: "2026",
+    newPin: "",
+    confirmPin: "",
+    biometricEnabled: true,
+  });
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavedNotification(true);
+    setTimeout(() => setSavedNotification(false), 3000);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* En-tête */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
+            <Building2 className="w-7 h-7 text-[#F7162D]" />
+            Paramètres de la Société & Système
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Identifiants légaux marocains (ICE, IF, RC), TVA 10%, coordonnées bancaires et sécurité d'accès.
+          </p>
+        </div>
+
+        {savedNotification && (
+          <div className="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-2 animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            Modifications enregistrées avec succès
+          </div>
+        )}
+      </div>
+
+      {/* Navigation par Onglets */}
+      <div className="bg-white dark:bg-gray-900 p-1.5 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-xs flex items-center gap-1 overflow-x-auto">
+        {[
+          { id: "SOCIETE", label: "Identité SARL", icon: Building2 },
+          { id: "FISCAL", label: "TVA & Facturation", icon: Percent },
+          { id: "BANQUE", label: "Banques & RIB", icon: CreditCard },
+          { id: "SECURITE", label: "Code PIN & Biométrie", icon: Lock },
+          { id: "NUMEROTATION", label: "Numérotation BL", icon: Hash },
+          { id: "CLOUD", label: "Infrastructure Cloud", icon: Server },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                activeTab === tab.id
+                  ? "bg-[#F7162D] text-white shadow-xs"
+                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900"
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Contenu de l'onglet actif */}
+      <form onSubmit={handleSave} className="space-y-6">
+        {/* ========================================================================= */}
+        {/* 1. IDENTITE SARL & MENTIONS LEGALES                                       */}
+        {/* ========================================================================= */}
+        {activeTab === "SOCIETE" && (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-xs space-y-6">
+            <div className="border-b border-gray-100 dark:border-gray-800 pb-4">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-[#F7162D]" />
+                Raison Sociale & Identifiants Officiels Marocains
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Ces mentions figurent obligatoirement sur tous vos Bons de Livraison, Factures et Devis imprimés.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
+                  Raison Sociale Légale *
+                </label>
+                <input
+                  type="text"
+                  value={companyInfo.name}
+                  onChange={(e) => setCompanyInfo({ ...companyInfo, name: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-[#F7162D]"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
+                  Nom Commercial / Enseigne
+                </label>
+                <input
+                  type="text"
+                  value={companyInfo.tradeName}
+                  onChange={(e) => setCompanyInfo({ ...companyInfo, tradeName: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-[#F7162D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
+                  Numéro ICE (15 chiffres) *
+                </label>
+                <input
+                  type="text"
+                  maxLength={15}
+                  value={companyInfo.ice}
+                  onChange={(e) => setCompanyInfo({ ...companyInfo, ice: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-mono font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-[#F7162D]"
+                  placeholder="001892345000088"
+                  required
+                />
+                <p className="text-[11px] text-gray-400 mt-1">Identifiant Commun de l'Entreprise obligatoire au Maroc</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
+                  Identifiant Fiscal (IF) *
+                </label>
+                <input
+                  type="text"
+                  value={companyInfo.identifiantFiscal}
+                  onChange={(e) => setCompanyInfo({ ...companyInfo, identifiantFiscal: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-mono font-semibold focus:ring-2 focus:ring-[#F7162D]"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
+                  Registre de Commerce (RC) *
+                </label>
+                <input
+                  type="text"
+                  value={companyInfo.registreCommerce}
+                  onChange={(e) => setCompanyInfo({ ...companyInfo, registreCommerce: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-[#F7162D]"
+                  placeholder="348912 Casablanca"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
+                  Taxe Professionnelle (Patente)
+                </label>
+                <input
+                  type="text"
+                  value={companyInfo.taxeProfessionnelle}
+                  onChange={(e) => setCompanyInfo({ ...companyInfo, taxeProfessionnelle: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-mono font-semibold focus:ring-2 focus:ring-[#F7162D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
+                  Numéro d'affiliation CNSS
+                </label>
+                <input
+                  type="text"
+                  value={companyInfo.cnss}
+                  onChange={(e) => setCompanyInfo({ ...companyInfo, cnss: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-mono font-semibold focus:ring-2 focus:ring-[#F7162D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
+                  Forme Juridique & Capital
+                </label>
+                <input
+                  type="text"
+                  value={`${companyInfo.legalForm} au capital de ${companyInfo.capital}`}
+                  disabled
+                  className="w-full px-3.5 py-2.5 bg-gray-100 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-semibold text-gray-500 cursor-not-allowed"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
+                  Adresse du Siège & Magasin
+                </label>
+                <input
+                  type="text"
+                  value={companyInfo.address}
+                  onChange={(e) => setCompanyInfo({ ...companyInfo, address: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-[#F7162D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
+                  Téléphone Magasin
+                </label>
+                <input
+                  type="text"
+                  value={companyInfo.phone}
+                  onChange={(e) => setCompanyInfo({ ...companyInfo, phone: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-[#F7162D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
+                  WhatsApp Commercial (Envoi PDF Direct)
+                </label>
+                <input
+                  type="text"
+                  value={companyInfo.mobileWhatsApp}
+                  onChange={(e) => setCompanyInfo({ ...companyInfo, mobileWhatsApp: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-[#F7162D]"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 2. FISCALITE & TVA                                                        */}
+        {/* ========================================================================= */}
+        {activeTab === "FISCAL" && (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-xs space-y-6">
+            <div className="border-b border-gray-100 dark:border-gray-800 pb-4">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Percent className="w-5 h-5 text-[#F7162D]" />
+                Régime Fiscal & Règles de Facturation
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Conformité aux règles comptables marocaines pour le commerce de pièces de rechange motos.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
+                  Taux de TVA par Défaut
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={fiscalSettings.defaultTvaRate}
+                    disabled
+                    className="w-24 px-3.5 py-2.5 bg-gray-100 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-bold text-gray-900 dark:text-white cursor-not-allowed"
+                  />
+                  <span className="text-sm font-bold text-[#F7162D]">% (Régime pièces auto/moto Maroc)</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
+                  Devise d'Émission
+                </label>
+                <input
+                  type="text"
+                  value="MAD (Dirham Marocain)"
+                  disabled
+                  className="w-full px-3.5 py-2.5 bg-gray-100 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-semibold text-gray-500 cursor-not-allowed"
+                />
+              </div>
+
+              <div className="md:col-span-2 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50">
+                <div className="flex items-start gap-3">
+                  <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600 font-bold shrink-0">
+                    ℹ️
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                      Règle de Calcul de la Remise Commerciale (%)
+                    </h3>
+                    <p className="text-xs text-amber-800 dark:text-amber-300/80 mt-1 leading-relaxed">
+                      Conformément à la convention de SARL BM Motors, la remise (%) est déduite directement du <strong>Total Brut HT</strong> pour obtenir le <strong>Total Net HT</strong>, sur lequel s'applique ensuite la TVA de 10%.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
+                  Mention Légale de Bas de Page (Factures & BL)
+                </label>
+                <textarea
+                  rows={3}
+                  value={fiscalSettings.invoiceFooterNote}
+                  onChange={(e) => setFiscalSettings({ ...fiscalSettings, invoiceFooterNote: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#F7162D]"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 3. COORDONNEES BANCAIRES                                                  */}
+        {/* ========================================================================= */}
+        {activeTab === "BANQUE" && (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-xs space-y-6">
+            <div className="border-b border-gray-100 dark:border-gray-800 pb-4">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-[#F7162D]" />
+                Comptes Bancaires & RIB de la Société
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Ces coordonnées figurent sur les Devis et Factures pour les règlements par Virement ou Effet LCN.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Compte 1 */}
+              <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 space-y-3">
+                <span className="text-xs font-bold text-[#F7162D] uppercase tracking-wider">
+                  Compte Principal (Attijariwafa)
+                </span>
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 mb-1">Banque & Agence</label>
+                  <input
+                    type="text"
+                    value={bankSettings.bank1Name}
+                    onChange={(e) => setBankSettings({ ...bankSettings, bank1Name: e.target.value })}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 mb-1">Relevé d'Identité Bancaire (RIB - 24 chiffres)</label>
+                  <input
+                    type="text"
+                    value={bankSettings.bank1Rib}
+                    onChange={(e) => setBankSettings({ ...bankSettings, bank1Rib: e.target.value })}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-mono font-bold text-gray-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              {/* Compte 2 */}
+              <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 space-y-3">
+                <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">
+                  Compte Secondaire (BMCE / BOA)
+                </span>
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 mb-1">Banque & Agence</label>
+                  <input
+                    type="text"
+                    value={bankSettings.bank2Name}
+                    onChange={(e) => setBankSettings({ ...bankSettings, bank2Name: e.target.value })}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 mb-1">Relevé d'Identité Bancaire (RIB - 24 chiffres)</label>
+                  <input
+                    type="text"
+                    value={bankSettings.bank2Rib}
+                    onChange={(e) => setBankSettings({ ...bankSettings, bank2Rib: e.target.value })}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-mono font-bold text-gray-900 dark:text-white"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 4. SECURITE & CODE PIN                                                    */}
+        {/* ========================================================================= */}
+        {activeTab === "SECURITE" && (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-xs space-y-6">
+            <div className="border-b border-gray-100 dark:border-gray-800 pb-4">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Lock className="w-5 h-5 text-[#F7162D]" />
+                Sécurité Monoutilisateur & Authentification Rapide
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Protection par Code PIN tactile 4 chiffres et Biométrie WebAuthn (Touch ID, Face ID, Empreinte).
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Statut Biométrie */}
+              <div className="p-5 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Fingerprint className="w-6 h-6 text-emerald-600" />
+                    <span className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
+                      Capteur Biométrique Actif
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-800 text-[10px] font-black uppercase">
+                    Configuré
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-800 dark:text-emerald-300/80 leading-relaxed">
+                  Votre appareil (iPhone 17 Pro Max ou PC Comptoir) est autorisé pour le déverrouillage instantané à l'empreinte digitale sans ressaisie du mot de passe.
+                </p>
+              </div>
+
+              {/* Modification PIN */}
+              <div className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 space-y-3">
+                <span className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider block">
+                  Code PIN Comptoir Actuel : <span className="font-mono text-[#F7162D]">2026</span>
+                </span>
+                <p className="text-xs text-gray-500">
+                  Pour modifier votre code PIN à 4 chiffres :
+                </p>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Nouveau PIN</label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      placeholder="****"
+                      value={pinSettings.newPin}
+                      onChange={(e) => setPinSettings({ ...pinSettings, newPin: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-center font-mono font-bold tracking-widest text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Confirmer PIN</label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      placeholder="****"
+                      value={pinSettings.confirmPin}
+                      onChange={(e) => setPinSettings({ ...pinSettings, confirmPin: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-center font-mono font-bold tracking-widest text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 5. NUMEROTATION DES DOCUMENTS                                             */}
+        {/* ========================================================================= */}
+        {activeTab === "NUMEROTATION" && (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-xs space-y-6">
+            <div className="border-b border-gray-100 dark:border-gray-800 pb-4">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Hash className="w-5 h-5 text-[#F7162D]" />
+                Séquences & Numérotation Automatique
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Format légal séquentiel sans rupture des pièces commerciales.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                  Bons de Livraison (BL)
+                </span>
+                <div className="text-lg font-mono font-black text-gray-900 dark:text-white">
+                  BL-2026-XXXX
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Exemple : BL-2026-0043</p>
+              </div>
+
+              <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                  Factures Normalisées
+                </span>
+                <div className="text-lg font-mono font-black text-gray-900 dark:text-white">
+                  FAC-2026-XXXX
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Exemple : FAC-2026-0012</p>
+              </div>
+
+              <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                  Bons de Réception (BR)
+                </span>
+                <div className="text-lg font-mono font-black text-gray-900 dark:text-white">
+                  BR-2026-XXXX
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Exemple : BR-2026-0042</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 6. INFRASTRUCTURE & BACKUP CLOUD                                          */}
+        {/* ========================================================================= */}
+        {activeTab === "CLOUD" && (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-xs space-y-6">
+            <div className="border-b border-gray-100 dark:border-gray-800 pb-4">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Server className="w-5 h-5 text-[#F7162D]" />
+                Infrastructure & Sauvegardes Nocturnes (0,00 €/an)
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">
+                État de l'hébergement serveur, de la base de données et des sauvegardes automatiques.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Cloud className="w-6 h-6 text-blue-500" />
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-900 dark:text-white">Google Cloud Run</h3>
+                    <p className="text-[11px] text-gray-500">Conteneur Docker Serverless (europe-west1)</p>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold">
+                  En ligne
+                </span>
+              </div>
+
+              <div className="p-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Database className="w-6 h-6 text-emerald-500" />
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-900 dark:text-white">Neon PostgreSQL</h3>
+                    <p className="text-[11px] text-gray-500">Base relationnelle avec PITR & SSL</p>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold">
+                  Connecté
+                </span>
+              </div>
+
+              <div className="p-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <RefreshCw className="w-6 h-6 text-purple-500" />
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-900 dark:text-white">Sauvegarde Quotidienne GitHub</h3>
+                    <p className="text-[11px] text-gray-500">Cron 02h00 UTC vers Cloudflare R2</p>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 text-xs font-bold">
+                  Actif (02:00)
+                </span>
+              </div>
+
+              <div className="p-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Smartphone className="w-6 h-6 text-orange-500" />
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-900 dark:text-white">Application PWA / Offline</h3>
+                    <p className="text-[11px] text-gray-500">Service Worker pour iPhone & Comptoir</p>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 text-xs font-bold">
+                  Installée
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bouton d'enregistrement global */}
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            className="px-6 py-3 bg-[#F7162D] hover:bg-[#d81023] text-white text-sm font-bold rounded-xl shadow-md transition flex items-center gap-2"
+          >
+            <Save className="w-4 h-4" />
+            Enregistrer les Paramètres
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

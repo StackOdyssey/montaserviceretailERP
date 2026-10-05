@@ -1,0 +1,43 @@
+{
+  "name": "BM Motors ERP - Pièces Motos & Quads Bashan",
+  "short_name": "BM Motors",
+  "description": "Système de caisse, inventaire et facturation pour pièces détachées moto et quad à Casablanca",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#F7162D",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "fr-FR",
+  "icons": [
+    {
+      "src": "/bashan-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/bashan-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nouveau Bon de Livraison",
+      "url": "/ventes/nouveau",
+      "description": "Créer un nouveau BL au comptoir"
+    },
+    {
+      "name": "Catalogue & Stock",
+      "url": "/stock",
+      "description": "Rechercher une pièce moto"
+    },
+    {
+      "name": "Règlements Clients",
+      "url": "/reglements",
+      "description": "Encaisser un règlement client"
+    }
+  ]
+}

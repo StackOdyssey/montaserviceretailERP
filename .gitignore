@@ -1,0 +1,14 @@
+# Customer exports (personal data, Law 09-08)
+/*.csv
+
+# Reference media, legacy-system analysis with personal data, AI session logs;
+# keep only the planning documents
+/References_/*
+!/References_/implementation_plan_v2.md
+!/References_/legacy_erp_analysis_and_saas_roadmap.md
+!/References_/References/
+/References_/References/*
+!/References_/References/implementation_plan.md
+
+# Local AI tool state
+.kilo/
