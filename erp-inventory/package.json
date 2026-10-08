@@ -6,9 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs migrate",
+    "db:push": "node --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs push",
+    "db:import-stock": "node --env-file=.env.local scripts/import-stock.mjs",
+    "db:verify-stock": "node --env-file=.env.local scripts/verify-stock.mjs"
   },
   "dependencies": {
+    "@browserbasehq/sdk": "^2.21.0",
     "@neondatabase/serverless": "^1.1.0",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.3",

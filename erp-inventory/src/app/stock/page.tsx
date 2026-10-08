@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useTransition } from "react";
+import Link from "next/link";
 import {
   Boxes,
   Search,
@@ -14,6 +15,7 @@ import {
   RefreshCw,
   Tag,
   Package,
+  ClipboardList,
 } from "lucide-react";
 import {
   getProducts,
@@ -26,6 +28,7 @@ import { formatMoney } from "@/lib/money";
 import { ProductModal } from "@/components/stock/ProductModal";
 import { StockAdjustmentModal } from "@/components/stock/StockAdjustmentModal";
 import { CsvModal } from "@/components/stock/CsvModal";
+import { useBusinessLine } from "@/components/layout/BusinessLineProvider";
 
 export default function StockCataloguePage() {
   const [productsList, setProductsList] = useState<ProductItem[]>([]);
@@ -43,6 +46,8 @@ export default function StockCataloguePage() {
 
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
 
+  const { activeCode, activeLine } = useBusinessLine();
+
   // Charger les pièces avec recherche instantanée
   const fetchProducts = () => {
     startTransition(async () => {
@@ -50,6 +55,7 @@ export default function StockCataloguePage() {
         search: searchTerm,
         stockFilter,
         category: categoryFilter,
+        businessLineCode: activeCode,
       });
       setProductsList(data);
     });
@@ -61,7 +67,7 @@ export default function StockCataloguePage() {
     }, 150); // Débounce rapide (<200 ms)
 
     return () => clearTimeout(timer);
-  }, [searchTerm, stockFilter, categoryFilter]);
+  }, [searchTerm, stockFilter, categoryFilter, activeCode]);
 
   // Sauvegarder un produit
   const handleSaveProduct = async (productData: any) => {
@@ -104,11 +110,23 @@ export default function StockCataloguePage() {
             Gestion du Stock & Catalogue
           </h1>
           <p className="text-sm text-[#4B5563] mt-0.5">
-            Recherche instantanée, gestion des prix en Dirhams (TVA 10%) et suivi du stock en temps réel.
+            Ligne active :{" "}
+            <span className="font-semibold text-[#111827]">
+              {activeLine?.displayName ?? "Pièces moto"}
+            </span>{" "}
+            — recherche instantanée, prix en Dirhams et suivi du stock en temps réel.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5">
+          <Link
+            href="/stock/inventaire"
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
+          >
+            <ClipboardList size={16} className="text-[#4338CA]" />
+            <span>Inventaire</span>
+          </Link>
+
           <button
             onClick={() => setIsCsvModalOpen(true)}
             className="flex items-center gap-2 px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"

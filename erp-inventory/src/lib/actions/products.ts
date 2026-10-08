@@ -1,7 +1,8 @@
 "use server";
 
-import { db, products, stockMovements, categories } from "@/db";
-import { eq, desc, ilike, or, and, lte, lt } from "drizzle-orm";
+import { and, asc, eq, gte, ilike, or, sql } from "drizzle-orm";
+import { businessLines, categories, db, products, settings, stockMovements } from "@/db";
+import { applyMovement, type CmupState } from "@/lib/stock";
 
 export interface ProductItem {
   id: number;
@@ -21,245 +22,158 @@ export interface ProductItem {
   barcode: string | null;
   photoUrl: string | null;
   isActive: boolean;
+  businessLineId?: number;
+  businessLineCode?: string;
+  isSerialized?: boolean;
+  cmupCents?: number;
 }
 
-// Données réalistes pour initialisation et mode hors base active
-const initialProducts: ProductItem[] = [
-  {
-    id: 1,
-    sku: "BASH-014",
-    oemCode: "16001-BSH-001",
-    name: "Plaquettes de frein avant Bashan 200 / 250cc",
-    brand: "Bashan",
-    categoryId: 2,
-    categoryName: "Freinage",
-    purchasePriceCents: 4500, // 45,00 DH
-    salePriceRetailCents: 8500, // 85,00 DH
-    salePriceWholesaleCents: 6500, // 65,00 DH
-    tvaRate: 10,
-    minStockAlert: 4,
-    currentStock: -2, // Stock négatif autorisé
-    shelfLocation: "Rayon A-02",
-    barcode: "611123456701",
-    photoUrl: null,
-    isActive: true,
-  },
-  {
-    id: 2,
-    sku: "BASH-092",
-    oemCode: "22870-BSH-092",
-    name: "Câble d'embrayage renforcé Bashan 250cc",
-    brand: "Bashan",
-    categoryId: 3,
-    categoryName: "Transmission & Câblage",
-    purchasePriceCents: 3200,
-    salePriceRetailCents: 6500,
-    salePriceWholesaleCents: 4800,
-    tvaRate: 10,
-    minStockAlert: 3,
-    currentStock: 0,
-    shelfLocation: "Rayon B-05",
-    barcode: "611123456702",
-    photoUrl: null,
-    isActive: true,
-  },
-  {
-    id: 3,
-    sku: "YAM-088",
-    oemCode: "5NW-E7641-00",
-    name: "Courroie transmission renforcée MBK / Yamaha 100cc",
-    brand: "Yamaha",
-    categoryId: 3,
-    categoryName: "Transmission & Câblage",
-    purchasePriceCents: 9500,
-    salePriceRetailCents: 16000,
-    salePriceWholesaleCents: 13000,
-    tvaRate: 10,
-    minStockAlert: 5,
-    currentStock: 1,
-    shelfLocation: "Rayon C-01",
-    barcode: "611123456703",
-    photoUrl: null,
-    isActive: true,
-  },
-  {
-    id: 4,
-    sku: "NGK-D8EA",
-    oemCode: "D8EA-2120",
-    name: "Bougie d'allumage NGK D8EA Moto & Quad",
-    brand: "NGK",
-    categoryId: 4,
-    categoryName: "Électricité & Allumage",
-    purchasePriceCents: 1800,
-    salePriceRetailCents: 3500,
-    salePriceWholesaleCents: 2600,
-    tvaRate: 10,
-    minStockAlert: 10,
-    currentStock: 18,
-    shelfLocation: "Rayon E-12",
-    barcode: "611123456704",
-    photoUrl: null,
-    isActive: true,
-  },
-  {
-    id: 5,
-    sku: "CARB-PZ30",
-    oemCode: "PZ30-BASH",
-    name: "Carburateur complet PZ30 starter manuel Bashan 250",
-    brand: "Bashan",
-    categoryId: 1,
-    categoryName: "Moteur & Carburation",
-    purchasePriceCents: 19000,
-    salePriceRetailCents: 32000,
-    salePriceWholesaleCents: 26000,
-    tvaRate: 10,
-    minStockAlert: 2,
-    currentStock: 4,
-    shelfLocation: "Rayon A-08",
-    barcode: "611123456705",
-    photoUrl: null,
-    isActive: true,
-  },
-  {
-    id: 6,
-    sku: "BAT-YTX9",
-    oemCode: "YTX9-BS-GEL",
-    name: "Batterie Gel 12V 9Ah YTX9-BS sans entretien",
-    brand: "Outdo",
-    categoryId: 4,
-    categoryName: "Électricité & Allumage",
-    purchasePriceCents: 17500,
-    salePriceRetailCents: 29000,
-    salePriceWholesaleCents: 23500,
-    tvaRate: 10,
-    minStockAlert: 3,
-    currentStock: 6,
-    shelfLocation: "Zone Batteries",
-    barcode: "611123456706",
-    photoUrl: null,
-    isActive: true,
-  },
-  {
-    id: 7,
-    sku: "KIT-CHAINE-428",
-    oemCode: "428H-136L-GOLD",
-    name: "Kit chaîne renforcé 428H - 136 maillons Gold",
-    brand: "KMC",
-    categoryId: 3,
-    categoryName: "Transmission & Câblage",
-    purchasePriceCents: 14000,
-    salePriceRetailCents: 24000,
-    salePriceWholesaleCents: 19000,
-    tvaRate: 10,
-    minStockAlert: 3,
-    currentStock: 5,
-    shelfLocation: "Rayon C-04",
-    barcode: "611123456707",
-    photoUrl: null,
-    isActive: true,
-  },
-  {
-    id: 8,
-    sku: "CYL-BASH-250",
-    oemCode: "12100-BSH-250",
-    name: "Cylindre piston complet 67mm Bashan 250cc 4T",
-    brand: "Bashan",
-    categoryId: 1,
-    categoryName: "Moteur & Carburation",
-    purchasePriceCents: 38000,
-    salePriceRetailCents: 58000,
-    salePriceWholesaleCents: 49000,
-    tvaRate: 10,
-    minStockAlert: 2,
-    currentStock: 2,
-    shelfLocation: "Rayon A-10",
-    barcode: "611123456708",
-    photoUrl: null,
-    isActive: true,
-  },
-];
+function requireDb() {
+  if (!db) throw new Error("BASE_INDISPONIBLE: DATABASE_URL non configurée");
+  return db;
+}
 
-// Cache en mémoire pour fonctionnement immédiat en dev
-let memoryProducts = [...initialProducts];
+async function lineIdByCode(code: string): Promise<number | null> {
+  const d = requireDb();
+  const rows = await d
+    .select({ id: businessLines.id })
+    .from(businessLines)
+    .where(eq(businessLines.code, code))
+    .limit(1);
+  return rows[0]?.id ?? null;
+}
+
+async function ensureCategory(name: string): Promise<number | null> {
+  const d = requireDb();
+  const existing = await d
+    .select({ id: categories.id })
+    .from(categories)
+    .where(eq(categories.name, name))
+    .limit(1);
+  if (existing[0]) return existing[0].id;
+  const inserted = await d
+    .insert(categories)
+    .values({ name })
+    .returning({ id: categories.id });
+  return inserted[0]?.id ?? null;
+}
+
+type ProductLike = {
+  id: number;
+  sku: string;
+  oemCode: string | null;
+  name: string;
+  brand: string | null;
+  categoryId: number | null;
+  cmupCents: number;
+  salePriceHtCents: number;
+  tvaRate: number;
+  minStockAlert: number;
+  currentStock: number;
+  shelfLocation: string | null;
+  barcode: string | null;
+  photoUrl: string | null;
+  isActive: boolean;
+  businessLineId: number;
+  isSerialized: boolean;
+};
+
+function rawToItem(r: ProductLike, lineCode: string, categoryName?: string | null): ProductItem {
+  return {
+    id: r.id,
+    sku: r.sku,
+    oemCode: r.oemCode,
+    name: r.name,
+    brand: r.brand,
+    categoryId: r.categoryId,
+    categoryName: categoryName ?? undefined,
+    purchasePriceCents: r.cmupCents,
+    salePriceRetailCents: r.salePriceHtCents,
+    salePriceWholesaleCents: null,
+    tvaRate: r.tvaRate,
+    minStockAlert: r.minStockAlert,
+    currentStock: r.currentStock,
+    shelfLocation: r.shelfLocation,
+    barcode: r.barcode,
+    photoUrl: r.photoUrl,
+    isActive: r.isActive,
+    businessLineId: r.businessLineId,
+    businessLineCode: lineCode,
+    isSerialized: r.isSerialized,
+    cmupCents: r.cmupCents,
+  };
+}
 
 /**
- * Récupère les pièces du catalogue avec recherche et filtres instantanés
+ * Récupère les pièces du catalogue filtrées par ligne métier (défaut PIECES).
  */
 export async function getProducts(options?: {
   search?: string;
   category?: string;
   stockFilter?: "all" | "low" | "negative";
+  businessLineCode?: string;
 }): Promise<ProductItem[]> {
-  const search = options?.search?.toLowerCase().trim() || "";
+  const d = requireDb();
+  const lineCode = options?.businessLineCode || "PIECES";
+  const lineId = await lineIdByCode(lineCode);
+  if (!lineId) return [];
+
+  const search = options?.search?.trim() || "";
   const stockFilter = options?.stockFilter || "all";
-  const category = options?.category || "";
+  const categoryName = options?.category || "";
 
-  // Si base PostgreSQL connectée
-  if (db) {
-    try {
-      let query = db.select().from(products).$dynamic();
-
-      // En mode base de données
-      const rows = await query;
-      if (rows.length > 0) {
-        return rows.map((r) => ({
-          id: r.id,
-          sku: r.sku,
-          oemCode: r.oemCode,
-          name: r.name,
-          brand: r.brand,
-          categoryId: r.categoryId,
-          purchasePriceCents: r.purchasePriceCents,
-          salePriceRetailCents: r.salePriceRetailCents,
-          salePriceWholesaleCents: r.salePriceWholesaleCents,
-          tvaRate: r.tvaRate,
-          minStockAlert: r.minStockAlert,
-          currentStock: r.currentStock,
-          shelfLocation: r.shelfLocation,
-          barcode: r.barcode,
-          photoUrl: r.photoUrl,
-          isActive: r.isActive,
-        }));
-      }
-    } catch {
-      // Fallback gracieux en mode mémoire
-    }
+  const conds = [eq(products.businessLineId, lineId), eq(products.isActive, true)];
+  if (search) {
+    const like = `%${search}%`;
+    conds.push(
+      or(
+        ilike(products.sku, like),
+        ilike(products.oemCode, like),
+        ilike(products.name, like),
+        ilike(products.brand, like),
+        ilike(products.shelfLocation, like)
+      )!
+    );
   }
+  if (stockFilter === "low")
+    conds.push(sql`${products.currentStock} <= ${products.minStockAlert}`, gte(products.currentStock, 0));
+  if (stockFilter === "negative") conds.push(sql`${products.currentStock} < 0`);
+  if (categoryName) conds.push(eq(categories.name, categoryName));
 
-  // Filtrage mémoire instantané (< 1ms)
-  return memoryProducts.filter((p) => {
-    // 1. Recherche multi-critères
-    if (search) {
-      const matchSku = p.sku.toLowerCase().includes(search);
-      const matchOem = p.oemCode?.toLowerCase().includes(search);
-      const matchName = p.name.toLowerCase().includes(search);
-      const matchBrand = p.brand?.toLowerCase().includes(search);
-      const matchShelf = p.shelfLocation?.toLowerCase().includes(search);
+  const rows = await d
+    .select({
+      id: products.id,
+      sku: products.sku,
+      oemCode: products.oemCode,
+      name: products.name,
+      brand: products.brand,
+      categoryId: products.categoryId,
+      categoryName: categories.name,
+      costPriceHtCents: products.costPriceHtCents,
+      lastPurchasePriceCents: products.lastPurchasePriceCents,
+      cmupCents: products.cmupCents,
+      salePriceHtCents: products.salePriceHtCents,
+      tvaRate: products.tvaRate,
+      minStockAlert: products.minStockAlert,
+      currentStock: products.currentStock,
+      shelfLocation: products.shelfLocation,
+      barcode: products.barcode,
+      photoUrl: products.photoUrl,
+      isActive: products.isActive,
+      businessLineId: products.businessLineId,
+      isSerialized: products.isSerialized,
+    })
+    .from(products)
+    .leftJoin(categories, eq(products.categoryId, categories.id))
+    .where(and(...conds))
+    .orderBy(asc(products.sku))
+    .limit(500);
 
-      if (!matchSku && !matchOem && !matchName && !matchBrand && !matchShelf) {
-        return false;
-      }
-    }
-
-    // 2. Filtre de stock
-    if (stockFilter === "low" && (p.currentStock > p.minStockAlert || p.currentStock < 0)) {
-      return false;
-    }
-    if (stockFilter === "negative" && p.currentStock >= 0) {
-      return false;
-    }
-
-    // 3. Filtre par catégorie
-    if (category && p.categoryName !== category) {
-      return false;
-    }
-
-    return true;
-  });
+  return rows.map((r) => rawToItem(r, lineCode, r.categoryName));
 }
 
 /**
- * Enregistre ou met à jour une pièce dans le catalogue
+ * Crée ou met à jour une pièce (upsert par id ou par sku).
  */
 export async function saveProduct(data: {
   id?: number;
@@ -277,75 +191,132 @@ export async function saveProduct(data: {
   shelfLocation?: string;
   barcode?: string;
   photoUrl?: string;
+  businessLineCode?: string;
 }): Promise<ProductItem> {
-  if (data.id) {
-    // Mise à jour
-    const index = memoryProducts.findIndex((p) => p.id === data.id);
-    if (index !== -1) {
-      const updated: ProductItem = {
-        ...memoryProducts[index],
-        ...data,
-        oemCode: data.oemCode || null,
-        brand: data.brand || null,
-        salePriceWholesaleCents: data.salePriceWholesaleCents || null,
-        shelfLocation: data.shelfLocation || null,
-        barcode: data.barcode || null,
-        photoUrl: data.photoUrl || null,
-        tvaRate: data.tvaRate ?? 10,
-      };
-      memoryProducts[index] = updated;
-      return updated;
-    }
-  }
+  const d = requireDb();
+  const lineCode = data.businessLineCode || "PIECES";
+  const lineId = await lineIdByCode(lineCode);
+  if (!lineId) throw new Error("LIGNE_METIER_INTROUVABLE");
 
-  // Création
-  const newProduct: ProductItem = {
-    id: Date.now(),
-    sku: data.sku,
-    oemCode: data.oemCode || null,
-    name: data.name,
-    brand: data.brand || "Bashan",
-    categoryId: 1,
-    categoryName: data.categoryName || "Général",
-    purchasePriceCents: data.purchasePriceCents,
-    salePriceRetailCents: data.salePriceRetailCents,
-    salePriceWholesaleCents: data.salePriceWholesaleCents || null,
-    tvaRate: data.tvaRate ?? 10,
+  const categoryId = data.categoryName ? await ensureCategory(data.categoryName) : null;
+
+  const values = {
+    sku: data.sku.trim(),
+    oemCode: data.oemCode ?? null,
+    name: data.name.trim(),
+    brand: data.brand ?? null,
+    businessLineId: lineId,
+    categoryId,
+    tvaRate: data.tvaRate ?? 20,
+    costPriceHtCents: data.purchasePriceCents,
+    lastPurchasePriceCents: data.purchasePriceCents,
+    cmupCents: data.purchasePriceCents,
+    salePriceHtCents: data.salePriceRetailCents,
     minStockAlert: data.minStockAlert,
     currentStock: data.currentStock,
-    shelfLocation: data.shelfLocation || null,
-    barcode: data.barcode || null,
-    photoUrl: data.photoUrl || null,
-    isActive: true,
+    shelfLocation: data.shelfLocation ?? null,
+    barcode: data.barcode ?? null,
+    photoUrl: data.photoUrl ?? null,
+    updatedAt: new Date(),
   };
 
-  memoryProducts.unshift(newProduct);
-  return newProduct;
+  let savedId: number;
+  if (data.id) {
+    const r = await d
+      .update(products)
+      .set(values)
+      .where(eq(products.id, data.id))
+      .returning({ id: products.id });
+    savedId = r[0]?.id ?? data.id;
+  } else {
+    const r = await d
+      .insert(products)
+      .values(values)
+      .onConflictDoUpdate({ target: products.sku, set: values })
+      .returning({ id: products.id });
+    savedId = r[0].id;
+  }
+
+  return {
+    id: savedId,
+    sku: values.sku,
+    oemCode: values.oemCode,
+    name: values.name,
+    brand: values.brand,
+    categoryId,
+    categoryName: data.categoryName,
+    purchasePriceCents: values.cmupCents,
+    salePriceRetailCents: values.salePriceHtCents,
+    salePriceWholesaleCents: null,
+    tvaRate: values.tvaRate,
+    minStockAlert: values.minStockAlert,
+    currentStock: values.currentStock,
+    shelfLocation: values.shelfLocation,
+    barcode: values.barcode,
+    photoUrl: values.photoUrl,
+    isActive: true,
+    businessLineId: lineId,
+    businessLineCode: lineCode,
+    isSerialized: false,
+    cmupCents: values.cmupCents,
+  };
 }
 
 /**
- * Enregistre un mouvement de stock dans le grand livre (append-only)
+ * Enregistre un mouvement de stock (append-only) et met à jour stock + CMUP.
+ * Bloque le stock négatif sauf si `settings.negative_stock_allowed`.
  */
 export async function recordStockMovement(data: {
   productId: number;
   movementType: "ACHAT_RECEPTION" | "VENTE_BL" | "AVOIR_RETOUR" | "AJUSTEMENT_INVENTAIRE";
-  quantity: number; // positif pour entrée, négatif pour sortie
+  quantity: number; // positif = entrée, négatif = sortie
   reason: string;
   unitCostCents?: number;
 }): Promise<ProductItem> {
-  const product = memoryProducts.find((p) => p.id === data.productId);
-  if (!product) {
-    throw new Error("Pièce introuvable");
+  const d = requireDb();
+  const found = await d.select().from(products).where(eq(products.id, data.productId)).limit(1);
+  const p = found[0];
+  if (!p) throw new Error("PIECE_INTROUVABLE");
+
+  const state: CmupState = { quantity: p.currentStock, cmupCents: p.cmupCents };
+  const inboundCost = data.quantity > 0 ? data.unitCostCents ?? p.cmupCents : 0;
+  const { state: next } = applyMovement(state, data.quantity, inboundCost);
+
+  if (next.quantity < 0) {
+    const s = await d.select({ neg: settings.negativeStockAllowed }).from(settings).limit(1);
+    if (!s[0]?.neg) throw new Error("STOCK_NEGATIF_INTERDIT");
   }
 
-  // Mise à jour du stock calculé
-  product.currentStock += data.quantity;
+  await d.insert(stockMovements).values({
+    productId: p.id,
+    businessLineId: p.businessLineId,
+    movementType: data.movementType,
+    quantity: data.quantity,
+    unitCostCents: data.quantity > 0 ? inboundCost : p.cmupCents,
+    reason: data.reason,
+  });
 
-  return product;
+  const updates: Partial<typeof products.$inferInsert> = {
+    currentStock: next.quantity,
+    cmupCents: next.cmupCents,
+    updatedAt: new Date(),
+  };
+  if (data.quantity > 0 && data.unitCostCents != null) {
+    updates.lastPurchasePriceCents = data.unitCostCents;
+  }
+  await d.update(products).set(updates).where(eq(products.id, p.id));
+
+  const line = await d
+    .select({ code: businessLines.code })
+    .from(businessLines)
+    .where(eq(businessLines.id, p.businessLineId))
+    .limit(1);
+
+  return rawToItem({ ...p, currentStock: next.quantity, cmupCents: next.cmupCents }, line[0]?.code ?? "PIECES");
 }
 
 /**
- * Importation de masse depuis un tableau CSV
+ * Import de masse CSV : upsert par sku + mouvement de stock initial.
  */
 export async function importProductsBatch(
   items: Array<{
@@ -360,34 +331,49 @@ export async function importProductsBatch(
     shelfLocation?: string;
   }>
 ): Promise<{ count: number }> {
+  const d = requireDb();
+  const lineId = await lineIdByCode("PIECES");
+  if (!lineId) throw new Error("LIGNE_METIER_INTROUVABLE");
+
+  let count = 0;
   for (const item of items) {
-    const existingIndex = memoryProducts.findIndex((p) => p.sku === item.sku);
-    const productData: ProductItem = {
-      id: existingIndex !== -1 ? memoryProducts[existingIndex].id : Date.now() + Math.random(),
-      sku: item.sku,
-      oemCode: item.oemCode || null,
-      name: item.name,
-      brand: item.brand || "Générique",
-      categoryId: 1,
-      categoryName: "Importé",
-      purchasePriceCents: Math.round(item.purchasePriceDH * 100),
-      salePriceRetailCents: Math.round(item.salePriceRetailDH * 100),
-      salePriceWholesaleCents: null,
-      tvaRate: 10,
+    const costCents = Math.round(item.purchasePriceDH * 100);
+    const values = {
+      sku: item.sku.trim(),
+      oemCode: item.oemCode ?? null,
+      name: item.name.trim(),
+      brand: item.brand ?? "Générique",
+      businessLineId: lineId,
+      tvaRate: 20,
+      costPriceHtCents: costCents,
+      lastPurchasePriceCents: costCents,
+      cmupCents: costCents,
+      salePriceHtCents: Math.round(item.salePriceRetailDH * 100),
       minStockAlert: item.minStock || 2,
       currentStock: item.stock,
-      shelfLocation: item.shelfLocation || null,
-      barcode: null,
-      photoUrl: null,
-      isActive: true,
+      shelfLocation: item.shelfLocation ?? null,
+      updatedAt: new Date(),
     };
+    const saved = await d
+      .insert(products)
+      .values(values)
+      .onConflictDoUpdate({ target: products.sku, set: values })
+      .returning({ id: products.id });
+    const productId = saved[0].id;
 
-    if (existingIndex !== -1) {
-      memoryProducts[existingIndex] = productData;
-    } else {
-      memoryProducts.push(productData);
-    }
+    await d
+      .delete(stockMovements)
+      .where(and(eq(stockMovements.productId, productId), eq(stockMovements.movementType, "STOCK_INITIAL")));
+    await d.insert(stockMovements).values({
+      productId,
+      businessLineId: lineId,
+      movementType: "STOCK_INITIAL",
+      quantity: item.stock,
+      unitCostCents: costCents,
+      sourceDocumentType: "IMPORT",
+      reason: `Import CSV — ${values.sku}`,
+    });
+    count++;
   }
-
-  return { count: items.length };
+  return { count };
 }

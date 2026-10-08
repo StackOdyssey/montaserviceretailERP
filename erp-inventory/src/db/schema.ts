@@ -5,28 +5,147 @@ import {
   integer,
   boolean,
   timestamp,
+  numeric,
+  unique,
+  check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // ==========================================
 // 1. PARAMÈTRES GÉNÉRAUX DE L'ENTREPRISE
 // ==========================================
 export const settings = pgTable("settings", {
   id: serial("id").primaryKey(),
-  companyName: text("company_name").notNull().default("SARL BM Motors"),
-  ice: text("ice").notNull().default(""), // Identifiant Commun de l'Entreprise (Maroc)
-  identifiantFiscal: text("identifiant_fiscal").default(""), // IF
-  registreCommerce: text("registre_commerce").default(""), // RC
-  taxeProfessionnelle: text("taxe_professionnelle").default(""), // TP / Patente
+  // Identité société — saisie manuellement, aucune valeur codée en dur.
+  raisonSociale: text("raison_sociale").notNull().default(""),
+  tradeName: text("trade_name").default(""),
+  legalForm: text("legal_form").notNull().default("SARL"), // SARL, SARL AU, SA, PERSONNE_PHYSIQUE, AUTO_ENTREPRENEUR, AUTRE
   address: text("address").default(""),
-  city: text("city").default("Casablanca"),
+  city: text("city").default(""),
   phone: text("phone").default(""),
   email: text("email").default(""),
-  defaultTvaRate: integer("default_tva_rate").notNull().default(10), // 10% TVA SARL
+  ice: text("ice").notNull().default(""), // 15 chiffres
+  identifiantFiscal: text("identifiant_fiscal").default(""), // IF
+  registreCommerce: text("registre_commerce").default(""), // RC
+  rcTribunal: text("rc_tribunal").default(""),
+  taxeProfessionnelle: text("taxe_professionnelle").default(""), // TP / Patente
+  capitalCents: integer("capital_cents").notNull().default(0),
+  cnss: text("cnss").default(""),
+  website: text("website").default(""),
+  logoUrl: text("logo_url"),
+  footerText: text("footer_text").default(""),
+  // Fiscalité & paramètres généraux
+  defaultVatRateId: integer("default_vat_rate_id").references(() => vatRates.id),
+  vatRegime: text("vat_regime").notNull().default("ENCAISSEMENTS"), // ENCAISSEMENTS | DEDITS
   currency: text("currency").notNull().default("MAD"),
+  localeDefault: text("locale_default").notNull().default("fr"),
+  localeSecondary: text("locale_secondary").notNull().default("en"),
+  timezone: text("timezone").notNull().default("Africa/Casablanca"),
+  negativeStockAllowed: boolean("negative_stock_allowed").notNull().default(false),
+  cashDailyThresholdCents: integer("cash_daily_threshold_cents").notNull().default(500000),
+  cashMonthlyThresholdCents: integer("cash_monthly_threshold_cents").notNull().default(5000000),
+  yearStartMonth: integer("year_start_month").notNull().default(1),
+  numberWidth: integer("number_width").notNull().default(5),
+  // Préfixes de numérotation
+  devisPrefix: text("devis_prefix").notNull().default("DV-"),
+  bcPrefix: text("bc_prefix").notNull().default("BC-"),
   blPrefix: text("bl_prefix").notNull().default("BL-"),
-  facturePrefix: text("facture_prefix").notNull().default("FAC-"),
-  avoirPrefix: text("avoir_prefix").notNull().default("AV-"),
+  facPrefix: text("fac_prefix").notNull().default("FAC-"),
+  avPrefix: text("av_prefix").notNull().default("AV-"),
+  brPrefix: text("br_prefix").notNull().default("BR-"),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ==========================================
+// 1b. LIGNES MÉTIER (SIDE 1 PIECES / SIDE 2 VEHICULES)
+// ==========================================
+export const businessLines = pgTable("business_lines", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // PIECES, VEHICULES
+  displayName: text("display_name").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  logoUrl: text("logo_url"),
+  footerText: text("footer_text"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Visibilité TVA par ligne métier et type de document (l'affichage, pas le calcul).
+export const businessLineDocumentSettings = pgTable(
+  "business_line_document_settings",
+  {
+    id: serial("id").primaryKey(),
+    businessLineId: integer("business_line_id")
+      .notNull()
+      .references(() => businessLines.id, { onDelete: "cascade" }),
+    docType: text("doc_type").notNull(), // DEVIS, BC, BL, FAC, AV
+    showVat: boolean("show_vat").notNull().default(true),
+    priceBasis: text("price_basis").notNull().default("TTC"), // TTC | HT (utilisé si show_vat = false)
+    showDiscount: boolean("show_discount").notNull().default(true),
+    templateCode: text("template_code"),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    unique("business_line_document_settings_unique").on(table.businessLineId, table.docType),
+    check(
+      "business_line_document_settings_fac_av_show_vat",
+      sql`${table.docType} NOT IN ('FAC','AV') OR ${table.showVat}`
+    ),
+  ]
+);
+
+// ==========================================
+// 1c. PARAMÈTRES SYSTÈME (NUMÉROTATION, DÉPENSES, PAIEMENTS, HISTORIQUE)
+// ==========================================
+export const numberingSequences = pgTable(
+  "numbering_sequences",
+  {
+    id: serial("id").primaryKey(),
+    docType: text("doc_type").notNull(), // DEVIS, BC, BL, FAC, AV, BR
+    year: integer("year").notNull(),
+    scopeBusinessLineId: integer("scope_business_line_id").references(() => businessLines.id, {
+      onDelete: "cascade",
+    }), // NULL = série société (défaut)
+    prefix: text("prefix").notNull(),
+    width: integer("width").notNull().default(5),
+    nextNumber: integer("next_number").notNull().default(1),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    unique("numbering_sequences_scope_unique").on(
+      table.docType,
+      table.year,
+      table.scopeBusinessLineId
+    ),
+  ]
+);
+
+export const expenseCategories = pgTable("expense_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  vatDeductibleDefault: boolean("vat_deductible_default").notNull().default(true),
+  receiptRequired: boolean("receipt_required").notNull().default(true),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const paymentMethods = pgTable("payment_methods", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // ESPECES, CHEQUE, EFFET_LCN, VIREMENT
+  label: text("label").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const settingsHistory = pgTable("settings_history", {
+  id: serial("id").primaryKey(),
+  actorUserId: integer("actor_user_id"),
+  fieldName: text("field_name").notNull(),
+  beforeValue: text("before_value"),
+  afterValue: text("after_value"),
+  changedAt: timestamp("changed_at").defaultNow(),
 });
 
 // ==========================================
@@ -41,28 +160,94 @@ export const categories = pgTable("categories", {
 });
 
 // ==========================================
-// 3. CATALOGUE DES PIÈCES & ARTICLES
+// 3. PARAMÈTRES DU CATALOGUE (TVA, ENTREPÔTS, NIVEAUX DE PRIX)
+// ==========================================
+export const vatRates = pgTable("vat_rates", {
+  id: serial("id").primaryKey(),
+  label: text("label").notNull(), // "TVA 20%", "TVA 10%", "Exonéré"
+  ratePercent: integer("rate_percent").notNull(), // 20, 10, 0
+  isActive: boolean("is_active").notNull().default(true),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const warehouses = pgTable("warehouses", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(), // "Entrepôt Principal"
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const priceLevels = pgTable(
+  "price_levels",
+  {
+    id: serial("id").primaryKey(),
+    businessLineId: integer("business_line_id")
+      .notNull()
+      .references(() => businessLines.id, { onDelete: "cascade" }),
+    code: text("code").notNull(), // GROS, SEMI_GROS, LISTE
+    label: text("label").notNull(),
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => [unique("price_levels_line_code_unique").on(table.businessLineId, table.code)]
+);
+
+// ==========================================
+// 4. CATALOGUE DES PIÈCES & ARTICLES
 // ==========================================
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
-  sku: text("sku").notNull().unique(), // Référence interne
+  sku: text("sku").notNull().unique(), // Ref (BestWay)
+  barcode: text("barcode"), // Code Barre
+  name: text("name").notNull(), // Designation
+  brand: text("brand"), // Marque
   oemCode: text("oem_code"), // Code constructeur OEM
-  name: text("name").notNull(), // Désignation de la pièce
-  brand: text("brand").default("Bashan"), // Bashan, Yamaha, Honda, MBK, Docker, etc.
+  nature: text("nature"), // Nature (NORMAL, ...)
+  businessLineId: integer("business_line_id")
+    .notNull()
+    .references(() => businessLines.id), // PIECES | VEHICULES
+  isSerialized: boolean("is_serialized").notNull().default(false), // true = unités sérialisées (châssis/VIN)
   categoryId: integer("category_id").references(() => categories.id),
-  purchasePriceCents: integer("purchase_price_cents").notNull().default(0), // Prix d'achat unitaire HT en centimes
-  salePriceRetailCents: integer("sale_price_retail_cents").notNull().default(0), // Prix de vente détail TTC en centimes
-  salePriceWholesaleCents: integer("sale_price_wholesale_cents").default(0), // Prix de vente gros TTC en centimes
-  tvaRate: integer("tva_rate").notNull().default(10), // 10%
-  minStockAlert: integer("min_stock_alert").notNull().default(2), // Seuil d'alerte stock faible
-  currentStock: integer("current_stock").notNull().default(0), // Stock en temps réel (tolère les négatifs)
-  shelfLocation: text("shelf_location"), // Rayon / Emplacement en boutique
-  barcode: text("barcode"),
+  supplierId: integer("supplier_id").references(() => suppliers.id),
+  warehouseId: integer("warehouse_id").references(() => warehouses.id),
+  vatRateId: integer("vat_rate_id").references(() => vatRates.id),
+  tvaRate: integer("tva_rate").notNull().default(20), // Taux par défaut 20%
+  costPriceHtCents: integer("cost_price_ht_cents").notNull().default(0), // C.R HT importé (coût de référence)
+  lastPurchasePriceCents: integer("last_purchase_price_cents").notNull().default(0), // dernier prix d'achat (informatif)
+  cmupCents: integer("cmup_cents").notNull().default(0), // coût moyen pondéré (CMUP)
+  salePriceHtCents: integer("sale_price_ht_cents").notNull().default(0), // P.V HT (prix de vente)
+  marginPercent: numeric("margin_percent", { precision: 8, scale: 2 }), // T.Marge % (valeur du fichier, non recalculée)
+  stockValuePurchaseCents: integer("stock_value_purchase_cents").notNull().default(0), // Val_PA_HT (valeur du fichier)
+  minStockAlert: integer("min_stock_alert").notNull().default(5),
+  currentStock: integer("current_stock").notNull().default(0),
+  shelfLocation: text("shelf_location"),
   photoUrl: text("photo_url"),
+  unit: text("unit").default("PIECE"),
   isActive: boolean("is_active").notNull().default(true),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+export const productPrices = pgTable(
+  "product_prices",
+  {
+    id: serial("id").primaryKey(),
+    productId: integer("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    priceLevelId: integer("price_level_id")
+      .notNull()
+      .references(() => priceLevels.id),
+    priceHtCents: integer("price_ht_cents").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => [
+    unique("product_prices_product_level_unique").on(table.productId, table.priceLevelId),
+  ]
+);
 
 // ==========================================
 // 4. RÉFÉRENCES ÉQUIVALENTES ET CODES OEM
@@ -84,6 +269,9 @@ export const stockMovements = pgTable("stock_movements", {
   productId: integer("product_id")
     .notNull()
     .references(() => products.id),
+  businessLineId: integer("business_line_id")
+    .notNull()
+    .references(() => businessLines.id),
   movementType: text("movement_type").notNull(), // ACHAT_RECEPTION, VENTE_BL, AVOIR_RETOUR, AJUSTEMENT_INVENTAIRE, STOCK_INITIAL
   quantity: integer("quantity").notNull(), // Signé : positif pour entrées, négatif pour sorties
   unitCostCents: integer("unit_cost_cents"), // Coût unitaire d'achat
@@ -91,6 +279,55 @@ export const stockMovements = pgTable("stock_movements", {
   sourceDocumentType: text("source_document_type"), // BL, FACTURE, AVOIR, RECEPTION
   reason: text("reason"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ==========================================
+// 5b. UNITÉS SÉRIALISÉES (VÉHICULES — CHÂSSIS/VIN) & INVENTAIRE
+// ==========================================
+export const stockUnits = pgTable("stock_units", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id")
+    .notNull()
+    .references(() => products.id),
+  businessLineId: integer("business_line_id")
+    .notNull()
+    .references(() => businessLines.id),
+  serialNo: text("serial_no").notNull().unique(), // châssis / VIN
+  engineNo: text("engine_no"),
+  colour: text("colour"),
+  modelYear: integer("model_year"),
+  status: text("status").notNull().default("IN_STOCK"), // IN_STOCK, RESERVED, SOLD, RETURNED
+  unitCostCents: integer("unit_cost_cents").notNull().default(0), // identification spécifique
+  receiptLineId: integer("receipt_line_id"),
+  saleLineId: integer("sale_line_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const stockCounts = pgTable("stock_counts", {
+  id: serial("id").primaryKey(),
+  businessLineId: integer("business_line_id")
+    .notNull()
+    .references(() => businessLines.id),
+  code: text("code").notNull().unique(),
+  status: text("status").notNull().default("DRAFT"), // DRAFT, VALIDATED, CANCELLED
+  countedAt: timestamp("counted_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const stockCountLines = pgTable("stock_count_lines", {
+  id: serial("id").primaryKey(),
+  stockCountId: integer("stock_count_id")
+    .notNull()
+    .references(() => stockCounts.id, { onDelete: "cascade" }),
+  productId: integer("product_id")
+    .notNull()
+    .references(() => products.id),
+  countedQty: integer("counted_qty").notNull(),
+  expectedQty: integer("expected_qty").notNull(),
+  varianceQty: integer("variance_qty").notNull(),
+  unitCostCents: integer("unit_cost_cents").notNull().default(0),
 });
 
 // ==========================================
@@ -287,5 +524,18 @@ export const supplierEmails = pgTable("supplier_emails", {
   threadId: text("thread_id"),
   sentAt: timestamp("sent_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ==========================================
+// 16. PROFILS UTILISATEURS (auth gérée — Neon Auth / Better Auth)
+// ==========================================
+export const profiles = pgTable("profiles", {
+  userId: text("user_id").primaryKey(), // id utilisateur Neon Auth (neon_auth.user.id)
+  email: text("email"),
+  displayName: text("display_name"),
+  role: text("role").notNull().default("ADMIN"), // ADMIN actif; GERANT, VENTE, STOCK, COMPTA, LECTURE réservés
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 

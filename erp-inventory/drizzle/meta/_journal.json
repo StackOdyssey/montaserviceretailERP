@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791465135274,
+      "tag": "0000_thin_mariko_yashida",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791467024569,
+      "tag": "0001_business_lines",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791468045879,
+      "tag": "0002_system_parameters",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791468245556,
+      "tag": "0003_drop_legacy_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791469326902,
+      "tag": "0004_profiles",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791470608353,
+      "tag": "0005_stock_ledger",
+      "breakpoints": true
+    }
+  ]
+}

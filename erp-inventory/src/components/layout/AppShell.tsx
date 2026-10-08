@@ -26,6 +26,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logout } from "@/lib/actions/auth";
+import {
+  BusinessLineProvider,
+  BusinessLineSelect,
+  type BusinessLine,
+} from "@/components/layout/BusinessLineProvider";
 
 interface NavItem {
   label: string;
@@ -88,7 +93,7 @@ const navItems: NavItem[] = [
 ];
 
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, lines }: { children: React.ReactNode; lines: BusinessLine[] }) {
   const pathname = usePathname();
 
   // Sur la page de connexion, afficher l'écran plein écran sans la barre de navigation
@@ -114,6 +119,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
+    <BusinessLineProvider lines={lines}>
     <div className="min-h-screen bg-[#F8F9FA] text-[#111827] flex flex-col md:flex-row">
       {/* ======================================================== */}
       {/* 1. SIDEBAR DESKTOP PLIABLE VERS LA GAUCHE                */}
@@ -382,6 +388,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-4">
+            <BusinessLineSelect />
             <div className="text-right">
               <span className="text-xs font-semibold text-[#111827] block">SARL BM Motors</span>
               <span className="text-[11px] text-[#059669] font-medium flex items-center justify-end gap-1">
@@ -457,5 +464,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
       </nav>
     </div>
+    </BusinessLineProvider>
   );
 }
