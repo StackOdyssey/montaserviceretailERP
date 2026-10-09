@@ -2,11 +2,20 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME, verifyToken } from "@/lib/auth";
 
+// App interne : aucune indexation/archivage, quel que soit le domaine (Cloud Run ou futur domaine).
+const NO_INDEX = "noindex, nofollow, noarchive, nosnippet, noimageindex";
+
+function noIndex(res: NextResponse): NextResponse {
+  res.headers.set("X-Robots-Tag", NO_INDEX);
+  return res;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 1. Chemins publics toujours autorisés
   if (
+    pathname === "/robots.txt" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
@@ -15,7 +24,7 @@ export async function proxy(request: NextRequest) {
     pathname === "/bashan-logo.png" ||
     pathname === "/favicon.ico"
   ) {
-    return NextResponse.next();
+    return noIndex(NextResponse.next());
   }
 
   // 2. Vérification du cookie de session
@@ -25,10 +34,10 @@ export async function proxy(request: NextRequest) {
   // 3. Redirection vers la page de connexion si non authentifié
   if (!isAuthenticated) {
     const loginUrl = new URL("/login", request.url);
-    return NextResponse.redirect(loginUrl);
+    return noIndex(NextResponse.redirect(loginUrl));
   }
 
-  return NextResponse.next();
+  return noIndex(NextResponse.next());
 }
 
 export const config = {

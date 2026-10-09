@@ -37,6 +37,15 @@ export const metadata: Metadata = {
     icon: "/bashan-logo.png",
     apple: "/bashan-logo.png",
   },
+  // Application interne : ne jamais indexer, suivre ni archiver (aucun domaine autorisé).
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    noarchive: true,
+    nosnippet: true,
+    noimageindex: true,
+  },
 };
 
 export default async function RootLayout({

@@ -226,7 +226,7 @@ export default function LoginPage() {
             </div>
           ) : (
             <div className="text-[11px] text-gray-500 font-medium">
-              Saisissez votre code PIN à 4 chiffres (Par défaut : 2026)
+              Saisissez votre code PIN à 4 chiffres
             </div>
           )}
         </div>

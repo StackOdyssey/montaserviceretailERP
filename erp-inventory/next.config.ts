@@ -17,6 +17,22 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  // INTERDICTION D'INDEXATION — appliqué à TOUTES les réponses, quel que soit le domaine
+  // (URL Cloud Run actuelle et tout futur domaine acheté). Application interne : ne doit
+  // jamais être indexée, suivie ni archivée par les moteurs de recherche.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow, noarchive, nosnippet, noimageindex",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
