@@ -192,6 +192,7 @@ export async function saveProduct(data: {
   barcode?: string;
   photoUrl?: string;
   businessLineCode?: string;
+  isSerialized?: boolean;
 }): Promise<ProductItem> {
   const d = requireDb();
   const lineCode = data.businessLineCode || "PIECES";
@@ -206,6 +207,7 @@ export async function saveProduct(data: {
     name: data.name.trim(),
     brand: data.brand ?? null,
     businessLineId: lineId,
+    isSerialized: data.isSerialized ?? false,
     categoryId,
     tvaRate: data.tvaRate ?? 20,
     costPriceHtCents: data.purchasePriceCents,
@@ -257,7 +259,7 @@ export async function saveProduct(data: {
     isActive: true,
     businessLineId: lineId,
     businessLineCode: lineCode,
-    isSerialized: false,
+    isSerialized: data.isSerialized ?? false,
     cmupCents: values.cmupCents,
   };
 }

@@ -1,0 +1,15 @@
+# Build context = repository root (Cloud Build).
+.git
+.github
+.gitignore
+.kilo
+.agents
+.vscode
+**/node_modules
+**/.next
+References_
+*.md
+.neon
+**/.env*
+BestWay*
+*.csv
