@@ -4,8 +4,8 @@ import { cookies } from "next/headers";
 import {
   createSessionToken,
   verifyToken,
+  verifyAdminPin,
   SESSION_COOKIE_NAME,
-  DEFAULT_PIN,
 } from "@/lib/auth";
 
 export interface AuthResult {
@@ -14,13 +14,17 @@ export interface AuthResult {
 }
 
 /**
- * Connexion par Code PIN tactile
+ * Connexion par code PIN (comparaison en temps constant, exp. ADMIN_PIN requis).
  */
 export async function loginWithPin(pin: string): Promise<AuthResult> {
-  const cleanPin = pin.trim();
-  const configuredPin = process.env.ADMIN_PIN || DEFAULT_PIN;
+  if (!process.env.ADMIN_PIN) {
+    return {
+      success: false,
+      message: "Accès non configuré. Contactez l'administrateur.",
+    };
+  }
 
-  if (cleanPin !== configuredPin) {
+  if (!verifyAdminPin(pin)) {
     return {
       success: false,
       message: "Code PIN incorrect. Veuillez réessayer.",
@@ -38,35 +42,22 @@ export async function loginWithPin(pin: string): Promise<AuthResult> {
     path: "/",
   });
 
-  return {
-    success: true,
-  };
+  return { success: true };
 }
 
 /**
- * Connexion biométrique (Empreinte digitale / Touch ID / Face ID)
+ * Connexion biométrique — DÉSACTIVÉE (fail-closed).
+ * Aucune session n'est émise sans vérification WebAuthn/FIDO2 côté serveur.
  */
 export async function loginWithBiometrics(): Promise<AuthResult> {
-  // Une fois la biométrie validée côté matériel dans le navigateur via WebAuthn,
-  // le serveur valide la session du gérant
-  const token = await createSessionToken();
-  const cookieStore = await cookies();
-
-  cookieStore.set(SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 30 * 24 * 3600,
-    path: "/",
-  });
-
   return {
-    success: true,
+    success: false,
+    message: "Déverrouillage biométrique indisponible.",
   };
 }
 
 /**
- * Déconnexion
+ * Déconnexion.
  */
 export async function logout(): Promise<void> {
   const cookieStore = await cookies();
@@ -74,7 +65,7 @@ export async function logout(): Promise<void> {
 }
 
 /**
- * Vérifie si la session actuelle est valide
+ * Vérifie si la session actuelle est valide.
  */
 export async function checkSession(): Promise<boolean> {
   const cookieStore = await cookies();
