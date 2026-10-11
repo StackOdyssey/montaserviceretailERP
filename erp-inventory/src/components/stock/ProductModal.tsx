@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { X, Camera, Upload, Check, AlertCircle } from "lucide-react";
 import { ProductItem } from "@/lib/actions/products";
 import { compressImageToWebP } from "@/lib/image-compressor";
+import { getPhotoUploadUrl } from "@/lib/actions/media";
 import { toCentimes, toDirhams } from "@/lib/money";
 
 interface ProductModalProps {
@@ -34,6 +35,7 @@ export function ProductModal({
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   const [isCompressing, setIsCompressing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [compressionInfo, setCompressionInfo] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -82,17 +84,46 @@ export function ProductModal({
   const handleImageCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    e.target.value = "";
 
     try {
       setIsCompressing(true);
       setErrorMessage(null);
+      setCompressionInfo(null);
+
+      // 1. Compression WebP côté client
       const result = await compressImageToWebP(file, 1000, 1000, 0.8);
-      setPhotoUrl(result.previewUrl);
-      setCompressionInfo(`Image WebP optimisée : ${result.sizeKb} Ko (${result.width}x${result.height}px)`);
-    } catch {
-      setErrorMessage("Échec de compression de la photo");
+      setCompressionInfo(
+        `Image WebP optimisée : ${result.sizeKb} Ko (${result.width}x${result.height}px)`
+      );
+
+      // 2. Dépôt direct vers Cloudflare R2 via URL présignée
+      //    (les octets ne passent pas par Cloud Run)
+      setIsCompressing(false);
+      setIsUploading(true);
+      const contentType = result.file.type || "image/webp";
+      const { uploadUrl, publicUrl } = await getPhotoUploadUrl({
+        contentType,
+        sizeBytes: result.file.size,
+      });
+      const put = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "content-type": contentType },
+        body: result.file,
+      });
+      if (!put.ok) throw new Error(`téléversement refusé (${put.status})`);
+
+      // 3. On enregistre l'URL publique R2 (jamais de base64 en base)
+      setPhotoUrl(publicUrl);
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error && err.message
+          ? `Échec de la photo : ${err.message}`
+          : "Échec du téléversement de la photo"
+      );
     } finally {
       setIsCompressing(false);
+      setIsUploading(false);
     }
   };
 
@@ -358,7 +389,7 @@ export function ProductModal({
           {/* Ligne 6 : Photo avec compression WebP client */}
           <div>
             <label className="block text-xs font-bold text-[#374151] mb-1">
-              Photo de la pièce (Compression WebP auto &lt; 80 Ko)
+              Photo de la pièce (WebP &lt; 80 Ko, stockée sur Cloudflare R2)
             </label>
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] cursor-pointer shadow-xs active:scale-98 transition-all">
@@ -376,6 +407,12 @@ export function ProductModal({
               {isCompressing && (
                 <span className="text-xs text-[#D97706] font-medium animate-pulse">
                   Compression en cours...
+                </span>
+              )}
+
+              {isUploading && (
+                <span className="text-xs text-[#D97706] font-medium animate-pulse">
+                  Téléversement...
                 </span>
               )}
 
@@ -413,7 +450,7 @@ export function ProductModal({
             </button>
             <button
               type="submit"
-              disabled={isSaving || isCompressing}
+              disabled={isSaving || isCompressing || isUploading}
               className="flex items-center gap-2 bg-[#F7162D] hover:bg-[#D90E23] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs transition-all active:scale-98 disabled:opacity-50"
             >
               <Check size={16} />
