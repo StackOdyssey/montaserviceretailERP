@@ -3,6 +3,7 @@
 import { and, desc, eq, gte, ilike, sql } from "drizzle-orm";
 import { db, expenses } from "@/db";
 import { assertAuthenticated } from "@/lib/action-guard";
+import { assertPeriodOpen } from "@/lib/accounting-period";
 import type { ExpenseCategory, ExpenseItem } from "@/lib/constants/expenses";
 
 export type { ExpenseCategory, ExpenseItem };
@@ -117,6 +118,7 @@ export async function recordExpense(data: {
 }): Promise<ExpenseItem> {
   await assertAuthenticated();
   const d = requireDb();
+  await assertPeriodOpen(data.expenseDate ? new Date(data.expenseDate) : new Date());
 
   if (!data.title.trim()) throw new Error("L'intitulé de la dépense est obligatoire");
   if (data.amountCents <= 0) throw new Error("Le montant de la dépense doit être supérieur à 0");

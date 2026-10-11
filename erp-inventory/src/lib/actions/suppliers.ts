@@ -11,6 +11,7 @@ import {
   suppliers,
 } from "@/db";
 import { assertAuthenticated } from "@/lib/action-guard";
+import { assertPeriodOpen } from "@/lib/accounting-period";
 import { nextDocumentNumber } from "@/lib/numbering";
 import { applyMovement, type CmupState } from "@/lib/stock";
 
@@ -259,6 +260,7 @@ export async function createSupplierReceipt(data: {
 }): Promise<SupplierReceiptItem> {
   await assertAuthenticated();
   const d = requireDb();
+  await assertPeriodOpen();
 
   if (!data.lines || data.lines.length === 0) throw new Error("Le Bon de Réception doit contenir au moins un article");
 
@@ -357,6 +359,7 @@ export async function recordSupplierPayment(data: {
 }): Promise<SupplierPaymentItem> {
   await assertAuthenticated();
   const d = requireDb();
+  await assertPeriodOpen();
 
   if (data.amountCents <= 0) throw new Error("Le montant du règlement doit être supérieur à 0");
 

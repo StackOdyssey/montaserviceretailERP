@@ -16,6 +16,7 @@ import {
 import { calculateDocumentTotals } from "@/lib/money";
 import { nextDocumentNumber } from "@/lib/numbering";
 import { assertAuthenticated } from "@/lib/action-guard";
+import { assertPeriodOpen } from "@/lib/accounting-period";
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { Resend } from "resend";
 
@@ -125,7 +126,7 @@ async function loadDocumentById(id: number): Promise<SalesDocumentItem | null> {
  * Récupère les documents de vente (base de données).
  */
 export async function getSalesDocuments(options?: {
-  docType?: "BL" | "FACTURE" | "AVOIR";
+  docType?: "BL" | "FACTURE" | "AVOIR" | "BC" | "DEVIS";
   search?: string;
   status?: string;
 }): Promise<SalesDocumentItem[]> {
@@ -194,6 +195,7 @@ export async function createSalesDocument(data: {
   if (!data.lines || data.lines.length === 0) {
     throw new Error("Le document doit contenir au moins un article");
   }
+  await assertPeriodOpen();
 
   const docType = data.docType ?? "BL";
   const year = new Date().getFullYear();
@@ -502,6 +504,7 @@ export async function convertBlToFacture(
   const d = requireDb();
 
   if (!blIds || blIds.length === 0) throw new Error("Sélectionnez au moins un BL à facturer");
+  await assertPeriodOpen();
 
   const bls = await d
     .select()
@@ -605,6 +608,7 @@ export async function createAvoir(data: {
   const source = (await d.select().from(salesDocuments).where(eq(salesDocuments.id, data.sourceDocumentId)).limit(1))[0];
   if (!source) throw new Error("Document d'origine introuvable");
   if (source.docType === "AVOIR") throw new Error("Impossible de créditer un avoir");
+  await assertPeriodOpen(source.docDate ?? new Date());
 
   const srcLines = await d.select().from(salesLines).where(eq(salesLines.documentId, source.id));
   if (srcLines.length === 0) throw new Error("Le document d'origine n'a aucune ligne");
@@ -744,6 +748,7 @@ export async function cancelDocument(documentId: number, reason?: string): Promi
   const doc = (await d.select().from(salesDocuments).where(eq(salesDocuments.id, documentId)).limit(1))[0];
   if (!doc) throw new Error("Document introuvable");
   if (doc.status === "ANNULE") throw new Error("Document déjà annulé");
+  await assertPeriodOpen(doc.docDate ?? new Date());
 
   await d.transaction(async (tx) => {
     const movs = await tx.select().from(stockMovements).where(eq(stockMovements.sourceDocumentId, documentId));

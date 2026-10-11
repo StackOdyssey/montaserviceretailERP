@@ -573,3 +573,20 @@ export const profiles = pgTable("profiles", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// ==========================================
+// 17. PÉRIODES COMPTABLES (VERROUILLAGE APRÈS RÉVISION)
+// ==========================================
+export const accountingPeriods = pgTable(
+  "accounting_periods",
+  {
+    id: serial("id").primaryKey(),
+    year: integer("year").notNull(),
+    month: integer("month").notNull(), // 1..12
+    status: text("status").notNull().default("OPEN"), // OPEN, LOCKED
+    lockedAt: timestamp("locked_at"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => [unique("accounting_periods_year_month_unique").on(table.year, table.month)]
+);
+

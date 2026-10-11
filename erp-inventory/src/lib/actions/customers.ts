@@ -3,6 +3,7 @@
 import { and, asc, eq, ilike, isNull, ne, or, sql } from "drizzle-orm";
 import { customerPayments, customers, db, salesDocuments } from "@/db";
 import { assertAuthenticated } from "@/lib/action-guard";
+import { assertPeriodOpen } from "@/lib/accounting-period";
 import { getSalesDocuments, type SalesDocumentItem } from "./sales";
 
 export interface CustomerItem {
@@ -219,6 +220,7 @@ export async function recordCustomerPayment(data: {
 }): Promise<CustomerPaymentItem> {
   await assertAuthenticated();
   const d = requireDb();
+  await assertPeriodOpen();
 
   if (data.amountCents <= 0) throw new Error("Le montant du règlement doit être supérieur à 0");
 
