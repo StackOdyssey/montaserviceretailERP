@@ -1,7 +1,18 @@
 "use server";
 
-import { db, suppliers, supplierReceipts, supplierReceiptLines, supplierPayments } from "@/db";
-import { recordStockMovement } from "./products";
+import { and, asc, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
+import {
+  db,
+  products,
+  stockMovements,
+  supplierPayments,
+  supplierReceiptLines,
+  supplierReceipts,
+  suppliers,
+} from "@/db";
+import { assertAuthenticated } from "@/lib/action-guard";
+import { nextDocumentNumber } from "@/lib/numbering";
+import { applyMovement, type CmupState } from "@/lib/stock";
 
 export interface SupplierItem {
   id: number;
@@ -22,7 +33,7 @@ export interface SupplierReceiptItem {
   id: number;
   supplierId: number;
   supplierName: string;
-  receiptNumber: string; // BR-2026-0042
+  receiptNumber: string;
   supplierInvoiceNumber: string | null;
   receiptDate: string;
   status: "RECU" | "EN_ATTENTE" | "ANNULE";
@@ -34,7 +45,7 @@ export interface SupplierReceiptItem {
   notes: string | null;
   lines: Array<{
     id: number;
-    productId: number;
+    productId: number | null;
     productName: string;
     sku: string;
     quantity: number;
@@ -60,314 +71,279 @@ export interface SupplierPaymentItem {
   createdAt: string;
 }
 
-// Numérotation séquentielle des bons de réception
-let receiptCounter = 42;
+function requireDb() {
+  if (!db) throw new Error("BASE_INDISPONIBLE: DATABASE_URL non configurée");
+  return db;
+}
 
-// Fournisseurs initiaux en mémoire (Bashan Chine, Grossistes Derb Omar)
-let memorySuppliers: SupplierItem[] = [
-  {
-    id: 1,
-    name: "Bashan Motorcycle Industrial Co., Ltd",
-    contactName: "Mr. Chen Wei (Export Dept)",
-    phone: "+86 23 6280 8888",
-    email: "export@bashanmotor.com",
-    city: "Chongqing, Chine",
-    ice: "FOREIGN-CN-99201",
-    notes: "Fabricant officiel pièces d'origine Bashan Quads & Motos. Expédition par conteneur Port Tanger Med.",
-    createdAt: new Date("2025-11-01").toISOString(),
-  },
-  {
-    id: 2,
-    name: "Grossiste Pièces Moto Derb Omar",
-    contactName: "Hajj Abdelkrim",
-    phone: "0522304050",
-    email: "abdelkrim.pieces@gmail.com",
-    city: "Casablanca",
-    ice: "001554289000072",
-    notes: "Fournisseur local pièces courantes (bougies, huiles, câbles, kit chaînes) - Paiement par chèque 60 jours.",
-    createdAt: new Date("2026-01-05").toISOString(),
-  },
-  {
-    id: 3,
-    name: "Maghreb Pneus & Accessoires SARL",
-    contactName: "Karim Bennani",
-    phone: "0522889911",
-    email: "commandes@maghrebpneus.ma",
-    city: "Casablanca",
-    ice: "001889214000033",
-    notes: "Fournisseur pneus quads 10 pouces et chambres à air.",
-    createdAt: new Date("2026-01-20").toISOString(),
-  },
-];
+type SupplierRow = typeof suppliers.$inferSelect;
+type ReceiptRow = typeof supplierReceipts.$inferSelect;
+type ReceiptLineRow = typeof supplierReceiptLines.$inferSelect;
+type PaymentRow = typeof supplierPayments.$inferSelect;
 
-// Réceptions en mémoire
-let memoryReceipts: SupplierReceiptItem[] = [
-  {
-    id: 1,
-    supplierId: 1,
-    supplierName: "Bashan Motorcycle Industrial Co., Ltd",
-    receiptNumber: "BR-2026-0040",
-    supplierInvoiceNumber: "INV-BSH-2026-881",
-    receiptDate: new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString(),
-    status: "RECU",
-    totalHtCents: 4500000,
-    tvaRate: 10,
-    tvaAmountCents: 450000,
-    totalTtcCents: 4950000,
-    paidAmountCents: 4950000,
-    notes: "Conteneur dédouané Port Tanger Med - Réception complète",
-    lines: [
-      {
-        id: 1,
-        productId: 1,
-        productName: "Plaquettes de frein avant Bashan 200 / 250cc",
-        sku: "BASH-014",
-        quantity: 100,
-        unitCostCents: 2500,
-        totalCostCents: 250000,
-      },
-      {
-        id: 2,
-        productId: 5,
-        productName: "Carburateur complet PZ30 starter manuel Bashan 250",
-        sku: "CARB-PZ30",
-        quantity: 50,
-        unitCostCents: 15000,
-        totalCostCents: 750000,
-      },
-    ],
-  },
-  {
-    id: 2,
-    supplierId: 2,
-    supplierName: "Grossiste Pièces Moto Derb Omar",
-    receiptNumber: "BR-2026-0041",
-    supplierInvoiceNumber: "FAC-DO-8892",
-    receiptDate: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString(),
-    status: "RECU",
-    totalHtCents: 1200000,
-    tvaRate: 10,
-    tvaAmountCents: 120000,
-    totalTtcCents: 1320000,
-    paidAmountCents: 500000,
-    notes: "Réassort kit chaînes et batteries",
-    lines: [
-      {
-        id: 3,
-        productId: 7,
-        productName: "Kit chaîne renforcé 428H - 136 maillons Gold",
-        sku: "KIT-CHAINE-428",
-        quantity: 20,
-        unitCostCents: 11000,
-        totalCostCents: 220000,
-      },
-      {
-        id: 4,
-        productId: 8,
-        productName: "Batterie Gel 12V 9Ah YTX9-BS",
-        sku: "BAT-12V-9AH",
-        quantity: 15,
-        unitCostCents: 18000,
-        totalCostCents: 270000,
-      },
-    ],
-  },
-];
+function mapSupplier(r: SupplierRow): SupplierItem {
+  return {
+    id: r.id,
+    name: r.name,
+    contactName: r.contactName,
+    phone: r.phone,
+    email: r.email,
+    city: r.city,
+    ice: r.ice,
+    notes: r.notes,
+    createdAt: (r.createdAt ?? new Date()).toISOString(),
+  };
+}
 
-// Règlements fournisseurs en mémoire
-let memorySupplierPayments: SupplierPaymentItem[] = [
-  {
-    id: 1,
-    supplierId: 1,
-    supplierName: "Bashan Motorcycle Industrial Co., Ltd",
-    receiptId: 1,
-    receiptNumber: "BR-2026-0040",
-    amountCents: 4950000,
-    paymentMethod: "VIREMENT",
-    paymentDate: new Date(Date.now() - 12 * 24 * 3600 * 1000).toISOString(),
-    referenceNumber: "SWIFT-BMCE-9921",
-    dueDate: null,
-    bankName: "Bank of Africa (BMCE)",
-    status: "DEBITE",
-    notes: "Virement international Swift",
-    createdAt: new Date(Date.now() - 12 * 24 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: 2,
-    supplierId: 2,
-    supplierName: "Grossiste Pièces Moto Derb Omar",
-    receiptId: 2,
-    receiptNumber: "BR-2026-0041",
-    amountCents: 500000,
-    paymentMethod: "CHEQUE",
-    paymentDate: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
-    referenceNumber: "CHQ-BM-449102",
-    dueDate: new Date(Date.now() + 25 * 24 * 3600 * 1000).toISOString(),
-    bankName: "Attijariwafa Bank",
-    status: "EN_ATTENTE",
-    notes: "Acompte chèque fin de mois",
-    createdAt: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
-  },
-];
+function mapReceipt(r: ReceiptRow, supplierName: string, lines: ReceiptLineRow[]): SupplierReceiptItem {
+  return {
+    id: r.id,
+    supplierId: r.supplierId,
+    supplierName,
+    receiptNumber: r.receiptNumber,
+    supplierInvoiceNumber: r.supplierInvoiceNumber,
+    receiptDate: (r.receiptDate ?? r.createdAt ?? new Date()).toISOString(),
+    status: r.status as SupplierReceiptItem["status"],
+    totalHtCents: r.totalHtCents,
+    tvaRate: r.tvaRate,
+    tvaAmountCents: r.tvaAmountCents,
+    totalTtcCents: r.totalTtcCents,
+    paidAmountCents: r.paidAmountCents,
+    notes: r.notes,
+    lines: lines.map((l) => ({
+      id: l.id,
+      productId: l.productId,
+      productName: l.productName,
+      sku: l.sku,
+      quantity: l.quantity,
+      unitCostCents: l.unitCostCents,
+      totalCostCents: l.totalCostCents,
+    })),
+  };
+}
 
-/**
- * Récupère tous les fournisseurs avec leurs dettes et totaux
- */
-export async function getSuppliers(searchQuery?: string): Promise<SupplierItem[]> {
-  const search = searchQuery?.toLowerCase().trim() || "";
-
-  return memorySuppliers
-    .filter((s) => {
-      if (!search) return true;
-      return (
-        s.name.toLowerCase().includes(search) ||
-        (s.contactName && s.contactName.toLowerCase().includes(search)) ||
-        (s.phone && s.phone.includes(search)) ||
-        (s.city && s.city.toLowerCase().includes(search))
-      );
-    })
-    .map((supplier) => {
-      const receipts = memoryReceipts.filter(
-        (r) => r.supplierId === supplier.id && r.status !== "ANNULE"
-      );
-      const totalPurchases = receipts.reduce(
-        (sum, r) => sum + r.totalTtcCents,
-        0
-      );
-
-      const payments = memorySupplierPayments.filter(
-        (p) => p.supplierId === supplier.id && p.status !== "REJETE"
-      );
-      const totalPaid = payments.reduce((sum, p) => sum + p.amountCents, 0);
-
-      return {
-        ...supplier,
-        totalPurchasesTtcCents: totalPurchases,
-        totalPaidCents: totalPaid,
-        balanceDueCents: totalPurchases - totalPaid,
-      };
-    });
+function mapPayment(p: PaymentRow, supplierName: string, receiptNumber: string | null = null): SupplierPaymentItem {
+  return {
+    id: p.id,
+    supplierId: p.supplierId,
+    supplierName,
+    receiptId: p.receiptId,
+    receiptNumber,
+    amountCents: p.amountCents,
+    paymentMethod: p.paymentMethod as SupplierPaymentItem["paymentMethod"],
+    paymentDate: (p.paymentDate ?? p.createdAt ?? new Date()).toISOString(),
+    referenceNumber: p.referenceNumber,
+    dueDate: p.dueDate ? p.dueDate.toISOString() : null,
+    bankName: p.bankName,
+    status: p.status as SupplierPaymentItem["status"],
+    notes: p.notes,
+    createdAt: (p.createdAt ?? new Date()).toISOString(),
+  };
 }
 
 /**
- * Récupère l'historique complet d'un fournisseur
+ * Fournisseurs avec dettes calculées (réceptions - règlements).
+ */
+export async function getSuppliers(searchQuery?: string): Promise<SupplierItem[]> {
+  await assertAuthenticated();
+  const d = requireDb();
+
+  const search = searchQuery?.trim().toLowerCase() || "";
+  const conds = search
+    ? [
+        or(
+          ilike(suppliers.name, `%${search}%`),
+          ilike(suppliers.contactName, `%${search}%`),
+          ilike(suppliers.phone, `%${search}%`),
+          ilike(suppliers.city, `%${search}%`)
+        )!,
+      ]
+    : [];
+
+  const rows = await d
+    .select()
+    .from(suppliers)
+    .where(conds.length ? and(...conds) : undefined)
+    .orderBy(asc(suppliers.name))
+    .limit(500);
+
+  const purchases = await d
+    .select({
+      supplierId: supplierReceipts.supplierId,
+      total: sql<string>`coalesce(sum(${supplierReceipts.totalTtcCents}),0)::bigint`,
+    })
+    .from(supplierReceipts)
+    .where(ne(supplierReceipts.status, "ANNULE"))
+    .groupBy(supplierReceipts.supplierId);
+
+  const paid = await d
+    .select({
+      supplierId: supplierPayments.supplierId,
+      total: sql<string>`coalesce(sum(${supplierPayments.amountCents}),0)::bigint`,
+    })
+    .from(supplierPayments)
+    .where(ne(supplierPayments.status, "REJETE"))
+    .groupBy(supplierPayments.supplierId);
+
+  const purchasesMap = new Map(purchases.map((r) => [r.supplierId, Number(r.total)]));
+  const paidMap = new Map(paid.map((r) => [r.supplierId, Number(r.total)]));
+
+  return rows.map((r) => {
+    const totalPurchasesTtcCents = purchasesMap.get(r.id) ?? 0;
+    const totalPaidCents = paidMap.get(r.id) ?? 0;
+    return {
+      ...mapSupplier(r),
+      totalPurchasesTtcCents,
+      totalPaidCents,
+      balanceDueCents: totalPurchasesTtcCents - totalPaidCents,
+    };
+  });
+}
+
+/**
+ * Historique complet d'un fournisseur (réceptions + règlements).
  */
 export async function getSupplierDetail(supplierId: number) {
-  const supplier = memorySuppliers.find((s) => s.id === supplierId);
+  await assertAuthenticated();
+  const d = requireDb();
+
+  const supplier = (await d.select().from(suppliers).where(eq(suppliers.id, supplierId)).limit(1))[0];
   if (!supplier) return null;
 
-  const receipts = memoryReceipts
-    .filter((r) => r.supplierId === supplierId)
-    .sort(
-      (a, b) =>
-        new Date(b.receiptDate).getTime() - new Date(a.receiptDate).getTime()
-    );
+  const receiptRows = await d
+    .select()
+    .from(supplierReceipts)
+    .where(eq(supplierReceipts.supplierId, supplierId))
+    .orderBy(desc(supplierReceipts.id));
+  const ids = receiptRows.map((r) => r.id);
+  const lineRows = ids.length
+    ? await d.select().from(supplierReceiptLines).where(inArray(supplierReceiptLines.receiptId, ids))
+    : [];
+  const linesByReceipt = new Map<number, ReceiptLineRow[]>();
+  for (const l of lineRows) {
+    const arr = linesByReceipt.get(l.receiptId) ?? [];
+    arr.push(l);
+    linesByReceipt.set(l.receiptId, arr);
+  }
+  const receipts = receiptRows.map((r) => mapReceipt(r, supplier.name, linesByReceipt.get(r.id) ?? []));
 
-  const payments = memorySupplierPayments
-    .filter((p) => p.supplierId === supplierId)
-    .sort(
-      (a, b) =>
-        new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
-    );
+  const paymentRows = await d
+    .select()
+    .from(supplierPayments)
+    .where(eq(supplierPayments.supplierId, supplierId))
+    .orderBy(desc(supplierPayments.paymentDate));
+  const receiptNumbers = new Map(receiptRows.map((r) => [r.id, r.receiptNumber]));
+  const payments = paymentRows.map((p) => mapPayment(p, supplier.name, p.receiptId ? receiptNumbers.get(p.receiptId) ?? null : null));
 
-  const totalPurchases = receipts
-    .filter((r) => r.status !== "ANNULE")
-    .reduce((sum, r) => sum + r.totalTtcCents, 0);
-
-  const totalPaid = payments
-    .filter((p) => p.status !== "REJETE")
-    .reduce((sum, p) => sum + p.amountCents, 0);
+  const totalPurchasesTtcCents = receipts.filter((r) => r.status !== "ANNULE").reduce((s, r) => s + r.totalTtcCents, 0);
+  const totalPaidCents = payments.filter((p) => p.status !== "REJETE").reduce((s, p) => s + p.amountCents, 0);
 
   return {
-    supplier,
-    totalPurchasesTtcCents: totalPurchases,
-    totalPaidCents: totalPaid,
-    balanceDueCents: totalPurchases - totalPaid,
+    supplier: mapSupplier(supplier),
+    totalPurchasesTtcCents,
+    totalPaidCents,
+    balanceDueCents: totalPurchasesTtcCents - totalPaidCents,
     receipts,
     payments,
   };
 }
 
 /**
- * Enregistre un Bon de Réception (BR) et alimente le stock en temps réel
+ * Enregistre un Bon de Réception (BR) : numéro gapless, lignes, entrée de stock (CMUP), transaction.
  */
 export async function createSupplierReceipt(data: {
   supplierId: number;
   supplierInvoiceNumber?: string;
-  lines: Array<{
-    productId: number;
-    productName: string;
-    sku: string;
-    quantity: number;
-    unitCostCents: number;
-  }>;
+  lines: Array<{ productId: number; productName: string; sku: string; quantity: number; unitCostCents: number }>;
   notes?: string;
-}) {
-  if (!data.lines || data.lines.length === 0) {
-    throw new Error("Le Bon de Réception doit contenir au moins un article");
-  }
+}): Promise<SupplierReceiptItem> {
+  await assertAuthenticated();
+  const d = requireDb();
 
-  const supplier = memorySuppliers.find((s) => s.id === data.supplierId);
-  if (!supplier) {
-    throw new Error("Fournisseur introuvable");
-  }
+  if (!data.lines || data.lines.length === 0) throw new Error("Le Bon de Réception doit contenir au moins un article");
 
-  receiptCounter += 1;
-  const receiptNumber = `BR-2026-${receiptCounter.toString().padStart(4, "0")}`;
+  const supplier = (await d.select().from(suppliers).where(eq(suppliers.id, data.supplierId)).limit(1))[0];
+  if (!supplier) throw new Error("Fournisseur introuvable");
 
-  let totalHtCents = 0;
-  const processedLines = data.lines.map((line, idx) => {
-    const totalLineCost = line.unitCostCents * line.quantity;
-    totalHtCents += totalLineCost;
-    return {
-      id: Date.now() + idx,
-      productId: line.productId,
-      productName: line.productName,
-      sku: line.sku,
-      quantity: line.quantity,
-      unitCostCents: line.unitCostCents,
-      totalCostCents: totalLineCost,
-    };
+  const tvaRate = 20;
+  let receiptId = 0;
+
+  await d.transaction(async (tx) => {
+    const totalHtCents = data.lines.reduce((s, l) => s + l.unitCostCents * l.quantity, 0);
+    const tvaAmountCents = Math.round((totalHtCents * tvaRate) / 100);
+    const totalTtcCents = totalHtCents + tvaAmountCents;
+
+    const { docNumber } = await nextDocumentNumber(tx, {
+      docType: "BR",
+      year: new Date().getFullYear(),
+      businessLineId: null,
+    });
+
+    receiptId = (
+      await tx
+        .insert(supplierReceipts)
+        .values({
+          supplierId: data.supplierId,
+          receiptNumber: docNumber,
+          supplierInvoiceNumber: data.supplierInvoiceNumber ?? null,
+          receiptDate: new Date(),
+          status: "RECU",
+          totalHtCents,
+          tvaRate,
+          tvaAmountCents,
+          totalTtcCents,
+          paidAmountCents: 0,
+          notes: data.notes ?? null,
+        })
+        .returning({ id: supplierReceipts.id })
+    )[0].id;
+
+    await tx.insert(supplierReceiptLines).values(
+      data.lines.map((l) => ({
+        receiptId,
+        productId: l.productId,
+        productName: l.productName,
+        sku: l.sku,
+        quantity: l.quantity,
+        unitCostCents: l.unitCostCents,
+        totalCostCents: l.unitCostCents * l.quantity,
+      }))
+    );
+
+    for (const l of data.lines) {
+      const p = (await tx.select().from(products).where(eq(products.id, l.productId)).limit(1))[0];
+      if (!p) throw new Error(`PIECE_INTROUVABLE: ${l.sku}`);
+      const state: CmupState = { quantity: p.currentStock, cmupCents: p.cmupCents };
+      const { state: next } = applyMovement(state, l.quantity, l.unitCostCents);
+      await tx.insert(stockMovements).values({
+        productId: p.id,
+        businessLineId: p.businessLineId,
+        movementType: "ACHAT_RECEPTION",
+        quantity: l.quantity,
+        unitCostCents: l.unitCostCents,
+        sourceDocumentId: receiptId,
+        sourceDocumentType: "BR",
+        reason: `Réception ${docNumber} (${supplier.name})`,
+      });
+      await tx
+        .update(products)
+        .set({
+          currentStock: next.quantity,
+          cmupCents: next.cmupCents,
+          lastPurchasePriceCents: l.unitCostCents,
+          updatedAt: new Date(),
+        })
+        .where(eq(products.id, p.id));
+    }
   });
 
-  const tvaRate = 10;
-  const tvaAmountCents = Math.round((totalHtCents * tvaRate) / 100);
-  const totalTtcCents = totalHtCents + tvaAmountCents;
-
-  // Alimentation automatique du stock via le grand livre append-only
-  for (const line of data.lines) {
-    await recordStockMovement({
-      productId: line.productId,
-      movementType: "ACHAT_RECEPTION",
-      quantity: line.quantity, // Entrée positive en stock
-      unitCostCents: line.unitCostCents,
-      reason: `Réception arrivage ${receiptNumber} (${supplier.name})`,
-    });
-  }
-
-  const newReceipt: SupplierReceiptItem = {
-    id: Date.now(),
-    supplierId: data.supplierId,
-    supplierName: supplier.name,
-    receiptNumber,
-    supplierInvoiceNumber: data.supplierInvoiceNumber || null,
-    receiptDate: new Date().toISOString(),
-    status: "RECU",
-    totalHtCents,
-    tvaRate,
-    tvaAmountCents,
-    totalTtcCents,
-    paidAmountCents: 0,
-    notes: data.notes || null,
-    lines: processedLines,
-  };
-
-  memoryReceipts.unshift(newReceipt);
-  return newReceipt;
+  const row = (await d.select().from(supplierReceipts).where(eq(supplierReceipts.id, receiptId)).limit(1))[0];
+  const lines = await d.select().from(supplierReceiptLines).where(eq(supplierReceiptLines.receiptId, receiptId));
+  return mapReceipt(row, supplier.name, lines);
 }
 
 /**
- * Enregistre un règlement émis à un fournisseur
+ * Enregistre un règlement émis à un fournisseur (et met à jour la réception ciblée).
  */
 export async function recordSupplierPayment(data: {
   supplierId: number;
@@ -378,49 +354,52 @@ export async function recordSupplierPayment(data: {
   dueDate?: string;
   bankName?: string;
   notes?: string;
-}) {
-  if (data.amountCents <= 0) {
-    throw new Error("Le montant du règlement doit être supérieur à 0");
-  }
+}): Promise<SupplierPaymentItem> {
+  await assertAuthenticated();
+  const d = requireDb();
 
-  const supplier = memorySuppliers.find((s) => s.id === data.supplierId);
+  if (data.amountCents <= 0) throw new Error("Le montant du règlement doit être supérieur à 0");
+
+  const supplier = (await d.select().from(suppliers).where(eq(suppliers.id, data.supplierId)).limit(1))[0];
   if (!supplier) throw new Error("Fournisseur introuvable");
 
-  let receiptNum: string | null = null;
-  if (data.receiptId) {
-    const rc = memoryReceipts.find((r) => r.id === data.receiptId);
-    if (rc) {
-      receiptNum = rc.receiptNumber;
-      rc.paidAmountCents += data.amountCents;
-    }
-  }
+  let receiptNumber: string | null = null;
+  const paymentId = await d.transaction(async (tx) => {
+      if (data.receiptId) {
+        const rc = (await tx.select().from(supplierReceipts).where(eq(supplierReceipts.id, data.receiptId)).limit(1))[0];
+        if (rc) {
+          receiptNumber = rc.receiptNumber;
+          await tx
+            .update(supplierReceipts)
+            .set({ paidAmountCents: rc.paidAmountCents + data.amountCents })
+            .where(eq(supplierReceipts.id, rc.id));
+        }
+      }
+      return (
+        await tx
+          .insert(supplierPayments)
+          .values({
+            supplierId: data.supplierId,
+            receiptId: data.receiptId ?? null,
+            amountCents: data.amountCents,
+            paymentMethod: data.paymentMethod,
+            paymentDate: new Date(),
+            referenceNumber: data.referenceNumber ?? null,
+            dueDate: data.dueDate ? new Date(data.dueDate) : null,
+            bankName: data.bankName ?? null,
+            status: data.paymentMethod === "ESPECES" || data.paymentMethod === "VIREMENT" ? "DEBITE" : "EN_ATTENTE",
+            notes: data.notes ?? null,
+          })
+          .returning({ id: supplierPayments.id })
+      )[0].id;
+    });
 
-  const newPayment: SupplierPaymentItem = {
-    id: Date.now(),
-    supplierId: data.supplierId,
-    supplierName: supplier.name,
-    receiptId: data.receiptId || null,
-    receiptNumber: receiptNum,
-    amountCents: data.amountCents,
-    paymentMethod: data.paymentMethod,
-    paymentDate: new Date().toISOString(),
-    referenceNumber: data.referenceNumber || null,
-    dueDate: data.dueDate || null,
-    bankName: data.bankName || null,
-    status:
-      data.paymentMethod === "ESPECES" || data.paymentMethod === "VIREMENT"
-        ? "DEBITE"
-        : "EN_ATTENTE",
-    notes: data.notes || null,
-    createdAt: new Date().toISOString(),
-  };
-
-  memorySupplierPayments.unshift(newPayment);
-  return newPayment;
+  const row = (await d.select().from(supplierPayments).where(eq(supplierPayments.id, paymentId)).limit(1))[0];
+  return mapPayment(row, supplier.name, receiptNumber);
 }
 
 /**
- * Enregistre ou met à jour un fournisseur
+ * Crée ou met à jour un fournisseur.
  */
 export async function saveSupplier(data: {
   id?: number;
@@ -432,25 +411,12 @@ export async function saveSupplier(data: {
   ice?: string;
   notes?: string;
 }): Promise<SupplierItem> {
-  if (!data.name.trim()) {
-    throw new Error("Le nom du fournisseur est obligatoire");
-  }
+  await assertAuthenticated();
+  const d = requireDb();
 
-  if (data.id) {
-    const existing = memorySuppliers.find((s) => s.id === data.id);
-    if (!existing) throw new Error("Fournisseur introuvable");
-    existing.name = data.name.trim();
-    existing.contactName = data.contactName || null;
-    existing.phone = data.phone || null;
-    existing.email = data.email || null;
-    existing.city = data.city || null;
-    existing.ice = data.ice || null;
-    existing.notes = data.notes || null;
-    return existing;
-  }
+  if (!data.name.trim()) throw new Error("Le nom du fournisseur est obligatoire");
 
-  const newSupplier: SupplierItem = {
-    id: Date.now(),
+  const values = {
     name: data.name.trim(),
     contactName: data.contactName || null,
     phone: data.phone || null,
@@ -458,9 +424,13 @@ export async function saveSupplier(data: {
     city: data.city || null,
     ice: data.ice || null,
     notes: data.notes || null,
-    createdAt: new Date().toISOString(),
+    updatedAt: new Date(),
   };
 
-  memorySuppliers.push(newSupplier);
-  return newSupplier;
+  const saved = data.id
+    ? (await d.update(suppliers).set(values).where(eq(suppliers.id, data.id)).returning())[0]
+    : (await d.insert(suppliers).values(values).returning())[0];
+
+  if (!saved) throw new Error("Fournisseur introuvable");
+  return mapSupplier(saved);
 }
