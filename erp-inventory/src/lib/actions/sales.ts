@@ -1,9 +1,19 @@
 "use server";
 
-import { db, salesDocuments, salesLines, stockMovements, products, customers } from "@/db";
-import { eq, desc } from "drizzle-orm";
-import { calculateDocumentTotals, DocumentTotals, toCentimes } from "@/lib/money";
-import { recordStockMovement } from "./products";
+import { and, desc, eq, inArray, ilike, isNull, or } from "drizzle-orm";
+import {
+  businessLines,
+  db,
+  products,
+  salesDocuments,
+  salesLines,
+  settings,
+  stockMovements,
+} from "@/db";
+import { calculateDocumentTotals } from "@/lib/money";
+import { nextDocumentNumber } from "@/lib/numbering";
+import { assertAuthenticated } from "@/lib/action-guard";
+import { applyMovement, type CmupState } from "@/lib/stock";
 import { Resend } from "resend";
 
 export interface SalesLineInput {
@@ -39,7 +49,7 @@ export interface SalesDocumentItem {
   notes?: string | null;
   lines: Array<{
     id: number;
-    productId: number;
+    productId: number | null;
     productName: string;
     sku: string;
     oemCode?: string | null;
@@ -49,129 +59,110 @@ export interface SalesDocumentItem {
   }>;
 }
 
-// Compteur séquentiel de documents en mémoire pour 2026
-let documentCounter = 130;
+function requireDb() {
+  if (!db) throw new Error("BASE_INDISPONIBLE: DATABASE_URL non configurée");
+  return db;
+}
 
-// Stockage en mémoire pour fonctionnement immédiat en dev
-let memorySalesDocuments: SalesDocumentItem[] = [
-  {
-    id: 1,
-    docType: "BL",
-    docNumber: "BL-2026-0128",
-    customerId: 1,
-    customerName: "Garage Moto Hassan",
-    customerPhone: "0661234567",
-    customerEmail: "contact@garagemotohassan.ma",
-    customerCity: "Ain Sebaa, Casablanca",
-    customerIce: "001892837000045",
-    docDate: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-    status: "VALIDE",
-    totalBrutHtCents: 75000,
-    discountPercent: 5,
-    discountAmountCents: 3750,
-    totalNetHtCents: 71250,
-    tvaRate: 10,
-    tvaAmountCents: 7125,
-    totalTtcCents: 78375,
-    paidAmountCents: 0,
-    paymentMethod: "A_CREDIT",
-    notes: "Règlement prévu fin de semaine",
-    lines: [
-      {
-        id: 101,
-        productId: 1,
-        productName: "Plaquettes de frein avant Bashan 200 / 250cc",
-        sku: "BASH-014",
-        oemCode: "16001-BSH-001",
-        unitPriceHTCents: 4500,
-        quantity: 5,
-        totalHtCents: 22500,
-      },
-      {
-        id: 102,
-        productId: 7,
-        productName: "Kit chaîne renforcé 428H - 136 maillons Gold",
-        sku: "KIT-CHAINE-428",
-        oemCode: "428H-136L-GOLD",
-        unitPriceHTCents: 17500,
-        quantity: 3,
-        totalHtCents: 52500,
-      },
-    ],
-  },
-  {
-    id: 2,
-    docType: "BL",
-    docNumber: "BL-2026-0127",
-    customerId: 2,
-    customerName: "Atelier Pro Biker",
-    customerPhone: "0662889900",
-    customerEmail: "probiker.casa@gmail.com",
-    customerCity: "Derb Ghallef, Casablanca",
-    customerIce: "002441928000088",
-    docDate: new Date(Date.now() - 70 * 60 * 1000).toISOString(),
-    status: "PAYE",
-    totalBrutHtCents: 120000,
-    discountPercent: 0,
-    discountAmountCents: 0,
-    totalNetHtCents: 120000,
-    tvaRate: 10,
-    tvaAmountCents: 12000,
-    totalTtcCents: 132000,
-    paidAmountCents: 132000,
-    paymentMethod: "ESPECES",
-    notes: "Payé en espèces au comptoir",
-    lines: [
-      {
-        id: 103,
-        productId: 5,
-        productName: "Carburateur complet PZ30 starter manuel Bashan 250",
-        sku: "CARB-PZ30",
-        oemCode: "PZ30-BASH",
-        unitPriceHTCents: 24000,
-        quantity: 5,
-        totalHtCents: 120000,
-      },
-    ],
-  },
-];
+type DocRow = typeof salesDocuments.$inferSelect;
+type LineRow = typeof salesLines.$inferSelect;
+
+function mapDoc(doc: DocRow, lines: LineRow[]): SalesDocumentItem {
+  return {
+    id: doc.id,
+    docType: doc.docType as SalesDocumentItem["docType"],
+    docNumber: doc.docNumber,
+    customerId: doc.customerId,
+    customerName: doc.customerName,
+    customerPhone: doc.customerPhone,
+    customerEmail: doc.customerEmail,
+    customerCity: doc.customerCity,
+    customerIce: doc.customerIce,
+    docDate: (doc.docDate ?? doc.createdAt ?? new Date()).toISOString(),
+    status: doc.status as SalesDocumentItem["status"],
+    totalBrutHtCents: doc.totalBrutHtCents,
+    discountPercent: doc.discountPercent,
+    discountAmountCents: doc.discountAmountCents,
+    totalNetHtCents: doc.totalNetHtCents,
+    tvaRate: doc.tvaRate,
+    tvaAmountCents: doc.tvaAmountCents,
+    totalTtcCents: doc.totalTtcCents,
+    paidAmountCents: doc.paidAmountCents,
+    paymentMethod: doc.paymentMethod,
+    notes: doc.notes,
+    lines: lines.map((l) => ({
+      id: l.id,
+      productId: l.productId,
+      productName: l.productNameSnapshot,
+      sku: l.skuSnapshot,
+      oemCode: l.oemCodeSnapshot,
+      unitPriceHTCents: l.unitPriceHtCents,
+      quantity: l.quantity,
+      totalHtCents: l.totalHtCents,
+    })),
+  };
+}
+
+/** Charge un document + ses lignes (interne). */
+async function loadDocumentById(id: number): Promise<SalesDocumentItem | null> {
+  const d = requireDb();
+  const doc = (await d.select().from(salesDocuments).where(eq(salesDocuments.id, id)).limit(1))[0];
+  if (!doc) return null;
+  const lines = await d.select().from(salesLines).where(eq(salesLines.documentId, id));
+  return mapDoc(doc, lines);
+}
 
 /**
- * Récupère tous les documents de vente
+ * Récupère les documents de vente (base de données).
  */
 export async function getSalesDocuments(options?: {
   docType?: "BL" | "FACTURE" | "AVOIR";
   search?: string;
   status?: string;
 }): Promise<SalesDocumentItem[]> {
-  const search = options?.search?.toLowerCase().trim() || "";
-  const docType = options?.docType;
-  const status = options?.status;
+  await assertAuthenticated();
+  const d = requireDb();
 
-  return memorySalesDocuments.filter((doc) => {
-    if (docType && doc.docType !== docType) return false;
-    if (status && status !== "ALL" && doc.status !== status) return false;
+  const conds = [isNull(salesDocuments.deletedAt)];
+  if (options?.docType) conds.push(eq(salesDocuments.docType, options.docType));
+  if (options?.status && options.status !== "ALL") conds.push(eq(salesDocuments.status, options.status));
+  const search = options?.search?.trim();
+  if (search) {
+    const like = `%${search}%`;
+    conds.push(or(ilike(salesDocuments.docNumber, like), ilike(salesDocuments.customerName, like))!);
+  }
 
-    if (search) {
-      const matchNum = doc.docNumber.toLowerCase().includes(search);
-      const matchClient = doc.customerName.toLowerCase().includes(search);
-      if (!matchNum && !matchClient) return false;
-    }
+  const docs = await d
+    .select()
+    .from(salesDocuments)
+    .where(and(...conds))
+    .orderBy(desc(salesDocuments.id))
+    .limit(200);
+  if (docs.length === 0) return [];
 
-    return true;
-  });
+  const ids = docs.map((x) => x.id);
+  const lines = await d.select().from(salesLines).where(inArray(salesLines.documentId, ids));
+  const byDoc = new Map<number, LineRow[]>();
+  for (const l of lines) {
+    const arr = byDoc.get(l.documentId) ?? [];
+    arr.push(l);
+    byDoc.set(l.documentId, arr);
+  }
+
+  return docs.map((doc) => mapDoc(doc, byDoc.get(doc.id) ?? []));
 }
 
 /**
- * Récupère un document par son identifiant ou numéro
+ * Récupère un document par identifiant.
  */
 export async function getSalesDocumentById(id: number): Promise<SalesDocumentItem | null> {
-  const found = memorySalesDocuments.find((d) => d.id === id);
-  return found || null;
+  await assertAuthenticated();
+  return loadDocumentById(id);
 }
 
 /**
- * Crée et valide un Bon de Livraison (BL) au comptoir
+ * Crée et valide un document commercial (BL/FACTURE/AVOIR) : numéro gapless,
+ * lignes avec snapshot COGS (CMUP), sortie de stock via le grand livre.
  */
 export async function createSalesDocument(data: {
   docType?: "BL" | "FACTURE" | "AVOIR";
@@ -182,164 +173,201 @@ export async function createSalesDocument(data: {
   customerCity?: string;
   customerIce?: string;
   lines: SalesLineInput[];
-  discountPercent: number; // Remise personnalisée en %
+  discountPercent: number;
   paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT" | "A_CREDIT";
   paidAmountCents?: number;
   notes?: string;
+  businessLineCode?: string;
 }): Promise<SalesDocumentItem> {
+  await assertAuthenticated();
+  const d = requireDb();
+
   if (!data.lines || data.lines.length === 0) {
-    throw new Error("Le Bon de Livraison doit contenir au moins un article");
+    throw new Error("Le document doit contenir au moins un article");
   }
 
-  // 1. Calcul strict des montants et de la remise
+  const docType = data.docType ?? "BL";
+  const year = new Date().getFullYear();
+  const tvaRate = 20; // TVA 20% (CGI pièces détachées)
+
+  // Ligne métier (défaut PIECES)
+  const line = (
+    await d
+      .select({ id: businessLines.id })
+      .from(businessLines)
+      .where(eq(businessLines.code, data.businessLineCode || "PIECES"))
+      .limit(1)
+  )[0];
+  if (!line) throw new Error("LIGNE_METIER_INTROUVABLE");
+
   const totals = calculateDocumentTotals(
-    data.lines.map((l) => ({
-      unitPriceHT: l.unitPriceHTCents,
-      quantity: l.quantity,
-    })),
+    data.lines.map((l) => ({ unitPriceHT: l.unitPriceHTCents, quantity: l.quantity })),
     data.discountPercent,
-    10 // TVA 10% SARL
+    tvaRate
   );
 
-  // 2. Génération séquentielle sans rupture du numéro de document
-  documentCounter += 1;
-  const prefix = data.docType || "BL";
-  const docNumber = `${prefix}-2026-${documentCounter.toString().padStart(4, "0")}`;
+  const negRow = (await d.select({ neg: settings.negativeStockAllowed }).from(settings).limit(1))[0];
+  const negativeAllowed = negRow?.neg ?? false;
 
-  // 3. Décrémentation du stock via le grand livre append-only
-  for (const line of data.lines) {
-    await recordStockMovement({
-      productId: line.productId,
-      movementType: "VENTE_BL",
-      quantity: -line.quantity, // Décrémentation
-      reason: `Vente au comptoir selon ${docNumber} pour ${data.customerName}`,
+  // 1. Calcul des effets de stock (COGS = CMUP courant) AVANT toute écriture
+  const effects: Array<{
+    productId: number;
+    businessLineId: number;
+    quantity: number;
+    unitCostCents: number;
+    nextStock: number;
+    nextCmup: number;
+  }> = [];
+  for (const l of data.lines) {
+    const p = (await d.select().from(products).where(eq(products.id, l.productId)).limit(1))[0];
+    if (!p) throw new Error(`PIECE_INTROUVABLE: ${l.sku}`);
+    const state: CmupState = { quantity: p.currentStock, cmupCents: p.cmupCents };
+    const { state: next } = applyMovement(state, -l.quantity, 0);
+    if (next.quantity < 0 && !negativeAllowed) throw new Error(`STOCK_NEGATIF_INTERDIT: ${p.sku}`);
+    effects.push({
+      productId: p.id,
+      businessLineId: p.businessLineId,
+      quantity: -l.quantity,
+      unitCostCents: p.cmupCents,
+      nextStock: next.quantity,
+      nextCmup: next.cmupCents,
     });
   }
 
-  // 4. Enregistrement du document commercial
-  const isFullyPaid =
-    data.paymentMethod !== "A_CREDIT" &&
-    (data.paidAmountCents ?? totals.totalTTC) >= totals.totalTTC;
+  // 2. Numéro gapless
+  const { docNumber, sequenceNo } = await nextDocumentNumber({
+    docType,
+    year,
+    businessLineId: line.id,
+  });
 
-  const newDoc: SalesDocumentItem = {
-    id: Date.now(),
-    docType: data.docType || "BL",
-    docNumber,
-    customerId: data.customerId || null,
-    customerName: data.customerName || "Client Comptoir Particulier",
-    customerPhone: data.customerPhone || null,
-    customerEmail: data.customerEmail || null,
-    customerCity: data.customerCity || "Casablanca",
-    customerIce: data.customerIce || null,
-    docDate: new Date().toISOString(),
-    status: isFullyPaid ? "PAYE" : "VALIDE",
-    totalBrutHtCents: totals.totalBrutHT,
-    discountPercent: totals.discountPercent,
-    discountAmountCents: totals.discountAmount,
-    totalNetHtCents: totals.totalNetHT,
-    tvaRate: totals.tvaRate,
-    tvaAmountCents: totals.tvaAmount,
-    totalTtcCents: totals.totalTTC,
-    paidAmountCents: isFullyPaid
-      ? totals.totalTTC
-      : data.paidAmountCents || 0,
-    paymentMethod: data.paymentMethod,
-    notes: data.notes || null,
-    lines: data.lines.map((l, idx) => ({
-      id: Date.now() + idx,
+  const isFullyPaid =
+    data.paymentMethod !== "A_CREDIT" && (data.paidAmountCents ?? totals.totalTTC) >= totals.totalTTC;
+
+  // 3. En-tête
+  const docId = (
+    await d
+      .insert(salesDocuments)
+      .values({
+        docType,
+        docNumber,
+        businessLineId: line.id,
+        docYear: year,
+        sequenceNo,
+        customerId: data.customerId ?? null,
+        customerName: data.customerName || "Client Comptoir Particulier",
+        customerPhone: data.customerPhone ?? null,
+        customerEmail: data.customerEmail ?? null,
+        customerCity: data.customerCity ?? "Casablanca",
+        customerIce: data.customerIce ?? null,
+        docDate: new Date(),
+        status: isFullyPaid ? "PAYE" : "VALIDE",
+        totalBrutHtCents: totals.totalBrutHT,
+        discountPercent: totals.discountPercent,
+        discountAmountCents: totals.discountAmount,
+        totalNetHtCents: totals.totalNetHT,
+        tvaRate: totals.tvaRate,
+        tvaAmountCents: totals.tvaAmount,
+        totalTtcCents: totals.totalTTC,
+        paidAmountCents: isFullyPaid ? totals.totalTTC : data.paidAmountCents ?? 0,
+        paymentMethod: data.paymentMethod,
+        notes: data.notes ?? null,
+        validatedAt: new Date(),
+      })
+      .returning({ id: salesDocuments.id })
+  )[0].id;
+
+  // 4. Lignes (avec snapshot COGS)
+  await d.insert(salesLines).values(
+    data.lines.map((l) => ({
+      documentId: docId,
       productId: l.productId,
-      productName: l.productName,
-      sku: l.sku,
-      oemCode: l.oemCode || null,
-      unitPriceHTCents: l.unitPriceHTCents,
+      productNameSnapshot: l.productName,
+      skuSnapshot: l.sku,
+      oemCodeSnapshot: l.oemCode ?? null,
+      unitPriceHtCents: l.unitPriceHTCents,
       quantity: l.quantity,
       totalHtCents: l.unitPriceHTCents * l.quantity,
-    })),
-  };
+      unitCostCents: effects.find((e) => e.productId === l.productId)?.unitCostCents ?? 0,
+      tvaRate,
+      totalTtcCents: Math.round(l.unitPriceHTCents * l.quantity * (1 + tvaRate / 100)),
+    }))
+  );
 
-  memorySalesDocuments.unshift(newDoc);
-  return newDoc;
+  // 5. Grand livre de stock + stock courant
+  for (const e of effects) {
+    await d.insert(stockMovements).values({
+      productId: e.productId,
+      businessLineId: e.businessLineId,
+      movementType: "VENTE_BL",
+      quantity: e.quantity,
+      unitCostCents: e.unitCostCents,
+      sourceDocumentId: docId,
+      sourceDocumentType: docType,
+      reason: `Vente au comptoir — ${docNumber}`,
+    });
+    await d
+      .update(products)
+      .set({ currentStock: e.nextStock, cmupCents: e.nextCmup, updatedAt: new Date() })
+      .where(eq(products.id, e.productId));
+  }
+
+  const created = await loadDocumentById(docId);
+  if (!created) throw new Error("ECHEC_CREATION_DOCUMENT");
+  return created;
 }
 
 /**
- * Envoie le Bon de Livraison par email avec Resend
+ * Envoie le document par email (Resend). Simulation si RESEND_API_KEY absente.
  */
 export async function sendDocumentByEmail(data: {
   documentId: number;
   recipientEmail: string;
 }): Promise<{ success: boolean; message: string }> {
-  const doc = memorySalesDocuments.find((d) => d.id === data.documentId);
-  if (!doc) {
-    throw new Error("Document introuvable");
-  }
+  await assertAuthenticated();
+  const doc = await loadDocumentById(data.documentId);
+  if (!doc) throw new Error("Document introuvable");
 
   const resendApiKey = process.env.RESEND_API_KEY;
-
   if (!resendApiKey) {
-    // Mode simulation si la clé n'est pas encore configurée dans .env
     return {
       success: true,
-      message: `[Simulation] Email préparé pour ${data.recipientEmail} concernant ${doc.docNumber}. (Ajoutez RESEND_API_KEY dans votre .env pour l'envoi réel)`,
+      message: `[Simulation] Email préparé pour ${data.recipientEmail} concernant ${doc.docNumber}. (Ajoutez RESEND_API_KEY pour l'envoi réel)`,
     };
   }
 
   try {
     const resend = new Resend(resendApiKey);
-
     await resend.emails.send({
       from: "BM Motors <onboarding@resend.dev>",
       to: data.recipientEmail,
-      subject: `Bon de Livraison N° ${doc.docNumber} - SARL BM Motors`,
+      subject: `Document N° ${doc.docNumber} - SARL BM Motors`,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
           <h2 style="color: #F7162D;">SARL BM Motors - Pièces Moto</h2>
-          <p>Bonjour,</p>
-          <p>Veuillez trouver ci-dessous le récapitulatif de votre <strong>Bon de Livraison N° ${doc.docNumber}</strong> du ${new Date(doc.docDate).toLocaleDateString("fr-FR")}.</p>
+          <p>Document <strong>${doc.docNumber}</strong> du ${new Date(doc.docDate).toLocaleDateString("fr-FR")}.</p>
           <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
-            <thead>
-              <tr style="background: #F8F9FA; border-bottom: 2px solid #E5E7EB; text-align: left;">
-                <th style="padding: 8px;">Désignation</th>
-                <th style="padding: 8px;">Qté</th>
-                <th style="padding: 8px; text-align: right;">Total HT</th>
-              </tr>
-            </thead>
+            <thead><tr style="background: #F8F9FA; text-align: left;">
+              <th style="padding: 8px;">Désignation</th><th style="padding: 8px;">Qté</th><th style="padding: 8px; text-align: right;">Total HT</th>
+            </tr></thead>
             <tbody>
               ${doc.lines
                 .map(
-                  (l) => `
-                <tr style="border-bottom: 1px solid #E5E7EB;">
-                  <td style="padding: 8px;">${l.productName} (${l.sku})</td>
-                  <td style="padding: 8px;">${l.quantity}</td>
-                  <td style="padding: 8px; text-align: right;">${(l.totalHtCents / 100).toFixed(2)} DH</td>
-                </tr>
-              `
+                  (l) =>
+                    `<tr><td style="padding:8px;">${l.productName} (${l.sku})</td><td style="padding:8px;">${l.quantity}</td><td style="padding:8px;text-align:right;">${(l.totalHtCents / 100).toFixed(2)} DH</td></tr>`
                 )
                 .join("")}
             </tbody>
           </table>
           <div style="margin-top: 20px; text-align: right;">
-            <p><strong>Total Brut HT :</strong> ${(doc.totalBrutHtCents / 100).toFixed(2)} DH</p>
-            ${
-              doc.discountPercent > 0
-                ? `<p style="color: #059669;"><strong>Remise (${doc.discountPercent}%) :</strong> -${(doc.discountAmountCents / 100).toFixed(2)} DH</p>`
-                : ""
-            }
             <p><strong>Total Net HT :</strong> ${(doc.totalNetHtCents / 100).toFixed(2)} DH</p>
-            <p><strong>TVA (10%) :</strong> ${(doc.tvaAmountCents / 100).toFixed(2)} DH</p>
+            <p><strong>TVA (${doc.tvaRate}%) :</strong> ${(doc.tvaAmountCents / 100).toFixed(2)} DH</p>
             <h3 style="color: #F7162D;">Total TTC : ${(doc.totalTtcCents / 100).toFixed(2)} DH</h3>
           </div>
-          <p style="margin-top: 30px; font-size: 12px; color: #6B7280;">
-            SARL BM Motors • ICE: 001892837000045 • Casablanca, Maroc
-          </p>
-        </div>
-      `,
+        </div>`,
     });
-
-    return {
-      success: true,
-      message: `Email envoyé avec succès à ${data.recipientEmail} via Resend`,
-    };
-  } catch (err: any) {
-    throw new Error(`Échec d'envoi par Resend: ${err.message}`);
+    return { success: true, message: `Email envoyé avec succès à ${data.recipientEmail} via Resend` };
+  } catch (err) {
+    throw new Error(`Échec d'envoi par Resend: ${(err as Error).message}`);
   }
 }

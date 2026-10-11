@@ -75,7 +75,7 @@ export function calculateNetHT(totalBrutHTCents: number, discountAmountCents: nu
  * Calcule le montant de la TVA en centimes sur la base du Total Net HT
  * Taux par défaut : 10% (Régime SARL pièces moto)
  */
-export function calculateTVAAmount(totalNetHTCents: number, tvaRatePercent: number = 10): number {
+export function calculateTVAAmount(totalNetHTCents: number, tvaRatePercent: number = 20): number {
   if (tvaRatePercent <= 0) return 0;
   return Math.round((totalNetHTCents * tvaRatePercent) / 100);
 }
@@ -92,7 +92,7 @@ export function calculateTVAAmount(totalNetHTCents: number, tvaRatePercent: numb
 export function calculateDocumentTotals(
   lines: Array<{ unitPriceHT: number; quantity: number }>,
   discountPercent: number = 0,
-  tvaRate: number = 10
+  tvaRate: number = 20
 ): DocumentTotals {
   const totalBrutHT = lines.reduce(
     (acc, line) => acc + calculateLineTotal(line.unitPriceHT, line.quantity),

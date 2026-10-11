@@ -43,6 +43,20 @@
       "when": 1791470608353,
       "tag": "0005_stock_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791731254947,
+      "tag": "0006_sales_decisions",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791731732249,
+      "tag": "0007_sales_snapshots",
+      "breakpoints": true
     }
   ]
 }

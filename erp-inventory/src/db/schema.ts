@@ -367,20 +367,34 @@ export const suppliers = pgTable("suppliers", {
 export const salesDocuments = pgTable("sales_documents", {
   id: serial("id").primaryKey(),
   docType: text("doc_type").notNull().default("BL"), // BL, FACTURE, AVOIR
-  docNumber: text("doc_number").notNull().unique(), // ex: "BL-2026-0001"
+  docNumber: text("doc_number").notNull().unique(), // ex: "BL-2026-00001"
+  businessLineId: integer("business_line_id")
+    .notNull()
+    .references(() => businessLines.id),
+  docYear: integer("doc_year").notNull(),
+  sequenceNo: integer("sequence_no").notNull(),
   customerId: integer("customer_id").references(() => customers.id),
+  customerName: text("customer_name").notNull().default(""),
+  customerPhone: text("customer_phone"),
+  customerEmail: text("customer_email"),
+  customerCity: text("customer_city"),
+  customerIce: text("customer_ice"),
   docDate: timestamp("doc_date").defaultNow(),
   status: text("status").notNull().default("BROUILLON"), // BROUILLON, VALIDE, ANNULE, PAYE
   totalBrutHtCents: integer("total_brut_ht_cents").notNull().default(0),
   discountPercent: integer("discount_percent").notNull().default(0), // Remise personnalisée en %
   discountAmountCents: integer("discount_amount_cents").notNull().default(0), // Montant remise
   totalNetHtCents: integer("total_net_ht_cents").notNull().default(0), // Brut HT - Remise
-  tvaRate: integer("tva_rate").notNull().default(10), // 10% SARL
+  tvaRate: integer("tva_rate").notNull().default(20), // TVA 20% par défaut
   tvaAmountCents: integer("tva_amount_cents").notNull().default(0),
   totalTtcCents: integer("total_ttc_cents").notNull().default(0), // Net HT + TVA
   paidAmountCents: integer("paid_amount_cents").notNull().default(0),
+  paymentMethod: text("payment_method"),
   notes: text("notes"),
   sourceBlId: integer("source_bl_id"), // Lien si facture ou avoir issu d'un BL
+  validatedAt: timestamp("validated_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -400,7 +414,26 @@ export const salesLines = pgTable("sales_lines", {
   unitPriceHtCents: integer("unit_price_ht_cents").notNull(),
   quantity: integer("quantity").notNull(),
   totalHtCents: integer("total_ht_cents").notNull(),
-  tvaRate: integer("tva_rate").notNull().default(10),
+  discountPercent: integer("discount_percent").notNull().default(0),
+  discountAmountCents: integer("discount_amount_cents").notNull().default(0),
+  unitCostCents: integer("unit_cost_cents").notNull().default(0), // COGS (CMUP au moment de la vente)
+  tvaRate: integer("tva_rate").notNull().default(20),
+  totalTtcCents: integer("total_ttc_cents").notNull().default(0),
+});
+
+// ==========================================
+// 9b. LIAISONS ENTRE DOCUMENTS (BL↔FAC, AV↔origine)
+// ==========================================
+export const documentLinks = pgTable("document_links", {
+  id: serial("id").primaryKey(),
+  sourceDocumentId: integer("source_document_id")
+    .notNull()
+    .references(() => salesDocuments.id, { onDelete: "cascade" }),
+  targetDocumentId: integer("target_document_id")
+    .notNull()
+    .references(() => salesDocuments.id, { onDelete: "cascade" }),
+  linkType: text("link_type").notNull(), // BL_TO_FAC, AV_TO_SOURCE
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // ==========================================
