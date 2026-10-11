@@ -56,6 +56,7 @@ export interface SalesDocumentItem {
     unitPriceHTCents: number;
     quantity: number;
     totalHtCents: number;
+    unitCostCents?: number;
   }>;
 }
 
@@ -99,6 +100,7 @@ function mapDoc(doc: DocRow, lines: LineRow[]): SalesDocumentItem {
       unitPriceHTCents: l.unitPriceHtCents,
       quantity: l.quantity,
       totalHtCents: l.totalHtCents,
+      unitCostCents: l.unitCostCents,
     })),
   };
 }

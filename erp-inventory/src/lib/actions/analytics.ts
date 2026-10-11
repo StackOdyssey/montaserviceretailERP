@@ -6,6 +6,13 @@ import { getCustomers } from "./customers";
 import { getSuppliers, SupplierItem } from "./suppliers";
 import { getExpenses } from "./expenses";
 import { formatMoney } from "@/lib/money";
+import { and, eq, gte, lte, ne } from "drizzle-orm";
+import { db, supplierReceipts, suppliers } from "@/db";
+
+function requireDb() {
+  if (!db) throw new Error("BASE_INDISPONIBLE: DATABASE_URL non configurée");
+  return db;
+}
 
 export interface DashboardMetrics {
   todaySalesTtcCents: number;
@@ -179,7 +186,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     monthRevenueHtCents += doc.totalNetHtCents;
     for (const line of doc.lines) {
       const prod = prods.find((p) => p.id === line.productId);
-      const unitCost = prod ? prod.purchasePriceCents : Math.round(line.unitPriceHTCents * 0.6);
+      const unitCost = line.unitCostCents ?? prod?.purchasePriceCents ?? 0;
       monthCostOfGoodsCents += unitCost * line.quantity;
     }
   }
@@ -256,7 +263,7 @@ export async function getStockValuation(): Promise<StockValuation> {
     };
   });
 
-  const totalRetailHtCents = Math.round(totalRetailTtcCents / 1.1);
+  const totalRetailHtCents = totalRetailTtcCents;
   const latentMarginHtCents = Math.max(0, totalRetailHtCents - totalCostHtCents);
   const latentMarginRatePercent =
     totalRetailHtCents > 0
@@ -318,7 +325,7 @@ export async function getProfitMarginsReport(period: "THIS_MONTH" | "LAST_MONTH"
 
     for (const line of doc.lines) {
       const prod = prods.find((p) => p.id === line.productId);
-      const unitCost = prod ? prod.purchasePriceCents : Math.round(line.unitPriceHTCents * 0.6);
+      const unitCost = line.unitCostCents ?? prod?.purchasePriceCents ?? 0;
       const lineCost = unitCost * line.quantity;
       const lineRevenue = Math.round(line.totalHtCents * discountRatio);
 
@@ -377,7 +384,7 @@ export async function getProfitMarginsReport(period: "THIS_MONTH" | "LAST_MONTH"
 }
 
 /**
- * Génère le récapitulatif officiel de TVA à 10% pour l'expert-comptable
+ * Génère le récapitulatif officiel de TVA à 20% pour l'expert-comptable
  */
 export async function getTvaAccountingExport(options?: {
   month?: number; // 0-11
@@ -428,25 +435,44 @@ export async function getTvaAccountingExport(options?: {
     };
   });
 
-  // Achats et TVA déductible (sur arrivages et charges de caisse)
-  // Données de réceptions du mois simulées pour le modèle fiscal
-  const purchasesTaxableHtCents = Math.round(salesTaxableHtCents * 0.55); // ~55% d'achats HT
-  const tvaDeductiblePurchasesCents = Math.round(purchasesTaxableHtCents * 0.10);
-  const tvaDeductibleExpensesCents = 73400; // TVA 10% sur charges (électricité, fournitures...)
+  // Achats et TVA déductible réels (bons de réception du mois)
+  const d = requireDb();
+  const receiptRows = await d
+    .select({
+      receiptNumber: supplierReceipts.receiptNumber,
+      receiptDate: supplierReceipts.receiptDate,
+      invoiceNumber: supplierReceipts.supplierInvoiceNumber,
+      totalHtCents: supplierReceipts.totalHtCents,
+      tvaAmountCents: supplierReceipts.tvaAmountCents,
+      totalTtcCents: supplierReceipts.totalTtcCents,
+      supplierName: suppliers.name,
+      supplierIce: suppliers.ice,
+    })
+    .from(supplierReceipts)
+    .innerJoin(suppliers, eq(supplierReceipts.supplierId, suppliers.id))
+    .where(
+      and(
+        ne(supplierReceipts.status, "ANNULE"),
+        gte(supplierReceipts.receiptDate, new Date(startOfMonth)),
+        lte(supplierReceipts.receiptDate, new Date(endOfMonth))
+      )
+    );
+
+  const purchasesTaxableHtCents = receiptRows.reduce((s, r) => s + r.totalHtCents, 0);
+  const tvaDeductiblePurchasesCents = receiptRows.reduce((s, r) => s + r.tvaAmountCents, 0);
+  const tvaDeductibleExpensesCents = 0;
   const totalTvaDeductibleCents = tvaDeductiblePurchasesCents + tvaDeductibleExpensesCents;
 
-  const purchaseLines = [
-    {
-      date: new Date(year, month, 5).toISOString(),
-      receiptNumber: "BR-2026-0041",
-      supplierName: "Grossiste Pièces Moto Derb Omar",
-      supplierIce: "001554289000072",
-      invoiceNumber: "FAC-DO-8892",
-      totalHtCents: purchasesTaxableHtCents,
-      tvaAmountCents: tvaDeductiblePurchasesCents,
-      totalTtcCents: purchasesTaxableHtCents + tvaDeductiblePurchasesCents,
-    },
-  ];
+  const purchaseLines = receiptRows.map((r) => ({
+    date: (r.receiptDate ?? new Date()).toISOString(),
+    receiptNumber: r.receiptNumber,
+    supplierName: r.supplierName,
+    supplierIce: r.supplierIce ?? null,
+    invoiceNumber: r.invoiceNumber,
+    totalHtCents: r.totalHtCents,
+    tvaAmountCents: r.tvaAmountCents,
+    totalTtcCents: r.totalTtcCents,
+  }));
 
   const netTvaDueCents = tvaCollectedCents - totalTvaDeductibleCents;
   const isCreditTva = netTvaDueCents < 0;
@@ -454,12 +480,12 @@ export async function getTvaAccountingExport(options?: {
   return {
     periodLabel,
     salesTaxableHtCents,
-    tvaCollectedRate: 10,
+    tvaCollectedRate: 20,
     tvaCollectedCents,
     salesTotalTtcCents,
     salesLines,
     purchasesTaxableHtCents,
-    tvaDeductibleRate: 10,
+    tvaDeductibleRate: 20,
     tvaDeductiblePurchasesCents,
     tvaDeductibleExpensesCents,
     totalTvaDeductibleCents,
