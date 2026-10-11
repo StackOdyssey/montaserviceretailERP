@@ -2,6 +2,7 @@
 
 import { and, desc, eq, inArray, ilike, isNull, or, sql } from "drizzle-orm";
 import {
+  auditLogs,
   businessLineDocumentSettings,
   businessLines,
   db,
@@ -29,7 +30,7 @@ export interface SalesLineInput {
 
 export interface SalesDocumentItem {
   id: number;
-  docType: "BL" | "FACTURE" | "AVOIR";
+  docType: "BL" | "FACTURE" | "AVOIR" | "BC" | "DEVIS";
   docNumber: string;
   customerId: number | null;
   customerName: string;
@@ -173,7 +174,7 @@ export async function getSalesDocumentById(id: number): Promise<SalesDocumentIte
  * numéro gapless, lignes avec snapshot COGS (CMUP) et sortie de stock, le tout atomique.
  */
 export async function createSalesDocument(data: {
-  docType?: "BL" | "FACTURE" | "AVOIR";
+  docType?: "BL" | "FACTURE" | "AVOIR" | "BC" | "DEVIS";
   customerId?: number | null;
   customerName: string;
   customerPhone?: string;
@@ -217,10 +218,11 @@ export async function createSalesDocument(data: {
       tvaRate
     );
 
+    const affectsStock = docType === "BL" || docType === "FACTURE";
     const negRow = (await tx.select({ neg: settings.negativeStockAllowed }).from(settings).limit(1))[0];
     const negativeAllowed = negRow?.neg ?? false;
 
-    // Effets de stock (COGS = CMUP courant) AVANT écriture
+    // Effets de stock (COGS = CMUP courant). BL/FACTURE décrémentent ; BC/DEVIS non.
     const effects: Array<{
       productId: number;
       businessLineId: number;
@@ -234,7 +236,7 @@ export async function createSalesDocument(data: {
       if (!p) throw new Error(`PIECE_INTROUVABLE: ${l.sku}`);
       const state: CmupState = { quantity: p.currentStock, cmupCents: p.cmupCents };
       const { state: next } = applyMovement(state, -l.quantity, 0);
-      if (next.quantity < 0 && !negativeAllowed) throw new Error(`STOCK_NEGATIF_INTERDIT: ${p.sku}`);
+      if (affectsStock && next.quantity < 0 && !negativeAllowed) throw new Error(`STOCK_NEGATIF_INTERDIT: ${p.sku}`);
       effects.push({
         productId: p.id,
         businessLineId: p.businessLineId,
@@ -304,21 +306,23 @@ export async function createSalesDocument(data: {
       }))
     );
 
-    for (const e of effects) {
-      await tx.insert(stockMovements).values({
-        productId: e.productId,
-        businessLineId: e.businessLineId,
-        movementType: "VENTE_BL",
-        quantity: e.quantity,
-        unitCostCents: e.unitCostCents,
-        sourceDocumentId: docId,
-        sourceDocumentType: docType,
-        reason: `Vente au comptoir — ${docNumber}`,
-      });
-      await tx
-        .update(products)
-        .set({ currentStock: e.nextStock, cmupCents: e.nextCmup, updatedAt: new Date() })
-        .where(eq(products.id, e.productId));
+    if (affectsStock) {
+      for (const e of effects) {
+        await tx.insert(stockMovements).values({
+          productId: e.productId,
+          businessLineId: e.businessLineId,
+          movementType: "VENTE_BL",
+          quantity: e.quantity,
+          unitCostCents: e.unitCostCents,
+          sourceDocumentId: docId,
+          sourceDocumentType: docType,
+          reason: `Vente au comptoir — ${docNumber}`,
+        });
+        await tx
+          .update(products)
+          .set({ currentStock: e.nextStock, cmupCents: e.nextCmup, updatedAt: new Date() })
+          .where(eq(products.id, e.productId));
+      }
     }
   });
 
@@ -701,8 +705,9 @@ export async function createAvoir(data: {
 
     // Retour en stock au COGS d'origine (CMUP recalculé)
     for (const x of avLines) {
-      if (!x.orig.productId) continue;
-      const p = (await tx.select().from(products).where(eq(products.id, x.orig.productId)).limit(1))[0];
+      const pid = x.orig.productId;
+      if (!pid) continue;
+      const p = (await tx.select().from(products).where(eq(products.id, pid)).limit(1))[0];
       if (!p) continue;
       const state: CmupState = { quantity: p.currentStock, cmupCents: p.cmupCents };
       const { state: next } = applyMovement(state, x.qty, x.orig.unitCostCents);
@@ -726,4 +731,57 @@ export async function createAvoir(data: {
   const created = await loadDocumentById(docId);
   if (!created) throw new Error("ECHEC_CREATION_AVOIR");
   return created;
+}
+
+/**
+ * Annule un document validé (immutabilité : on n'édite pas, on annule).
+ * Contrepasse les mouvements de stock du document et journalise l'action.
+ */
+export async function cancelDocument(documentId: number, reason?: string): Promise<SalesDocumentItem> {
+  await assertAuthenticated();
+  const d = requireDb();
+
+  const doc = (await d.select().from(salesDocuments).where(eq(salesDocuments.id, documentId)).limit(1))[0];
+  if (!doc) throw new Error("Document introuvable");
+  if (doc.status === "ANNULE") throw new Error("Document déjà annulé");
+
+  await d.transaction(async (tx) => {
+    const movs = await tx.select().from(stockMovements).where(eq(stockMovements.sourceDocumentId, documentId));
+    for (const m of movs) {
+      const p = (await tx.select().from(products).where(eq(products.id, m.productId)).limit(1))[0];
+      if (!p) continue;
+      const state: CmupState = { quantity: p.currentStock, cmupCents: p.cmupCents };
+      const { state: next } = applyMovement(state, -m.quantity, m.unitCostCents ?? 0);
+      await tx.insert(stockMovements).values({
+        productId: p.id,
+        businessLineId: p.businessLineId,
+        movementType: "AJUSTEMENT_INVENTAIRE",
+        quantity: -m.quantity,
+        unitCostCents: m.unitCostCents,
+        sourceDocumentId: documentId,
+        sourceDocumentType: "ANNULATION",
+        reason: `Annulation ${doc.docNumber}${reason ? " — " + reason : ""}`,
+      });
+      await tx
+        .update(products)
+        .set({ currentStock: next.quantity, cmupCents: next.cmupCents, updatedAt: new Date() })
+        .where(eq(products.id, p.id));
+    }
+
+    await tx
+      .update(salesDocuments)
+      .set({ status: "ANNULE", cancelledAt: new Date(), updatedAt: new Date() })
+      .where(eq(salesDocuments.id, documentId));
+
+    await tx.insert(auditLogs).values({
+      action: "ANNULATION_DOCUMENT",
+      entityType: doc.docType,
+      entityId: documentId,
+      details: `Annulation ${doc.docNumber}${reason ? " — " + reason : ""}`,
+    });
+  });
+
+  const updated = await loadDocumentById(documentId);
+  if (!updated) throw new Error("ECHEC_ANNULATION");
+  return updated;
 }
