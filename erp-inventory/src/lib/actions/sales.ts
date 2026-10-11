@@ -2,6 +2,7 @@
 
 import { and, desc, eq, inArray, ilike, isNull, or } from "drizzle-orm";
 import {
+  businessLineDocumentSettings,
   businessLines,
   db,
   products,
@@ -47,6 +48,7 @@ export interface SalesDocumentItem {
   paidAmountCents: number;
   paymentMethod?: string | null;
   notes?: string | null;
+  businessLineId?: number;
   lines: Array<{
     id: number;
     productId: number | null;
@@ -57,6 +59,7 @@ export interface SalesDocumentItem {
     quantity: number;
     totalHtCents: number;
     unitCostCents?: number;
+    tvaRate?: number;
   }>;
 }
 
@@ -91,6 +94,7 @@ function mapDoc(doc: DocRow, lines: LineRow[]): SalesDocumentItem {
     paidAmountCents: doc.paidAmountCents,
     paymentMethod: doc.paymentMethod,
     notes: doc.notes,
+    businessLineId: doc.businessLineId,
     lines: lines.map((l) => ({
       id: l.id,
       productId: l.productId,
@@ -101,6 +105,7 @@ function mapDoc(doc: DocRow, lines: LineRow[]): SalesDocumentItem {
       quantity: l.quantity,
       totalHtCents: l.totalHtCents,
       unitCostCents: l.unitCostCents,
+      tvaRate: l.tvaRate,
     })),
   };
 }
@@ -239,9 +244,10 @@ export async function createSalesDocument(data: {
       });
     }
 
-    // Numéro gapless (dans la transaction)
+    // Numéro gapless (clé de numérotation canonique : FAC/AV, pas FACTURE/AVOIR)
+    const sequenceKey = docType === "FACTURE" ? "FAC" : docType === "AVOIR" ? "AV" : docType;
     const { docNumber, sequenceNo } = await nextDocumentNumber(tx, {
-      docType,
+      docType: sequenceKey,
       year,
       businessLineId: line.id,
     });
@@ -373,4 +379,108 @@ export async function sendDocumentByEmail(data: {
   } catch (err) {
     throw new Error(`Échec d'envoi par Resend: ${(err as Error).message}`);
   }
+}
+
+export interface CompanyPrintInfo {
+  raisonSociale: string;
+  tradeName: string | null;
+  legalForm: string;
+  address: string | null;
+  city: string | null;
+  phone: string | null;
+  email: string | null;
+  ice: string;
+  identifiantFiscal: string | null;
+  registreCommerce: string | null;
+  taxeProfessionnelle: string | null;
+  capitalCents: number;
+  footerText: string | null;
+  logoUrl: string | null;
+}
+
+export interface DocumentPrintContext {
+  document: SalesDocumentItem;
+  businessLineCode: string;
+  vatDisplay: { showVat: boolean; priceBasis: "TTC" | "HT"; showDiscount: boolean };
+  company: CompanyPrintInfo | null;
+  docLabel: string;
+}
+
+const DOC_LABELS: Record<string, string> = {
+  BL: "BON DE LIVRAISON",
+  FACTURE: "FACTURE",
+  AVOIR: "AVOIR",
+  BC: "BON DE COMMANDE",
+  DEVIS: "DEVIS",
+};
+
+/**
+ * Contexte d'impression : document, visibilité TVA par ligne métier (§6A) et identité société.
+ * La visibilité TVA provient de `business_line_document_settings` (FAC/AV toujours affichés).
+ */
+export async function getDocumentPrintContext(documentId: number): Promise<DocumentPrintContext | null> {
+  await assertAuthenticated();
+  const d = requireDb();
+
+  const document = await loadDocumentById(documentId);
+  if (!document) return null;
+
+  const blId = document.businessLineId ?? null;
+  let businessLineCode = "PIECES";
+  if (blId) {
+    const bl = (await d.select({ code: businessLines.code }).from(businessLines).where(eq(businessLines.id, blId)).limit(1))[0];
+    businessLineCode = bl?.code ?? "PIECES";
+  }
+
+  const settingsKey = document.docType === "FACTURE" ? "FAC" : document.docType === "AVOIR" ? "AV" : document.docType;
+  let vatDisplay: DocumentPrintContext["vatDisplay"] = { showVat: true, priceBasis: "TTC", showDiscount: true };
+  if (blId) {
+    const row = (
+      await d
+        .select()
+        .from(businessLineDocumentSettings)
+        .where(
+          and(
+            eq(businessLineDocumentSettings.businessLineId, blId),
+            eq(businessLineDocumentSettings.docType, settingsKey)
+          )
+        )
+        .limit(1)
+    )[0];
+    if (row) {
+      vatDisplay = {
+        showVat: row.showVat,
+        priceBasis: row.priceBasis as "TTC" | "HT",
+        showDiscount: row.showDiscount,
+      };
+    }
+  }
+
+  const c = (await d.select().from(settings).limit(1))[0];
+  const company: CompanyPrintInfo | null = c
+    ? {
+        raisonSociale: c.raisonSociale,
+        tradeName: c.tradeName,
+        legalForm: c.legalForm,
+        address: c.address,
+        city: c.city,
+        phone: c.phone,
+        email: c.email,
+        ice: c.ice,
+        identifiantFiscal: c.identifiantFiscal,
+        registreCommerce: c.registreCommerce,
+        taxeProfessionnelle: c.taxeProfessionnelle,
+        capitalCents: c.capitalCents,
+        footerText: c.footerText,
+        logoUrl: c.logoUrl,
+      }
+    : null;
+
+  return {
+    document,
+    businessLineCode,
+    vatDisplay,
+    company,
+    docLabel: DOC_LABELS[document.docType] ?? document.docType,
+  };
 }
