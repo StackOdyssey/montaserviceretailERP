@@ -81,10 +81,10 @@ export default function TableauDeBordPage() {
             <span className="text-xs text-gray-500">Casablanca</span>
           </div>
           <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white mt-1.5 tracking-tight">
-            Tableau de Bord & Comptoir en Direct
+            Tableau de Bord
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Supervision du point de vente, des encaissements, du stock et des marges bénéficiaires.
+            Supervision du point de vente.
           </p>
         </div>
 
@@ -163,11 +163,10 @@ export default function TableauDeBordPage() {
           </div>
           <div>
             <span
-              className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded-md ${
-                (metrics?.monthGrowthPercent || 0) >= 0
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
-                  : "bg-red-50 text-[#F7162D]"
-              }`}
+              className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded-md ${(metrics?.monthGrowthPercent || 0) >= 0
+                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                : "bg-red-50 text-[#F7162D]"
+                }`}
             >
               {(metrics?.monthGrowthPercent || 0) >= 0 ? "+" : ""}
               {metrics?.monthGrowthPercent || 0}% vs mois dernier
@@ -278,11 +277,10 @@ export default function TableauDeBordPage() {
                             • {new Date(bl.docDate).toLocaleDateString("fr-FR")}
                           </span>
                           <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              isPaid
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                : "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-                            }`}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isPaid
+                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                              : "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                              }`}
                           >
                             {isPaid ? "Payé" : "À Crédit / Non Soldé"}
                           </span>
