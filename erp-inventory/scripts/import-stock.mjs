@@ -53,6 +53,14 @@ async function main() {
     return i === undefined ? "" : (r[i] ?? "");
   };
 
+  // Ligne métier cible (v3 : products/price_levels/stock_movements exigent business_line_id)
+  const lineRow = await sql.query("SELECT id FROM business_lines WHERE code = 'PIECES' LIMIT 1");
+  const lineId = lineRow[0]?.id;
+  if (!lineId) {
+    console.error("Ligne métier PIECES introuvable — appliquez d'abord les migrations.");
+    process.exit(1);
+  }
+
   // --- Référentiels ---
   const seedVat = [
     { label: "TVA 20%", rate: 20, active: true, def: true },
@@ -82,22 +90,25 @@ async function main() {
     ))[0].id;
   }
 
-  let grosId = (await sql.query("SELECT id FROM price_levels WHERE code = 'GROS' LIMIT 1"))[0]?.id;
+  let grosId = (await sql.query("SELECT id FROM price_levels WHERE business_line_id = $1 AND code = 'GROS' LIMIT 1", [lineId]))[0]?.id;
   if (!grosId) {
     grosId = (await sql.query(
-      "INSERT INTO price_levels (code, label, is_default) VALUES ('GROS', 'Gros', true) RETURNING id"
+      "INSERT INTO price_levels (business_line_id, code, label, is_default) VALUES ($1, 'GROS', 'Gros', true) RETURNING id",
+      [lineId]
     ))[0].id;
   }
   for (const lvl of [
     { code: "SEMI_GROS", label: "Semi-gros", def: false },
   ]) {
-    const ex = await sql.query("SELECT id FROM price_levels WHERE code = $1 LIMIT 1", [lvl.code]);
+    const ex = await sql.query("SELECT id FROM price_levels WHERE business_line_id = $1 AND code = $2 LIMIT 1", [
+      lineId,
+      lvl.code,
+    ]);
     if (ex.length === 0) {
-      await sql.query("INSERT INTO price_levels (code, label, is_default) VALUES ($1,$2,$3)", [
-        lvl.code,
-        lvl.label,
-        lvl.def,
-      ]);
+      await sql.query(
+        "INSERT INTO price_levels (business_line_id, code, label, is_default) VALUES ($1,$2,$3,$4)",
+        [lineId, lvl.code, lvl.label, lvl.def]
+      );
     }
   }
 
@@ -129,19 +140,22 @@ async function main() {
 
     const res = await sql.query(
       `INSERT INTO products
-        (sku, barcode, name, brand, nature, supplier_id, warehouse_id, vat_rate_id, tva_rate,
-         cost_price_ht_cents, sale_price_ht_cents, margin_percent, stock_value_purchase_cents,
+        (sku, barcode, name, brand, nature, business_line_id, supplier_id, warehouse_id, vat_rate_id, tva_rate,
+         cost_price_ht_cents, last_purchase_price_cents, cmup_cents, sale_price_ht_cents, margin_percent, stock_value_purchase_cents,
          current_stock, unit, is_active, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,20,$9,$10,$11,$12,$13,'PIECE',true, now())
+       VALUES ($1,$2,$3,$4,$5,$14,$6,$7,$8,20,$9,$9,$9,$10,$11,$12,$13,'PIECE',true, now())
        ON CONFLICT (sku) DO UPDATE SET
          barcode = EXCLUDED.barcode,
          name = EXCLUDED.name,
          brand = EXCLUDED.brand,
          nature = EXCLUDED.nature,
+         business_line_id = EXCLUDED.business_line_id,
          supplier_id = EXCLUDED.supplier_id,
          warehouse_id = EXCLUDED.warehouse_id,
          vat_rate_id = EXCLUDED.vat_rate_id,
          cost_price_ht_cents = EXCLUDED.cost_price_ht_cents,
+         last_purchase_price_cents = EXCLUDED.last_purchase_price_cents,
+         cmup_cents = EXCLUDED.cmup_cents,
          sale_price_ht_cents = EXCLUDED.sale_price_ht_cents,
          margin_percent = EXCLUDED.margin_percent,
          stock_value_purchase_cents = EXCLUDED.stock_value_purchase_cents,
@@ -162,6 +176,7 @@ async function main() {
         margin,
         stockValueCents,
         quantity,
+        lineId,
       ]
     );
     const productId = res[0].id;
@@ -183,9 +198,9 @@ async function main() {
     );
     await sql.query(
       `INSERT INTO stock_movements
-        (product_id, movement_type, quantity, unit_cost_cents, source_document_type, reason)
-       VALUES ($1,'STOCK_INITIAL',$2,$3,'IMPORT',$4)`,
-      [productId, quantity, costCents, `Import BestWay État du Stock — ${sku}`]
+        (product_id, business_line_id, movement_type, quantity, unit_cost_cents, source_document_type, reason)
+       VALUES ($1,$5,'STOCK_INITIAL',$2,$3,'IMPORT',$4)`,
+      [productId, quantity, costCents, `Import BestWay État du Stock — ${sku}`, lineId]
     );
 
     processed++;
