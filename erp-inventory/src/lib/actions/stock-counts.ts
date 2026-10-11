@@ -11,6 +11,7 @@ import {
   stockMovements,
 } from "@/db";
 import { applyMovement, type CmupState } from "@/lib/stock";
+import { assertAuthenticated } from "@/lib/action-guard";
 
 export interface StockCountSummary {
   id: number;
@@ -51,6 +52,7 @@ async function lineIdByCode(code: string): Promise<number | null> {
 
 /** Crée un inventaire brouillon et fige le stock théorique de chaque article de la ligne. */
 export async function createStockCount(businessLineCode: string): Promise<{ id: number; code: string }> {
+  await assertAuthenticated();
   const d = requireDb();
   const lineId = await lineIdByCode(businessLineCode);
   if (!lineId) throw new Error("LIGNE_METIER_INTROUVABLE");
@@ -163,6 +165,7 @@ export async function getStockCount(
 
 /** Saisit la quantité comptée d'une ligne (variance recalculée vs stock théorique). */
 export async function setStockCountLine(lineId: number, countedQty: number): Promise<void> {
+  await assertAuthenticated();
   const d = requireDb();
   await d
     .update(stockCountLines)
@@ -175,6 +178,7 @@ export async function setStockCountLine(lineId: number, countedQty: number): Pro
  * via le moteur CMUP, puis passe l'inventaire à VALIDATED.
  */
 export async function validateStockCount(id: number): Promise<{ adjusted: number }> {
+  await assertAuthenticated();
   const d = requireDb();
   const headerRows = await d
     .select({ id: stockCounts.id, code: stockCounts.code, status: stockCounts.status })
@@ -239,6 +243,7 @@ export async function validateStockCount(id: number): Promise<{ adjusted: number
 }
 
 export async function cancelStockCount(id: number): Promise<void> {
+  await assertAuthenticated();
   const d = requireDb();
   await d.update(stockCounts).set({ status: "CANCELLED" }).where(eq(stockCounts.id, id));
 }

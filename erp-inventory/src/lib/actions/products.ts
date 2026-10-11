@@ -3,6 +3,7 @@
 import { and, asc, eq, gte, ilike, or, sql } from "drizzle-orm";
 import { businessLines, categories, db, products, settings, stockMovements } from "@/db";
 import { applyMovement, type CmupState } from "@/lib/stock";
+import { assertAuthenticated } from "@/lib/action-guard";
 
 export interface ProductItem {
   id: number;
@@ -194,6 +195,7 @@ export async function saveProduct(data: {
   businessLineCode?: string;
   isSerialized?: boolean;
 }): Promise<ProductItem> {
+  await assertAuthenticated();
   const d = requireDb();
   const lineCode = data.businessLineCode || "PIECES";
   const lineId = await lineIdByCode(lineCode);
@@ -275,6 +277,7 @@ export async function recordStockMovement(data: {
   reason: string;
   unitCostCents?: number;
 }): Promise<ProductItem> {
+  await assertAuthenticated();
   const d = requireDb();
   const found = await d.select().from(products).where(eq(products.id, data.productId)).limit(1);
   const p = found[0];
@@ -333,6 +336,7 @@ export async function importProductsBatch(
     shelfLocation?: string;
   }>
 ): Promise<{ count: number }> {
+  await assertAuthenticated();
   const d = requireDb();
   const lineId = await lineIdByCode("PIECES");
   if (!lineId) throw new Error("LIGNE_METIER_INTROUVABLE");

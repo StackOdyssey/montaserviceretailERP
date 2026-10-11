@@ -2,6 +2,7 @@
 
 import { and, asc, eq, sql } from "drizzle-orm";
 import { businessLines, db, products, stockUnits } from "@/db";
+import { assertAuthenticated } from "@/lib/action-guard";
 
 export type UnitStatus = "IN_STOCK" | "RESERVED" | "SOLD" | "RETURNED";
 
@@ -139,6 +140,7 @@ export async function createStockUnit(data: {
   modelYear?: number;
   unitCostCents?: number;
 }): Promise<{ id: number }> {
+  await assertAuthenticated();
   const d = requireDb();
   const serialNo = data.serialNo.trim();
   if (!serialNo) throw new Error("NUMERO_SERIE_OBLIGATOIRE");
@@ -181,6 +183,7 @@ export async function updateStockUnit(data: {
   unitCostCents?: number;
   status?: UnitStatus;
 }): Promise<void> {
+  await assertAuthenticated();
   const d = requireDb();
   const unit = (await d.select().from(stockUnits).where(eq(stockUnits.id, data.id)).limit(1))[0];
   if (!unit) throw new Error("UNITE_INTROUVABLE");
@@ -198,6 +201,7 @@ export async function updateStockUnit(data: {
 
 /** Supprime une unité (registre) et recalcule le stock. */
 export async function deleteStockUnit(id: number): Promise<void> {
+  await assertAuthenticated();
   const d = requireDb();
   const unit = (await d.select().from(stockUnits).where(eq(stockUnits.id, id)).limit(1))[0];
   if (!unit) return;

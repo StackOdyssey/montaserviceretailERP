@@ -1,16 +1,13 @@
 // Authentification légère et sécurisée pour BM Motors.
 // Aucun secret codé en dur : SESSION_SECRET et ADMIN_PIN proviennent de l'environnement.
 // (Le déverrouillage biométrique réel (WebAuthn/FIDO2) reste à implémenter.)
+import { getEnv } from "@/lib/env";
 
 const SESSION_COOKIE_NAME = "bm_session";
 const SESSION_TTL_MS = 30 * 24 * 3600 * 1000; // 30 jours
 
 function getSessionSecret(): string {
-  const secret = process.env.SESSION_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error("SESSION_SECRET manquant ou trop faible (minimum 32 caractères).");
-  }
-  return secret;
+  return getEnv().SESSION_SECRET;
 }
 
 /** Comparaison en temps constant (évite les attaques temporelles). */
@@ -80,8 +77,12 @@ export async function createSessionToken(): Promise<string> {
  * Échoue (retourne false) si ADMIN_PIN n'est pas configuré — aucun PIN par défaut.
  */
 export function verifyAdminPin(pin: string): boolean {
-  const configured = process.env.ADMIN_PIN;
-  if (!configured) return false;
+  let configured: string;
+  try {
+    configured = getEnv().ADMIN_PIN;
+  } catch {
+    return false;
+  }
   return timingSafeEqual(pin.trim(), configured);
 }
 
