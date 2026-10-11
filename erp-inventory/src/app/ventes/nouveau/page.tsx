@@ -28,11 +28,26 @@ interface CartLine extends SalesLineInput {
   currentStock: number;
 }
 
+const DOC_TYPES: Array<{ id: "BL" | "FACTURE" | "BC" | "DEVIS"; label: string }> = [
+  { id: "BL", label: "Bon de Livraison" },
+  { id: "FACTURE", label: "Facture" },
+  { id: "BC", label: "Bon de Commande" },
+  { id: "DEVIS", label: "Devis" },
+];
+
+const DOC_TITLES: Record<string, string> = {
+  BL: "Nouveau Bon de Livraison (BL)",
+  FACTURE: "Nouvelle Facture",
+  BC: "Nouveau Bon de Commande (BC)",
+  DEVIS: "Nouveau Devis",
+};
+
 export default function NouveauBonDeLivraisonPage() {
   const router = useRouter();
 
   // Liste des articles du panier
   const [cart, setCart] = useState<CartLine[]>([]);
+  const [docType, setDocType] = useState<"BL" | "FACTURE" | "BC" | "DEVIS">("BL");
 
   // Informations client
   const [customerName, setCustomerName] = useState("Client Comptoir Particulier");
@@ -134,7 +149,7 @@ export default function NouveauBonDeLivraisonPage() {
       quantity: c.quantity,
     })),
     discountPercent,
-    10 // TVA 10% SARL
+    20 // TVA 20%
   );
 
   // Validation du BL
@@ -149,7 +164,7 @@ export default function NouveauBonDeLivraisonPage() {
       setErrorMessage(null);
 
       const doc = await createSalesDocument({
-        docType: "BL",
+        docType,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim() || undefined,
         customerCity: customerCity.trim() || undefined,
@@ -185,19 +200,26 @@ export default function NouveauBonDeLivraisonPage() {
           </button>
           <div>
             <h1 className="text-base md:text-xl font-bold text-[#111827] tracking-tight">
-              Nouveau Bon de Livraison (BL)
+              {DOC_TITLES[docType]}
             </h1>
             <p className="text-xs text-[#6B7280]">
-              Saisie rapide au comptoir • Régime SARL 10% TVA
+              Saisie rapide au comptoir • TVA 20%
             </p>
           </div>
         </div>
 
-        <div className="text-right hidden sm:block">
-          <span className="text-xs text-[#6B7280] block">Date d&apos;émission</span>
-          <span className="text-xs font-bold text-[#111827]">
-            {new Date().toLocaleDateString("fr-FR")}
-          </span>
+        <div className="flex items-center gap-1.5 text-xs font-bold">
+          {DOC_TYPES.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setDocType(t.id)}
+              className={`px-3 py-2 rounded-xl whitespace-nowrap transition-all ${
+                docType === t.id ? "bg-[#111827] text-white" : "bg-[#F8F9FA] text-[#4B5563] hover:bg-[#E5E7EB]"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -557,7 +579,7 @@ export default function NouveauBonDeLivraisonPage() {
               <span>
                 {isSubmitting
                   ? "Validation en cours..."
-                  : `Valider le Bon de Livraison (${formatMoney(totals.totalTTC)})`}
+                  : `Valider (${formatMoney(totals.totalTTC)})`}
               </span>
             </button>
           </div>
