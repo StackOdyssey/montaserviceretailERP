@@ -419,6 +419,7 @@ export const salesLines = pgTable("sales_lines", {
   unitCostCents: integer("unit_cost_cents").notNull().default(0), // COGS (CMUP au moment de la vente)
   tvaRate: integer("tva_rate").notNull().default(20),
   totalTtcCents: integer("total_ttc_cents").notNull().default(0),
+  originalLineId: integer("original_line_id"), // AV : ligne d'origine (FAC/BL) créditée
 });
 
 // ==========================================

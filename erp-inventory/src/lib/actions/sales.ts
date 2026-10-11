@@ -1,10 +1,11 @@
 "use server";
 
-import { and, desc, eq, inArray, ilike, isNull, or } from "drizzle-orm";
+import { and, desc, eq, inArray, ilike, isNull, or, sql } from "drizzle-orm";
 import {
   businessLineDocumentSettings,
   businessLines,
   db,
+  documentLinks,
   products,
   salesDocuments,
   salesLines,
@@ -483,4 +484,246 @@ export async function getDocumentPrintContext(documentId: number): Promise<Docum
     company,
     docLabel: DOC_LABELS[document.docType] ?? document.docType,
   };
+}
+
+/**
+ * Convertit un ou plusieurs BL en une Facture (FAC). Aucune sortie de stock
+ * supplémentaire (le BL l'a déjà déduit) ; liaison BL→FAC via document_links.
+ */
+export async function convertBlToFacture(
+  blIds: number[],
+  opts?: { customerId?: number | null }
+): Promise<SalesDocumentItem> {
+  await assertAuthenticated();
+  const d = requireDb();
+
+  if (!blIds || blIds.length === 0) throw new Error("Sélectionnez au moins un BL à facturer");
+
+  const bls = await d
+    .select()
+    .from(salesDocuments)
+    .where(and(inArray(salesDocuments.id, blIds), eq(salesDocuments.docType, "BL")));
+  const active = bls.filter((b) => b.status !== "ANNULE" && !b.deletedAt);
+  if (active.length === 0) throw new Error("Aucun BL valide sélectionné");
+
+  const srcLines = await d.select().from(salesLines).where(inArray(salesLines.documentId, active.map((b) => b.id)));
+  if (srcLines.length === 0) throw new Error("Les BL sélectionnés n'ont aucune ligne");
+
+  const head = active[0];
+  const year = new Date().getFullYear();
+  const sameCustomer = active.every((b) => b.customerId === head.customerId);
+  if (!sameCustomer) throw new Error("Les BL doivent concerner le même client");
+
+  const totalBrutHt = srcLines.reduce((s, l) => s + l.totalHtCents, 0);
+  const tvaAmount = srcLines.reduce((s, l) => s + Math.round((l.totalHtCents * l.tvaRate) / 100), 0);
+
+  let docId = 0;
+  await d.transaction(async (tx) => {
+    const { docNumber, sequenceNo } = await nextDocumentNumber(tx, {
+      docType: "FAC",
+      year,
+      businessLineId: head.businessLineId,
+    });
+
+    docId = (
+      await tx
+        .insert(salesDocuments)
+        .values({
+          docType: "FACTURE",
+          docNumber,
+          businessLineId: head.businessLineId,
+          docYear: year,
+          sequenceNo,
+          customerId: opts?.customerId ?? head.customerId,
+          customerName: head.customerName,
+          customerPhone: head.customerPhone,
+          customerEmail: head.customerEmail,
+          customerCity: head.customerCity,
+          customerIce: head.customerIce,
+          docDate: new Date(),
+          status: "VALIDE",
+          totalBrutHtCents: totalBrutHt,
+          discountPercent: 0,
+          discountAmountCents: 0,
+          totalNetHtCents: totalBrutHt,
+          tvaRate: head.tvaRate ?? 20,
+          tvaAmountCents: tvaAmount,
+          totalTtcCents: totalBrutHt + tvaAmount,
+          paidAmountCents: 0,
+          paymentMethod: head.paymentMethod,
+          notes: `Facture issue des BL : ${active.map((b) => b.docNumber).join(", ")}`,
+          validatedAt: new Date(),
+        })
+        .returning({ id: salesDocuments.id })
+    )[0].id;
+
+    await tx.insert(salesLines).values(
+      srcLines.map((l) => ({
+        documentId: docId,
+        productId: l.productId,
+        productNameSnapshot: l.productNameSnapshot,
+        skuSnapshot: l.skuSnapshot,
+        oemCodeSnapshot: l.oemCodeSnapshot,
+        unitPriceHtCents: l.unitPriceHtCents,
+        quantity: l.quantity,
+        totalHtCents: l.totalHtCents,
+        discountPercent: l.discountPercent,
+        discountAmountCents: l.discountAmountCents,
+        unitCostCents: l.unitCostCents,
+        tvaRate: l.tvaRate,
+        totalTtcCents: l.totalTtcCents,
+      }))
+    );
+
+    await tx.insert(documentLinks).values(
+      active.map((b) => ({ sourceDocumentId: b.id, targetDocumentId: docId, linkType: "BL_TO_FAC" }))
+    );
+  });
+
+  const created = await loadDocumentById(docId);
+  if (!created) throw new Error("ECHEC_CONVERSION_FACTURE");
+  return created;
+}
+
+/**
+ * Crée un Avoir (AV) lié au document d'origine ET à ses lignes. Les quantités
+ * créditées sont plafonnées (facturé − déjà crédité) ; la marchandise retourne
+ * en stock au COGS d'origine. TVA au taux d'origine.
+ */
+export async function createAvoir(data: {
+  sourceDocumentId: number;
+  returns: Array<{ lineId: number; quantity: number }>;
+  notes?: string;
+}): Promise<SalesDocumentItem> {
+  await assertAuthenticated();
+  const d = requireDb();
+
+  const source = (await d.select().from(salesDocuments).where(eq(salesDocuments.id, data.sourceDocumentId)).limit(1))[0];
+  if (!source) throw new Error("Document d'origine introuvable");
+  if (source.docType === "AVOIR") throw new Error("Impossible de créditer un avoir");
+
+  const srcLines = await d.select().from(salesLines).where(eq(salesLines.documentId, source.id));
+  if (srcLines.length === 0) throw new Error("Le document d'origine n'a aucune ligne");
+  const lineById = new Map(srcLines.map((l) => [l.id, l]));
+
+  const creditedRows = await d
+    .select({
+      originalLineId: salesLines.originalLineId,
+      qty: sql<string>`coalesce(sum(${salesLines.quantity}),0)::bigint`,
+    })
+    .from(salesLines)
+    .where(inArray(salesLines.originalLineId, srcLines.map((l) => l.id)))
+    .groupBy(salesLines.originalLineId);
+  const credited = new Map(creditedRows.map((r) => [r.originalLineId, Number(r.qty)]));
+
+  const avLines: Array<{ orig: typeof srcLines[number]; qty: number; lineHt: number; lineTva: number }> = [];
+  let totalHt = 0;
+  let tvaAmount = 0;
+  for (const r of data.returns) {
+    const orig = lineById.get(r.lineId);
+    if (!orig) throw new Error("Ligne d'origine introuvable");
+    const already = credited.get(orig.id) ?? 0;
+    const qty = Math.min(r.quantity, orig.quantity - already);
+    if (qty <= 0) continue;
+    const lineHt = orig.unitPriceHtCents * qty;
+    const lineTva = Math.round((lineHt * orig.tvaRate) / 100);
+    totalHt += lineHt;
+    tvaAmount += lineTva;
+    avLines.push({ orig, qty, lineHt, lineTva });
+  }
+  if (avLines.length === 0) throw new Error("Aucune quantité valide à créditer");
+
+  const year = new Date().getFullYear();
+  let docId = 0;
+  await d.transaction(async (tx) => {
+    const { docNumber, sequenceNo } = await nextDocumentNumber(tx, {
+      docType: "AV",
+      year,
+      businessLineId: source.businessLineId,
+    });
+
+    docId = (
+      await tx
+        .insert(salesDocuments)
+        .values({
+          docType: "AVOIR",
+          docNumber,
+          businessLineId: source.businessLineId,
+          docYear: year,
+          sequenceNo,
+          customerId: source.customerId,
+          customerName: source.customerName,
+          customerPhone: source.customerPhone,
+          customerEmail: source.customerEmail,
+          customerCity: source.customerCity,
+          customerIce: source.customerIce,
+          docDate: new Date(),
+          status: "VALIDE",
+          totalBrutHtCents: totalHt,
+          discountPercent: 0,
+          discountAmountCents: 0,
+          totalNetHtCents: totalHt,
+          tvaRate: source.tvaRate ?? 20,
+          tvaAmountCents: tvaAmount,
+          totalTtcCents: totalHt + tvaAmount,
+          paidAmountCents: 0,
+          paymentMethod: source.paymentMethod,
+          notes: data.notes ?? `Avoir sur ${source.docNumber}`,
+          validatedAt: new Date(),
+        })
+        .returning({ id: salesDocuments.id })
+    )[0].id;
+
+    await tx.insert(salesLines).values(
+      avLines.map((x) => ({
+        documentId: docId,
+        productId: x.orig.productId,
+        productNameSnapshot: x.orig.productNameSnapshot,
+        skuSnapshot: x.orig.skuSnapshot,
+        oemCodeSnapshot: x.orig.oemCodeSnapshot,
+        unitPriceHtCents: x.orig.unitPriceHtCents,
+        quantity: x.qty,
+        totalHtCents: x.lineHt,
+        discountPercent: 0,
+        discountAmountCents: 0,
+        unitCostCents: x.orig.unitCostCents,
+        tvaRate: x.orig.tvaRate,
+        totalTtcCents: x.lineHt + x.lineTva,
+        originalLineId: x.orig.id,
+      }))
+    );
+
+    await tx.insert(documentLinks).values({
+      sourceDocumentId: docId,
+      targetDocumentId: source.id,
+      linkType: "AV_TO_SOURCE",
+    });
+
+    // Retour en stock au COGS d'origine (CMUP recalculé)
+    for (const x of avLines) {
+      if (!x.orig.productId) continue;
+      const p = (await tx.select().from(products).where(eq(products.id, x.orig.productId)).limit(1))[0];
+      if (!p) continue;
+      const state: CmupState = { quantity: p.currentStock, cmupCents: p.cmupCents };
+      const { state: next } = applyMovement(state, x.qty, x.orig.unitCostCents);
+      await tx.insert(stockMovements).values({
+        productId: p.id,
+        businessLineId: p.businessLineId,
+        movementType: "AVOIR_RETOUR",
+        quantity: x.qty,
+        unitCostCents: x.orig.unitCostCents,
+        sourceDocumentId: docId,
+        sourceDocumentType: "AVOIR",
+        reason: `Retour client ${docNumber} (${source.docNumber})`,
+      });
+      await tx
+        .update(products)
+        .set({ currentStock: next.quantity, cmupCents: next.cmupCents, updatedAt: new Date() })
+        .where(eq(products.id, p.id));
+    }
+  });
+
+  const created = await loadDocumentById(docId);
+  if (!created) throw new Error("ECHEC_CREATION_AVOIR");
+  return created;
 }

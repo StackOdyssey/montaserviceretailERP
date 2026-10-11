@@ -1,0 +1,1 @@
+ALTER TABLE "sales_lines" ADD COLUMN "original_line_id" integer;
