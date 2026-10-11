@@ -1,8 +1,9 @@
 "use server";
 
-import { db, customers, customerPayments, salesDocuments, auditLogs } from "@/db";
-import { eq, desc } from "drizzle-orm";
-import { getSalesDocuments, SalesDocumentItem } from "./sales";
+import { and, asc, eq, ilike, isNull, ne, or, sql } from "drizzle-orm";
+import { customerPayments, customers, db, salesDocuments } from "@/db";
+import { assertAuthenticated } from "@/lib/action-guard";
+import { getSalesDocuments, type SalesDocumentItem } from "./sales";
 
 export interface CustomerItem {
   id: number;
@@ -38,7 +39,7 @@ export interface CustomerAccountStatement {
   customer: CustomerItem;
   totalBilledTtcCents: number;
   totalPaidCents: number;
-  balanceDueCents: number; // Solde débiteur restant dû
+  balanceDueCents: number;
   unpaidDocumentsCount: number;
   documents: Array<SalesDocumentItem & { remainingDueCents: number }>;
   payments: CustomerPaymentItem[];
@@ -58,210 +59,153 @@ export interface ChequeEffetAlert {
   daysRemaining: number;
 }
 
-// Données en mémoire initiales réalistes (clients réguliers de BM Motors)
-let memoryCustomers: CustomerItem[] = [
-  {
-    id: 1,
-    name: "Garage Moto Hassan",
-    phone: "0661234567",
-    email: "contact@garagemotohassan.ma",
-    city: "Ain Sebaa, Casablanca",
-    address: "Bd Chefchaouni, Quartier Industriel",
-    ice: "001892837000045",
-    isWholesale: true,
-    notes: "Client fidèle gros volume - Règlement fin de mois ou chèque à 30 jours",
-    createdAt: new Date("2026-01-10").toISOString(),
-  },
-  {
-    id: 2,
-    name: "Atelier Pro Biker",
-    phone: "0662889900",
-    email: "probiker.casa@gmail.com",
-    city: "Derb Ghallef, Casablanca",
-    address: "Rue 14, N° 45 Derb Ghallef",
-    ice: "002441928000088",
-    isWholesale: true,
-    notes: "Spécialiste quads et motos Bashan / Docker",
-    createdAt: new Date("2026-01-15").toISOString(),
-  },
-  {
-    id: 3,
-    name: "Moto Express Marrakech",
-    phone: "0663112233",
-    email: "motoexpress.kech@yahoo.fr",
-    city: "Gueliz, Marrakech",
-    address: "Avenue Mohammed V",
-    ice: "001994821000012",
-    isWholesale: true,
-    notes: "Commandes par expédition CTM / Ghazala",
-    createdAt: new Date("2026-02-01").toISOString(),
-  },
-  {
-    id: 4,
-    name: "Comptoir Particuliers (Cash)",
-    phone: "0660000000",
-    email: null,
-    city: "Casablanca",
-    address: "Vente directe magasin",
-    ice: null,
-    isWholesale: false,
-    notes: "Clients de passage réglant au comptoir",
-    createdAt: new Date("2026-01-01").toISOString(),
-  },
-];
-
-// Règlements initiaux en mémoire
-let memoryCustomerPayments: CustomerPaymentItem[] = [
-  {
-    id: 1,
-    customerId: 2,
-    customerName: "Atelier Pro Biker",
-    documentId: 2,
-    documentNumber: "BL-2026-0127",
-    amountCents: 132000,
-    paymentMethod: "ESPECES",
-    paymentDate: new Date(Date.now() - 70 * 60 * 1000).toISOString(),
-    referenceNumber: null,
-    chequeDueDate: null,
-    bankName: null,
-    status: "ENCAISSE",
-    notes: "Règlement comptoir espèces",
-    createdAt: new Date(Date.now() - 70 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 2,
-    customerId: 1,
-    customerName: "Garage Moto Hassan",
-    documentId: null,
-    documentNumber: null,
-    amountCents: 350000,
-    paymentMethod: "CHEQUE",
-    paymentDate: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString(),
-    referenceNumber: "CHQ-884920",
-    chequeDueDate: new Date(Date.now() + 4 * 24 * 3600 * 1000).toISOString(), // Dans 4 jours
-    bankName: "Attijariwafa Bank",
-    status: "EN_ATTENTE",
-    notes: "Acompte sur commandes en cours",
-    createdAt: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: 3,
-    customerId: 3,
-    customerName: "Moto Express Marrakech",
-    documentId: null,
-    documentNumber: null,
-    amountCents: 480000,
-    paymentMethod: "EFFET_LCN",
-    paymentDate: new Date(Date.now() - 10 * 24 * 3600 * 1000).toISOString(),
-    referenceNumber: "LCN-99210",
-    chequeDueDate: new Date(Date.now() - 1 * 24 * 3600 * 1000).toISOString(), // Échu hier !
-    bankName: "Banque Populaire",
-    status: "EN_ATTENTE",
-    notes: "Effet de commerce 30 jours à déposer",
-    createdAt: new Date(Date.now() - 10 * 24 * 3600 * 1000).toISOString(),
-  },
-];
-
-/**
- * Récupère tous les clients avec leur solde calculé
- */
-export async function getCustomers(searchQuery?: string) {
-  const allDocs = await getSalesDocuments();
-  const search = searchQuery?.toLowerCase().trim() || "";
-
-  return memoryCustomers
-    .filter((c) => {
-      if (!search) return true;
-      return (
-        c.name.toLowerCase().includes(search) ||
-        (c.phone && c.phone.includes(search)) ||
-        (c.city && c.city.toLowerCase().includes(search)) ||
-        (c.ice && c.ice.includes(search))
-      );
-    })
-    .map((customer) => {
-      // Calcul du total facturé TTC
-      const customerDocs = allDocs.filter(
-        (d) => d.customerId === customer.id && d.status !== "ANNULE"
-      );
-      const totalBilled = customerDocs.reduce(
-        (sum, d) => sum + d.totalTtcCents,
-        0
-      );
-
-      // Calcul du total réglé (encaissé ou en cours)
-      const customerPmts = memoryCustomerPayments.filter(
-        (p) => p.customerId === customer.id && p.status !== "REJETE"
-      );
-      const totalPaid = customerPmts.reduce(
-        (sum, p) => sum + p.amountCents,
-        0
-      );
-
-      const balanceDue = totalBilled - totalPaid;
-      const unpaidCount = customerDocs.filter((d) => d.status !== "PAYE").length;
-
-      return {
-        ...customer,
-        totalBilledTtcCents: totalBilled,
-        totalPaidCents: totalPaid,
-        balanceDueCents: balanceDue,
-        unpaidDocumentsCount: unpaidCount,
-      };
-    });
+function requireDb() {
+  if (!db) throw new Error("BASE_INDISPONIBLE: DATABASE_URL non configurée");
+  return db;
 }
 
-/**
- * Récupère le relevé de compte complet d'un client
- */
-export async function getCustomerStatement(
-  customerId: number
-): Promise<CustomerAccountStatement | null> {
-  const customer = memoryCustomers.find((c) => c.id === customerId);
-  if (!customer) return null;
+type CustomerRow = typeof customers.$inferSelect;
+type PaymentRow = typeof customerPayments.$inferSelect;
 
-  const allDocs = await getSalesDocuments();
-  const customerDocs = allDocs
-    .filter((d) => d.customerId === customerId && d.status !== "ANNULE")
-    .map((doc) => {
-      const remaining = Math.max(0, doc.totalTtcCents - doc.paidAmountCents);
-      return {
-        ...doc,
-        remainingDueCents: remaining,
-      };
-    });
-
-  const customerPmts = memoryCustomerPayments
-    .filter((p) => p.customerId === customerId)
-    .sort(
-      (a, b) =>
-        new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
-    );
-
-  const totalBilled = customerDocs.reduce(
-    (sum, d) => sum + d.totalTtcCents,
-    0
-  );
-  const totalPaid = customerPmts
-    .filter((p) => p.status !== "REJETE")
-    .reduce((sum, p) => sum + p.amountCents, 0);
-
-  const balanceDue = totalBilled - totalPaid;
-  const unpaidCount = customerDocs.filter((d) => d.status !== "PAYE").length;
-
+function mapCustomer(r: CustomerRow): CustomerItem {
   return {
-    customer,
-    totalBilledTtcCents: totalBilled,
-    totalPaidCents: totalPaid,
-    balanceDueCents: balanceDue,
-    unpaidDocumentsCount: unpaidCount,
-    documents: customerDocs,
-    payments: customerPmts,
+    id: r.id,
+    name: r.name,
+    phone: r.phone,
+    email: r.email,
+    city: r.city ?? "",
+    address: r.address,
+    ice: r.ice,
+    isWholesale: r.isWholesale ?? false,
+    notes: r.notes,
+    createdAt: (r.createdAt ?? new Date()).toISOString(),
+  };
+}
+
+function mapPayment(p: PaymentRow, customerName: string, documentNumber: string | null = null): CustomerPaymentItem {
+  return {
+    id: p.id,
+    customerId: p.customerId,
+    customerName,
+    documentId: p.documentId,
+    documentNumber,
+    amountCents: p.amountCents,
+    paymentMethod: p.paymentMethod as CustomerPaymentItem["paymentMethod"],
+    paymentDate: (p.paymentDate ?? p.createdAt ?? new Date()).toISOString(),
+    referenceNumber: p.referenceNumber,
+    chequeDueDate: p.chequeDueDate ? p.chequeDueDate.toISOString() : null,
+    bankName: p.bankName,
+    status: p.status as CustomerPaymentItem["status"],
+    notes: p.notes,
+    createdAt: (p.createdAt ?? new Date()).toISOString(),
   };
 }
 
 /**
- * Enregistre un nouveau règlement client (Espèces, Chèque, Effet LCN, Virement)
+ * Clients avec solde calculé depuis la base (documents + règlements).
+ */
+export async function getCustomers(searchQuery?: string) {
+  await assertAuthenticated();
+  const d = requireDb();
+
+  const search = searchQuery?.trim().toLowerCase() || "";
+  const conds = search
+    ? [
+        or(
+          ilike(customers.name, `%${search}%`),
+          ilike(customers.phone, `%${search}%`),
+          ilike(customers.city, `%${search}%`),
+          ilike(customers.ice, `%${search}%`)
+        )!,
+      ]
+    : [];
+
+  const rows = await d
+    .select()
+    .from(customers)
+    .where(conds.length ? and(...conds) : undefined)
+    .orderBy(asc(customers.name))
+    .limit(500);
+
+  const billedRows = await d
+    .select({
+      customerId: salesDocuments.customerId,
+      billed: sql<string>`coalesce(sum(${salesDocuments.totalTtcCents}),0)::bigint`,
+      unpaid: sql<number>`count(*) filter (where ${salesDocuments.status} <> 'PAYE')::int`,
+    })
+    .from(salesDocuments)
+    .where(and(isNull(salesDocuments.deletedAt), ne(salesDocuments.status, "ANNULE")))
+    .groupBy(salesDocuments.customerId);
+
+  const paidRows = await d
+    .select({
+      customerId: customerPayments.customerId,
+      paid: sql<string>`coalesce(sum(${customerPayments.amountCents}),0)::bigint`,
+    })
+    .from(customerPayments)
+    .where(ne(customerPayments.status, "REJETE"))
+    .groupBy(customerPayments.customerId);
+
+  const billedMap = new Map(billedRows.map((r) => [r.customerId, { billed: Number(r.billed), unpaid: r.unpaid }]));
+  const paidMap = new Map(paidRows.map((r) => [r.customerId, Number(r.paid)]));
+
+  return rows.map((r) => {
+    const c = mapCustomer(r);
+    const totalBilledTtcCents = billedMap.get(r.id)?.billed ?? 0;
+    const unpaidDocumentsCount = billedMap.get(r.id)?.unpaid ?? 0;
+    const totalPaidCents = paidMap.get(r.id) ?? 0;
+    return {
+      ...c,
+      totalBilledTtcCents,
+      totalPaidCents,
+      balanceDueCents: totalBilledTtcCents - totalPaidCents,
+      unpaidDocumentsCount,
+    };
+  });
+}
+
+/**
+ * Relevé de compte complet d'un client.
+ */
+export async function getCustomerStatement(customerId: number): Promise<CustomerAccountStatement | null> {
+  await assertAuthenticated();
+  const d = requireDb();
+
+  const row = (await d.select().from(customers).where(eq(customers.id, customerId)).limit(1))[0];
+  if (!row) return null;
+  const customer = mapCustomer(row);
+
+  const allDocs = await getSalesDocuments();
+  const documents = allDocs
+    .filter((doc) => doc.customerId === customerId && doc.status !== "ANNULE")
+    .map((doc) => ({ ...doc, remainingDueCents: Math.max(0, doc.totalTtcCents - doc.paidAmountCents) }));
+
+  const paymentRows = await d
+    .select()
+    .from(customerPayments)
+    .where(eq(customerPayments.customerId, customerId))
+    .orderBy(sql`${customerPayments.paymentDate} desc`);
+
+  const docNumbers = new Map(allDocs.map((doc) => [doc.id, doc.docNumber]));
+  const payments = paymentRows.map((p) => mapPayment(p, customer.name, p.documentId ? docNumbers.get(p.documentId) ?? null : null));
+
+  const totalBilledTtcCents = documents.reduce((s, doc) => s + doc.totalTtcCents, 0);
+  const totalPaidCents = payments.filter((p) => p.status !== "REJETE").reduce((s, p) => s + p.amountCents, 0);
+  const unpaidDocumentsCount = documents.filter((doc) => doc.status !== "PAYE").length;
+
+  return {
+    customer,
+    totalBilledTtcCents,
+    totalPaidCents,
+    balanceDueCents: totalBilledTtcCents - totalPaidCents,
+    unpaidDocumentsCount,
+    documents,
+    payments,
+  };
+}
+
+/**
+ * Enregistre un règlement client (transaction) et lettre (ciblé ou FIFO) les documents.
  */
 export async function recordCustomerPayment(data: {
   customerId: number;
@@ -272,142 +216,158 @@ export async function recordCustomerPayment(data: {
   chequeDueDate?: string;
   bankName?: string;
   notes?: string;
-}) {
-  if (data.amountCents <= 0) {
-    throw new Error("Le montant du règlement doit être supérieur à 0");
-  }
+}): Promise<CustomerPaymentItem> {
+  await assertAuthenticated();
+  const d = requireDb();
 
-  const customer = memoryCustomers.find((c) => c.id === data.customerId);
-  if (!customer) {
-    throw new Error("Client introuvable");
-  }
+  if (data.amountCents <= 0) throw new Error("Le montant du règlement doit être supérieur à 0");
 
-  // Statut initial : les espèces et virements sont réputés encaissés immédiatement
-  const initialStatus =
-    data.paymentMethod === "ESPECES" || data.paymentMethod === "VIREMENT"
-      ? "ENCAISSE"
-      : "EN_ATTENTE";
+  const customer = (await d.select().from(customers).where(eq(customers.id, data.customerId)).limit(1))[0];
+  if (!customer) throw new Error("Client introuvable");
+
+  const initialStatus: CustomerPaymentItem["status"] =
+    data.paymentMethod === "ESPECES" || data.paymentMethod === "VIREMENT" ? "ENCAISSE" : "EN_ATTENTE";
 
   let docNumber: string | null = null;
-  const allDocs = await getSalesDocuments();
+  let paymentId = 0;
 
-  if (data.documentId) {
-    const doc = allDocs.find((d) => d.id === data.documentId);
-    if (doc) {
-      docNumber = doc.docNumber;
-      // Lettrage / mise à jour du montant réglé sur le BL
-      doc.paidAmountCents += data.amountCents;
-      if (doc.paidAmountCents >= doc.totalTtcCents) {
-        doc.status = "PAYE";
-      }
-    }
-  } else {
-    // Si aucun BL spécifique n'est ciblé, lettrage automatique FIFO sur les BL impayés
-    let remainingToAllocate = data.amountCents;
-    const unpaidDocs = allDocs
-      .filter((d) => d.customerId === data.customerId && d.status !== "PAYE")
-      .sort(
-        (a, b) =>
-          new Date(a.docDate).getTime() - new Date(b.docDate).getTime()
-      );
+  await d.transaction(async (tx) => {
+    // Documents ciblés : un BL précis, sinon FIFO sur les BL impayés du client
+    const targetDocs = data.documentId
+      ? await tx
+          .select()
+          .from(salesDocuments)
+          .where(and(eq(salesDocuments.id, data.documentId), ne(salesDocuments.status, "ANNULE")))
+          .limit(1)
+      : await tx
+          .select()
+          .from(salesDocuments)
+          .where(
+            and(
+              eq(salesDocuments.customerId, data.customerId),
+              ne(salesDocuments.status, "PAYE"),
+              ne(salesDocuments.status, "ANNULE"),
+              isNull(salesDocuments.deletedAt)
+            )
+          )
+          .orderBy(asc(salesDocuments.docDate));
 
-    for (const doc of unpaidDocs) {
-      if (remainingToAllocate <= 0) break;
+    let remaining = data.amountCents;
+    for (const doc of targetDocs) {
+      if (remaining <= 0) break;
       const unpaidOnDoc = Math.max(0, doc.totalTtcCents - doc.paidAmountCents);
-      const allocated = Math.min(unpaidOnDoc, remainingToAllocate);
-      doc.paidAmountCents += allocated;
-      remainingToAllocate -= allocated;
-      if (doc.paidAmountCents >= doc.totalTtcCents) {
-        doc.status = "PAYE";
-      }
+      const allocated = Math.min(unpaidOnDoc, remaining);
+      if (allocated <= 0) continue;
+      const newPaid = doc.paidAmountCents + allocated;
+      remaining -= allocated;
+      await tx
+        .update(salesDocuments)
+        .set({ paidAmountCents: newPaid, status: newPaid >= doc.totalTtcCents ? "PAYE" : doc.status, updatedAt: new Date() })
+        .where(eq(salesDocuments.id, doc.id));
+      if (data.documentId) docNumber = doc.docNumber;
     }
-  }
 
-  const newPayment: CustomerPaymentItem = {
-    id: Date.now(),
-    customerId: data.customerId,
-    customerName: customer.name,
-    documentId: data.documentId || null,
-    documentNumber: docNumber,
-    amountCents: data.amountCents,
-    paymentMethod: data.paymentMethod,
-    paymentDate: new Date().toISOString(),
-    referenceNumber: data.referenceNumber || null,
-    chequeDueDate: data.chequeDueDate || null,
-    bankName: data.bankName || null,
-    status: initialStatus,
-    notes: data.notes || null,
-    createdAt: new Date().toISOString(),
-  };
+    paymentId = (
+      await tx
+        .insert(customerPayments)
+        .values({
+          customerId: data.customerId,
+          documentId: data.documentId ?? null,
+          amountCents: data.amountCents,
+          paymentMethod: data.paymentMethod,
+          paymentDate: new Date(),
+          referenceNumber: data.referenceNumber ?? null,
+          chequeDueDate: data.chequeDueDate ? new Date(data.chequeDueDate) : null,
+          bankName: data.bankName ?? null,
+          status: initialStatus,
+          notes: data.notes ?? null,
+        })
+        .returning({ id: customerPayments.id })
+    )[0].id;
 
-  memoryCustomerPayments.unshift(newPayment);
-  return newPayment;
+    if (data.documentId && !docNumber) {
+      const dn = (await tx.select({ n: salesDocuments.docNumber }).from(salesDocuments).where(eq(salesDocuments.id, data.documentId)).limit(1))[0];
+      docNumber = dn?.n ?? null;
+    }
+  });
+
+  const row = (await d.select().from(customerPayments).where(eq(customerPayments.id, paymentId)).limit(1))[0];
+  return mapPayment(row, customer.name, docNumber);
 }
 
 /**
- * Met à jour le statut d'un chèque ou effet LCN (Encaissement ou Rejet)
+ * Met à jour le statut d'un chèque ou effet LCN.
  */
 export async function updatePaymentStatus(
   paymentId: number,
   newStatus: "ENCAISSE" | "EN_ATTENTE" | "REJETE"
-) {
-  const pmt = memoryCustomerPayments.find((p) => p.id === paymentId);
-  if (!pmt) throw new Error("Règlement introuvable");
+): Promise<CustomerPaymentItem> {
+  await assertAuthenticated();
+  const d = requireDb();
 
-  pmt.status = newStatus;
-  return pmt;
+  const updated = (
+    await d
+      .update(customerPayments)
+      .set({ status: newStatus })
+      .where(eq(customerPayments.id, paymentId))
+      .returning()
+  )[0];
+  if (!updated) throw new Error("Règlement introuvable");
+
+  const customer = (await d.select().from(customers).where(eq(customers.id, updated.customerId)).limit(1))[0];
+  return mapPayment(updated, customer?.name ?? "");
 }
 
 /**
- * Récupère l'échéancier des chèques et effets de commerce
+ * Échéancier des chèques et effets de commerce.
  */
 export async function getChequesEffetsSchedule(): Promise<ChequeEffetAlert[]> {
+  await assertAuthenticated();
+  const d = requireDb();
+
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
-  return memoryCustomerPayments
-    .filter(
-      (p) =>
-        (p.paymentMethod === "CHEQUE" || p.paymentMethod === "EFFET_LCN") &&
-        p.chequeDueDate
-    )
-    .map((p) => {
+  const rows = await d
+    .select({ p: customerPayments, customerName: customers.name })
+    .from(customerPayments)
+    .innerJoin(customers, eq(customerPayments.customerId, customers.id))
+    .where(
+      and(
+        or(eq(customerPayments.paymentMethod, "CHEQUE"), eq(customerPayments.paymentMethod, "EFFET_LCN"))!,
+        sql`${customerPayments.chequeDueDate} is not null`
+      )
+    );
+
+  return rows
+    .map(({ p, customerName }) => {
       const dueDate = new Date(p.chequeDueDate!);
       dueDate.setHours(0, 0, 0, 0);
-      const diffTime = dueDate.getTime() - now.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      let urgency: "RETARD" | "AUJOURDHUI" | "PROCHE" | "FUTUR" = "FUTUR";
-      if (diffDays < 0) {
-        urgency = "RETARD";
-      } else if (diffDays === 0) {
-        urgency = "AUJOURDHUI";
-      } else if (diffDays <= 7) {
-        urgency = "PROCHE";
-      }
+      const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      let urgency: ChequeEffetAlert["urgency"] = "FUTUR";
+      if (diffDays < 0) urgency = "RETARD";
+      else if (diffDays === 0) urgency = "AUJOURDHUI";
+      else if (diffDays <= 7) urgency = "PROCHE";
 
       return {
         id: p.id,
         customerId: p.customerId,
-        customerName: p.customerName,
+        customerName,
         paymentMethod: p.paymentMethod as "CHEQUE" | "EFFET_LCN",
         amountCents: p.amountCents,
         referenceNumber: p.referenceNumber || "Sans N°",
         bankName: p.bankName || "Non spécifiée",
-        dueDate: p.chequeDueDate!,
-        status: p.status,
+        dueDate: p.chequeDueDate!.toISOString(),
+        status: p.status as ChequeEffetAlert["status"],
         urgency,
         daysRemaining: diffDays,
       };
     })
-    .sort(
-      (a, b) =>
-        new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
-    );
+    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 }
 
 /**
- * Crée ou modifie un client
+ * Crée ou modifie un client.
  */
 export async function saveCustomer(data: {
   id?: number;
@@ -420,26 +380,12 @@ export async function saveCustomer(data: {
   isWholesale?: boolean;
   notes?: string;
 }): Promise<CustomerItem> {
-  if (!data.name.trim()) {
-    throw new Error("Le nom du client ou de la société est obligatoire");
-  }
+  await assertAuthenticated();
+  const d = requireDb();
 
-  if (data.id) {
-    const existing = memoryCustomers.find((c) => c.id === data.id);
-    if (!existing) throw new Error("Client introuvable");
-    existing.name = data.name.trim();
-    existing.phone = data.phone || null;
-    existing.email = data.email || null;
-    existing.city = data.city || "Casablanca";
-    existing.address = data.address || null;
-    existing.ice = data.ice || null;
-    existing.isWholesale = data.isWholesale ?? false;
-    existing.notes = data.notes || null;
-    return existing;
-  }
+  if (!data.name.trim()) throw new Error("Le nom du client ou de la société est obligatoire");
 
-  const newCustomer: CustomerItem = {
-    id: Date.now(),
+  const values = {
     name: data.name.trim(),
     phone: data.phone || null,
     email: data.email || null,
@@ -448,9 +394,15 @@ export async function saveCustomer(data: {
     ice: data.ice || null,
     isWholesale: data.isWholesale ?? false,
     notes: data.notes || null,
-    createdAt: new Date().toISOString(),
+    updatedAt: new Date(),
   };
 
-  memoryCustomers.push(newCustomer);
-  return newCustomer;
+  const saved = data.id
+    ? (
+        await d.update(customers).set(values).where(eq(customers.id, data.id)).returning()
+      )[0]
+    : (await d.insert(customers).values(values).returning())[0];
+
+  if (!saved) throw new Error("Client introuvable");
+  return mapCustomer(saved);
 }
