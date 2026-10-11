@@ -161,8 +161,8 @@ export async function getSalesDocumentById(id: number): Promise<SalesDocumentIte
 }
 
 /**
- * Crée et valide un document commercial (BL/FACTURE/AVOIR) : numéro gapless,
- * lignes avec snapshot COGS (CMUP), sortie de stock via le grand livre.
+ * Crée et valide un document commercial (BL/FACTURE/AVOIR) dans une TRANSACTION :
+ * numéro gapless, lignes avec snapshot COGS (CMUP) et sortie de stock, le tout atomique.
  */
 export async function createSalesDocument(data: {
   docType?: "BL" | "FACTURE" | "AVOIR";
@@ -190,127 +190,128 @@ export async function createSalesDocument(data: {
   const year = new Date().getFullYear();
   const tvaRate = 20; // TVA 20% (CGI pièces détachées)
 
-  // Ligne métier (défaut PIECES)
-  const line = (
-    await d
-      .select({ id: businessLines.id })
-      .from(businessLines)
-      .where(eq(businessLines.code, data.businessLineCode || "PIECES"))
-      .limit(1)
-  )[0];
-  if (!line) throw new Error("LIGNE_METIER_INTROUVABLE");
+  let docId = 0;
 
-  const totals = calculateDocumentTotals(
-    data.lines.map((l) => ({ unitPriceHT: l.unitPriceHTCents, quantity: l.quantity })),
-    data.discountPercent,
-    tvaRate
-  );
+  await d.transaction(async (tx) => {
+    // Ligne métier (défaut PIECES)
+    const line = (
+      await tx
+        .select({ id: businessLines.id })
+        .from(businessLines)
+        .where(eq(businessLines.code, data.businessLineCode || "PIECES"))
+        .limit(1)
+    )[0];
+    if (!line) throw new Error("LIGNE_METIER_INTROUVABLE");
 
-  const negRow = (await d.select({ neg: settings.negativeStockAllowed }).from(settings).limit(1))[0];
-  const negativeAllowed = negRow?.neg ?? false;
+    const totals = calculateDocumentTotals(
+      data.lines.map((l) => ({ unitPriceHT: l.unitPriceHTCents, quantity: l.quantity })),
+      data.discountPercent,
+      tvaRate
+    );
 
-  // 1. Calcul des effets de stock (COGS = CMUP courant) AVANT toute écriture
-  const effects: Array<{
-    productId: number;
-    businessLineId: number;
-    quantity: number;
-    unitCostCents: number;
-    nextStock: number;
-    nextCmup: number;
-  }> = [];
-  for (const l of data.lines) {
-    const p = (await d.select().from(products).where(eq(products.id, l.productId)).limit(1))[0];
-    if (!p) throw new Error(`PIECE_INTROUVABLE: ${l.sku}`);
-    const state: CmupState = { quantity: p.currentStock, cmupCents: p.cmupCents };
-    const { state: next } = applyMovement(state, -l.quantity, 0);
-    if (next.quantity < 0 && !negativeAllowed) throw new Error(`STOCK_NEGATIF_INTERDIT: ${p.sku}`);
-    effects.push({
-      productId: p.id,
-      businessLineId: p.businessLineId,
-      quantity: -l.quantity,
-      unitCostCents: p.cmupCents,
-      nextStock: next.quantity,
-      nextCmup: next.cmupCents,
+    const negRow = (await tx.select({ neg: settings.negativeStockAllowed }).from(settings).limit(1))[0];
+    const negativeAllowed = negRow?.neg ?? false;
+
+    // Effets de stock (COGS = CMUP courant) AVANT écriture
+    const effects: Array<{
+      productId: number;
+      businessLineId: number;
+      quantity: number;
+      unitCostCents: number;
+      nextStock: number;
+      nextCmup: number;
+    }> = [];
+    for (const l of data.lines) {
+      const p = (await tx.select().from(products).where(eq(products.id, l.productId)).limit(1))[0];
+      if (!p) throw new Error(`PIECE_INTROUVABLE: ${l.sku}`);
+      const state: CmupState = { quantity: p.currentStock, cmupCents: p.cmupCents };
+      const { state: next } = applyMovement(state, -l.quantity, 0);
+      if (next.quantity < 0 && !negativeAllowed) throw new Error(`STOCK_NEGATIF_INTERDIT: ${p.sku}`);
+      effects.push({
+        productId: p.id,
+        businessLineId: p.businessLineId,
+        quantity: -l.quantity,
+        unitCostCents: p.cmupCents,
+        nextStock: next.quantity,
+        nextCmup: next.cmupCents,
+      });
+    }
+
+    // Numéro gapless (dans la transaction)
+    const { docNumber, sequenceNo } = await nextDocumentNumber(tx, {
+      docType,
+      year,
+      businessLineId: line.id,
     });
-  }
 
-  // 2. Numéro gapless
-  const { docNumber, sequenceNo } = await nextDocumentNumber({
-    docType,
-    year,
-    businessLineId: line.id,
+    const isFullyPaid =
+      data.paymentMethod !== "A_CREDIT" && (data.paidAmountCents ?? totals.totalTTC) >= totals.totalTTC;
+
+    docId = (
+      await tx
+        .insert(salesDocuments)
+        .values({
+          docType,
+          docNumber,
+          businessLineId: line.id,
+          docYear: year,
+          sequenceNo,
+          customerId: data.customerId ?? null,
+          customerName: data.customerName || "Client Comptoir Particulier",
+          customerPhone: data.customerPhone ?? null,
+          customerEmail: data.customerEmail ?? null,
+          customerCity: data.customerCity ?? "Casablanca",
+          customerIce: data.customerIce ?? null,
+          docDate: new Date(),
+          status: isFullyPaid ? "PAYE" : "VALIDE",
+          totalBrutHtCents: totals.totalBrutHT,
+          discountPercent: totals.discountPercent,
+          discountAmountCents: totals.discountAmount,
+          totalNetHtCents: totals.totalNetHT,
+          tvaRate: totals.tvaRate,
+          tvaAmountCents: totals.tvaAmount,
+          totalTtcCents: totals.totalTTC,
+          paidAmountCents: isFullyPaid ? totals.totalTTC : data.paidAmountCents ?? 0,
+          paymentMethod: data.paymentMethod,
+          notes: data.notes ?? null,
+          validatedAt: new Date(),
+        })
+        .returning({ id: salesDocuments.id })
+    )[0].id;
+
+    await tx.insert(salesLines).values(
+      data.lines.map((l) => ({
+        documentId: docId,
+        productId: l.productId,
+        productNameSnapshot: l.productName,
+        skuSnapshot: l.sku,
+        oemCodeSnapshot: l.oemCode ?? null,
+        unitPriceHtCents: l.unitPriceHTCents,
+        quantity: l.quantity,
+        totalHtCents: l.unitPriceHTCents * l.quantity,
+        unitCostCents: effects.find((e) => e.productId === l.productId)?.unitCostCents ?? 0,
+        tvaRate,
+        totalTtcCents: Math.round(l.unitPriceHTCents * l.quantity * (1 + tvaRate / 100)),
+      }))
+    );
+
+    for (const e of effects) {
+      await tx.insert(stockMovements).values({
+        productId: e.productId,
+        businessLineId: e.businessLineId,
+        movementType: "VENTE_BL",
+        quantity: e.quantity,
+        unitCostCents: e.unitCostCents,
+        sourceDocumentId: docId,
+        sourceDocumentType: docType,
+        reason: `Vente au comptoir — ${docNumber}`,
+      });
+      await tx
+        .update(products)
+        .set({ currentStock: e.nextStock, cmupCents: e.nextCmup, updatedAt: new Date() })
+        .where(eq(products.id, e.productId));
+    }
   });
-
-  const isFullyPaid =
-    data.paymentMethod !== "A_CREDIT" && (data.paidAmountCents ?? totals.totalTTC) >= totals.totalTTC;
-
-  // 3. En-tête
-  const docId = (
-    await d
-      .insert(salesDocuments)
-      .values({
-        docType,
-        docNumber,
-        businessLineId: line.id,
-        docYear: year,
-        sequenceNo,
-        customerId: data.customerId ?? null,
-        customerName: data.customerName || "Client Comptoir Particulier",
-        customerPhone: data.customerPhone ?? null,
-        customerEmail: data.customerEmail ?? null,
-        customerCity: data.customerCity ?? "Casablanca",
-        customerIce: data.customerIce ?? null,
-        docDate: new Date(),
-        status: isFullyPaid ? "PAYE" : "VALIDE",
-        totalBrutHtCents: totals.totalBrutHT,
-        discountPercent: totals.discountPercent,
-        discountAmountCents: totals.discountAmount,
-        totalNetHtCents: totals.totalNetHT,
-        tvaRate: totals.tvaRate,
-        tvaAmountCents: totals.tvaAmount,
-        totalTtcCents: totals.totalTTC,
-        paidAmountCents: isFullyPaid ? totals.totalTTC : data.paidAmountCents ?? 0,
-        paymentMethod: data.paymentMethod,
-        notes: data.notes ?? null,
-        validatedAt: new Date(),
-      })
-      .returning({ id: salesDocuments.id })
-  )[0].id;
-
-  // 4. Lignes (avec snapshot COGS)
-  await d.insert(salesLines).values(
-    data.lines.map((l) => ({
-      documentId: docId,
-      productId: l.productId,
-      productNameSnapshot: l.productName,
-      skuSnapshot: l.sku,
-      oemCodeSnapshot: l.oemCode ?? null,
-      unitPriceHtCents: l.unitPriceHTCents,
-      quantity: l.quantity,
-      totalHtCents: l.unitPriceHTCents * l.quantity,
-      unitCostCents: effects.find((e) => e.productId === l.productId)?.unitCostCents ?? 0,
-      tvaRate,
-      totalTtcCents: Math.round(l.unitPriceHTCents * l.quantity * (1 + tvaRate / 100)),
-    }))
-  );
-
-  // 5. Grand livre de stock + stock courant
-  for (const e of effects) {
-    await d.insert(stockMovements).values({
-      productId: e.productId,
-      businessLineId: e.businessLineId,
-      movementType: "VENTE_BL",
-      quantity: e.quantity,
-      unitCostCents: e.unitCostCents,
-      sourceDocumentId: docId,
-      sourceDocumentType: docType,
-      reason: `Vente au comptoir — ${docNumber}`,
-    });
-    await d
-      .update(products)
-      .set({ currentStock: e.nextStock, cmupCents: e.nextCmup, updatedAt: new Date() })
-      .where(eq(products.id, e.productId));
-  }
 
   const created = await loadDocumentById(docId);
   if (!created) throw new Error("ECHEC_CREATION_DOCUMENT");

@@ -2,7 +2,7 @@
 # Dockerfile multi-stage ultra-optimisé pour Next.js 16 Standalone sur Google Cloud Run (Strict 0 €/an)
 
 # Stage 1: Base Alpine avec compatibilité musl/glibc
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
