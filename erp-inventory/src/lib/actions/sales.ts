@@ -5,6 +5,7 @@ import {
   auditLogs,
   businessLineDocumentSettings,
   businessLines,
+  customers,
   db,
   documentLinks,
   products,
@@ -200,6 +201,20 @@ export async function createSalesDocument(data: {
   const docType = data.docType ?? "BL";
   const year = new Date().getFullYear();
   const tvaRate = 20; // TVA 20% (CGI pièces détachées)
+
+  // Exit gate Phase 3 : une facture à un client professionnel exige son ICE.
+  if (docType === "FACTURE") {
+    let ice = data.customerIce?.trim() || null;
+    let isProfessional = false;
+    if (data.customerId) {
+      const c = (await d.select().from(customers).where(eq(customers.id, data.customerId)).limit(1))[0];
+      isProfessional = c?.isProfessional ?? false;
+      ice = ice ?? c?.ice ?? null;
+    }
+    if (isProfessional && !ice) {
+      throw new Error("ICE_CLIENT_REQUIS: la facturation d'un client professionnel est bloquée sans ICE.");
+    }
+  }
 
   let docId = 0;
 

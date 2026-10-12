@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, eq, ilike, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { customerPayments, customers, db, salesDocuments } from "@/db";
 import { assertAuthenticated } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
@@ -16,6 +16,12 @@ export interface CustomerItem {
   address: string | null;
   ice: string | null;
   isWholesale: boolean;
+  isProfessional: boolean;
+  defaultPriceLevelId: number | null;
+  creditLimitCents: number | null;
+  paymentTerms: string | null;
+  representative: string | null;
+  externalRef: string | null;
   notes: string | null;
   createdAt: string;
 }
@@ -79,6 +85,12 @@ function mapCustomer(r: CustomerRow): CustomerItem {
     address: r.address,
     ice: r.ice,
     isWholesale: r.isWholesale ?? false,
+    isProfessional: r.isProfessional ?? false,
+    defaultPriceLevelId: r.defaultPriceLevelId ?? null,
+    creditLimitCents: r.creditLimitCents ?? null,
+    paymentTerms: r.paymentTerms,
+    representative: r.representative,
+    externalRef: r.externalRef,
     notes: r.notes,
     createdAt: (r.createdAt ?? new Date()).toISOString(),
   };
@@ -111,21 +123,22 @@ export async function getCustomers(searchQuery?: string) {
   const d = requireDb();
 
   const search = searchQuery?.trim().toLowerCase() || "";
-  const conds = search
-    ? [
-        or(
-          ilike(customers.name, `%${search}%`),
-          ilike(customers.phone, `%${search}%`),
-          ilike(customers.city, `%${search}%`),
-          ilike(customers.ice, `%${search}%`)
-        )!,
-      ]
-    : [];
+  const conds = [isNull(customers.deletedAt)];
+  if (search) {
+    conds.push(
+      or(
+        ilike(customers.name, `%${search}%`),
+        ilike(customers.phone, `%${search}%`),
+        ilike(customers.city, `%${search}%`),
+        ilike(customers.ice, `%${search}%`)
+      )!
+    );
+  }
 
   const rows = await d
     .select()
     .from(customers)
-    .where(conds.length ? and(...conds) : undefined)
+    .where(and(...conds))
     .orderBy(asc(customers.name))
     .limit(500);
 
@@ -368,7 +381,29 @@ export async function getChequesEffetsSchedule(): Promise<ChequeEffetAlert[]> {
 }
 
 /**
- * Crée ou modifie un client.
+ * Détecte les doublons clients (nom, téléphone, ICE). Exclut `excludeId` (édition).
+ */
+export async function findCustomerDuplicates(
+  data: { name?: string; phone?: string; ice?: string },
+  excludeId?: number
+): Promise<Array<{ id: number; name: string; phone: string | null; ice: string | null }>> {
+  const d = requireDb();
+  const ors = [];
+  if (data.name?.trim()) ors.push(ilike(customers.name, data.name.trim()));
+  if (data.phone?.trim()) ors.push(eq(customers.phone, data.phone.trim()));
+  if (data.ice?.trim()) ors.push(eq(customers.ice, data.ice.trim()));
+  if (ors.length === 0) return [];
+  const conds = [isNull(customers.deletedAt), or(...ors)!];
+  if (excludeId) conds.push(ne(customers.id, excludeId));
+  const rows = await d
+    .select({ id: customers.id, name: customers.name, phone: customers.phone, ice: customers.ice })
+    .from(customers)
+    .where(and(...conds));
+  return rows;
+}
+
+/**
+ * Crée ou modifie un client. Détecte les doublons et applique la règle ICE (B2B).
  */
 export async function saveCustomer(data: {
   id?: number;
@@ -379,12 +414,37 @@ export async function saveCustomer(data: {
   address?: string;
   ice?: string;
   isWholesale?: boolean;
+  isProfessional?: boolean;
+  defaultPriceLevelId?: number | null;
+  creditLimitCents?: number | null;
+  paymentTerms?: string;
+  representative?: string;
+  externalRef?: string;
   notes?: string;
+  force?: boolean;
 }): Promise<CustomerItem> {
   await assertAuthenticated();
   const d = requireDb();
 
   if (!data.name.trim()) throw new Error("Le nom du client ou de la société est obligatoire");
+
+  const isProfessional = data.isProfessional ?? false;
+  const iceValue = data.ice?.trim() || null;
+  if (isProfessional && !iceValue) {
+    throw new Error("ICE obligatoire pour un client professionnel (B2B).");
+  }
+
+  if (!data.force) {
+    const dups = await findCustomerDuplicates(
+      { name: data.name.trim(), phone: data.phone?.trim(), ice: iceValue ?? undefined },
+      data.id
+    );
+    if (dups.length > 0) {
+      throw new Error(
+        `Doublon potentiel : client existant « ${dups[0].name} » (#${dups[0].id}). Confirmez pour créer malgré tout.`
+      );
+    }
+  }
 
   const values = {
     name: data.name.trim(),
@@ -392,10 +452,15 @@ export async function saveCustomer(data: {
     email: data.email || null,
     city: data.city || "Casablanca",
     address: data.address || null,
-    ice: data.ice || null,
+    ice: iceValue,
     isWholesale: data.isWholesale ?? false,
+    isProfessional,
+    defaultPriceLevelId: data.defaultPriceLevelId ?? null,
+    creditLimitCents: data.creditLimitCents ?? null,
+    paymentTerms: data.paymentTerms || null,
+    representative: data.representative || null,
+    externalRef: data.externalRef || null,
     notes: data.notes || null,
-    updatedAt: new Date(),
   };
 
   const saved = data.id
@@ -406,6 +471,29 @@ export async function saveCustomer(data: {
 
   if (!saved) throw new Error("Client introuvable");
   return mapCustomer(saved);
+}
+
+/**
+ * Fusionne deux clients : ré-affecte documents + règlements à la cible puis
+ * archive (soft-delete) la source.
+ */
+export async function mergeCustomers(sourceId: number, targetId: number): Promise<CustomerItem> {
+  await assertAuthenticated();
+  const d = requireDb();
+  if (sourceId === targetId) throw new Error("La source et la cible sont identiques");
+
+  const rows = await d.select().from(customers).where(inArray(customers.id, [sourceId, targetId]));
+  const source = rows.find((r) => r.id === sourceId);
+  const target = rows.find((r) => r.id === targetId);
+  if (!source || !target) throw new Error("Client source ou cible introuvable");
+
+  await d.transaction(async (tx) => {
+    await tx.update(salesDocuments).set({ customerId: targetId }).where(eq(salesDocuments.customerId, sourceId));
+    await tx.update(customerPayments).set({ customerId: targetId }).where(eq(customerPayments.customerId, sourceId));
+    await tx.update(customers).set({ deletedAt: new Date() }).where(eq(customers.id, sourceId));
+  });
+
+  return mapCustomer(target);
 }
 
 export interface AgingBuckets {

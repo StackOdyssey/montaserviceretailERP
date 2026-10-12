@@ -350,9 +350,16 @@ export const customers = pgTable("customers", {
   email: text("email"), // Resend
   city: text("city").default("Casablanca"),
   address: text("address"),
-  ice: text("ice"),
+  ice: text("ice"), // obligatoire uniquement si is_professional (B2B)
   isWholesale: boolean("is_wholesale").default(false), // Grossiste ou détail
+  isProfessional: boolean("is_professional").default(false), // professionnel (ICE requis) vs particulier
+  defaultPriceLevelId: integer("default_price_level_id").references(() => priceLevels.id),
+  creditLimitCents: integer("credit_limit_cents"), // plafond de crédit (nullable = pas de limite)
+  paymentTerms: text("payment_terms"), // conditions de règlement (ex: "30 jours")
+  representative: text("representative"),
+  externalRef: text("external_ref"),
   notes: text("notes"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -367,7 +374,10 @@ export const suppliers = pgTable("suppliers", {
   email: text("email"), // Resend
   city: text("city"),
   ice: text("ice"),
+  isActive: boolean("is_active").default(true),
+  externalRef: text("external_ref"),
   notes: text("notes"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

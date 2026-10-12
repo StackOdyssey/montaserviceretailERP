@@ -85,6 +85,13 @@
       "when": 1791828773294,
       "tag": "0011_settings_banks",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791833310671,
+      "tag": "0012_new_dragon_lord",
+      "breakpoints": true
     }
   ]
 }

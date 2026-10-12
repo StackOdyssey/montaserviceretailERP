@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { X, UserPlus, Building, Phone, Mail, MapPin, FileText, CheckCircle2 } from "lucide-react";
 import { CustomerItem, saveCustomer } from "@/lib/actions/customers";
+import { useParameters } from "@/components/layout/SettingsProvider";
+import { toCentimes } from "@/lib/money";
 
 interface CustomerModalProps {
   isOpen: boolean;
@@ -20,6 +22,16 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
   const [ice, setIce] = useState(customer?.ice || "");
   const [isWholesale, setIsWholesale] = useState(customer?.isWholesale ?? false);
   const [notes, setNotes] = useState(customer?.notes || "");
+  const { priceLevels } = useParameters();
+  const [isProfessional, setIsProfessional] = useState(customer?.isProfessional ?? false);
+  const [priceLevelId, setPriceLevelId] = useState<number | null>(customer?.defaultPriceLevelId ?? null);
+  const [creditLimitDh, setCreditLimitDh] = useState(
+    customer?.creditLimitCents != null ? String(customer.creditLimitCents / 100) : ""
+  );
+  const [paymentTerms, setPaymentTerms] = useState(customer?.paymentTerms || "");
+  const [representative, setRepresentative] = useState(customer?.representative || "");
+  const [externalRef, setExternalRef] = useState(customer?.externalRef || "");
+  const [force, setForce] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,6 +47,7 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
     try {
       setIsSubmitting(true);
       setError(null);
+      const parsedLimit = creditLimitDh.trim() ? parseFloat(creditLimitDh.replace(",", ".")) : NaN;
       await saveCustomer({
         id: customer?.id,
         name,
@@ -44,7 +57,14 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
         address,
         ice,
         isWholesale,
+        isProfessional,
+        defaultPriceLevelId: priceLevelId,
+        creditLimitCents: Number.isFinite(parsedLimit) ? toCentimes(parsedLimit) : null,
+        paymentTerms,
+        representative,
+        externalRef,
         notes,
+        force,
       });
       onSaved();
       onClose();
@@ -87,6 +107,12 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
             <div className="p-3 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 rounded-xl text-sm border border-red-200 dark:border-red-900">
               {error}
             </div>
+          )}
+          {error && /Doublon/i.test(error) && (
+            <label className="flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
+              <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} className="w-4 h-4" />
+              Enregistrer malgré le doublon détecté
+            </label>
           )}
 
           <div>
@@ -187,18 +213,92 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
             />
           </div>
 
-          {/* Type client : Grossiste ou Particulier */}
-          <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
-            <input
-              type="checkbox"
-              id="isWholesale"
-              checked={isWholesale}
-              onChange={(e) => setIsWholesale(e.target.checked)}
-              className="w-4 h-4 text-[#F7162D] rounded border-gray-300 focus:ring-[#F7162D]"
-            />
-            <label htmlFor="isWholesale" className="text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer">
-              Client Professionnel / Grossiste (Tarification de gros)
+          {/* Type client : Grossiste / Professionnel */}
+          <div className="space-y-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isWholesale}
+                onChange={(e) => setIsWholesale(e.target.checked)}
+                className="w-4 h-4 text-[#F7162D] rounded border-gray-300 focus:ring-[#F7162D]"
+              />
+              <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                Client Grossiste (Tarification de gros)
+              </span>
             </label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isProfessional}
+                onChange={(e) => setIsProfessional(e.target.checked)}
+                className="w-4 h-4 text-[#F7162D] rounded border-gray-300 focus:ring-[#F7162D]"
+              />
+              <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                Client Professionnel (ICE obligatoire — B2B)
+              </span>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
+                Niveau de prix par défaut
+              </label>
+              <select
+                value={priceLevelId ?? ""}
+                onChange={(e) => setPriceLevelId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-[#F7162D]"
+              >
+                <option value="">Non défini</option>
+                {priceLevels.map((pl) => (
+                  <option key={pl.id} value={pl.id}>
+                    {pl.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
+                Plafond de crédit (DH)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={creditLimitDh}
+                onChange={(e) => setCreditLimitDh(e.target.value)}
+                placeholder="Laisser vide = pas de limite"
+                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-[#F7162D]"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
+                Conditions de règlement
+              </label>
+              <input
+                type="text"
+                value={paymentTerms}
+                onChange={(e) => setPaymentTerms(e.target.value)}
+                placeholder="Ex: Chèque à 30 jours"
+                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-[#F7162D]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
+                Représentant
+              </label>
+              <input
+                type="text"
+                value={representative}
+                onChange={(e) => setRepresentative(e.target.value)}
+                placeholder="Commercial référent"
+                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-[#F7162D]"
+              />
+            </div>
           </div>
 
           <div>

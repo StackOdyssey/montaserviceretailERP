@@ -116,7 +116,7 @@ export interface Parameters {
   vatRates: Array<{ id: number; label: string; ratePercent: number; isDefault: boolean }>;
   expenseCategories: Array<{ id: number; name: string; vatDeductibleDefault: boolean; receiptRequired: boolean }>;
   paymentMethods: Array<{ code: string; label: string }>;
-  priceLevels: Array<{ code: string; label: string }>;
+  priceLevels: Array<{ id: number; code: string; label: string }>;
 }
 
 const EMPTY_PARAMS: Parameters = { vatRates: [], expenseCategories: [], paymentMethods: [], priceLevels: [] };
@@ -146,7 +146,7 @@ export async function getParameters(): Promise<Parameters> {
         .from(paymentMethods)
         .where(eq(paymentMethods.isActive, true))
         .orderBy(asc(paymentMethods.sortOrder)),
-      db.select({ code: priceLevels.code, label: priceLevels.label }).from(priceLevels).orderBy(asc(priceLevels.id)),
+      db.select({ id: priceLevels.id, code: priceLevels.code, label: priceLevels.label }).from(priceLevels).orderBy(asc(priceLevels.id)),
     ]);
     return { vatRates: vats, expenseCategories: cats, paymentMethods: methods, priceLevels: levels };
   } catch {

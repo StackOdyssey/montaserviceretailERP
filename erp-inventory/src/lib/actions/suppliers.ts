@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, desc, eq, gte, ilike, inArray, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import {
   db,
   products,
@@ -25,6 +25,8 @@ export interface SupplierItem {
   email: string | null;
   city: string | null;
   ice: string | null;
+  isActive: boolean;
+  externalRef: string | null;
   notes: string | null;
   createdAt: string;
   totalPurchasesTtcCents?: number;
@@ -93,6 +95,8 @@ function mapSupplier(r: SupplierRow): SupplierItem {
     email: r.email,
     city: r.city,
     ice: r.ice,
+    isActive: r.isActive ?? true,
+    externalRef: r.externalRef,
     notes: r.notes,
     createdAt: (r.createdAt ?? new Date()).toISOString(),
   };
@@ -152,21 +156,22 @@ export async function getSuppliers(searchQuery?: string): Promise<SupplierItem[]
   const d = requireDb();
 
   const search = searchQuery?.trim().toLowerCase() || "";
-  const conds = search
-    ? [
-        or(
-          ilike(suppliers.name, `%${search}%`),
-          ilike(suppliers.contactName, `%${search}%`),
-          ilike(suppliers.phone, `%${search}%`),
-          ilike(suppliers.city, `%${search}%`)
-        )!,
-      ]
-    : [];
+  const conds = [isNull(suppliers.deletedAt)];
+  if (search) {
+    conds.push(
+      or(
+        ilike(suppliers.name, `%${search}%`),
+        ilike(suppliers.contactName, `%${search}%`),
+        ilike(suppliers.phone, `%${search}%`),
+        ilike(suppliers.city, `%${search}%`)
+      )!
+    );
+  }
 
   const rows = await d
     .select()
     .from(suppliers)
-    .where(conds.length ? and(...conds) : undefined)
+    .where(and(...conds))
     .orderBy(asc(suppliers.name))
     .limit(500);
 
@@ -449,6 +454,8 @@ export async function saveSupplier(data: {
   email?: string;
   city?: string;
   ice?: string;
+  isActive?: boolean;
+  externalRef?: string;
   notes?: string;
 }): Promise<SupplierItem> {
   await assertAuthenticated();
@@ -463,8 +470,9 @@ export async function saveSupplier(data: {
     email: data.email || null,
     city: data.city || null,
     ice: data.ice || null,
+    isActive: data.isActive ?? true,
+    externalRef: data.externalRef || null,
     notes: data.notes || null,
-    updatedAt: new Date(),
   };
 
   const saved = data.id
@@ -473,6 +481,16 @@ export async function saveSupplier(data: {
 
   if (!saved) throw new Error("Fournisseur introuvable");
   return mapSupplier(saved);
+}
+
+/**
+ * Archive (soft-delete) un fournisseur.
+ */
+export async function deleteSupplier(id: number): Promise<{ success: boolean }> {
+  await assertAuthenticated();
+  const d = requireDb();
+  await d.update(suppliers).set({ deletedAt: new Date() }).where(eq(suppliers.id, id));
+  return { success: true };
 }
 
 /**
