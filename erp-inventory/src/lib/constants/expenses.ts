@@ -18,7 +18,8 @@ export const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
 export interface ExpenseItem {
   id: number;
   title: string;
-  category: ExpenseCategory;
+  category: string; // nom de la catégorie (table expense_categories)
+  categoryId?: number | null;
   amountCents: number; // Total TTC
   amountHtCents?: number;
   tvaRate?: number;

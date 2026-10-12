@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { X, Receipt, Camera, Upload, Trash2, CheckCircle2 } from "lucide-react";
 import { recordExpense } from "@/lib/actions/expenses";
-import { ExpenseCategory, CATEGORY_LABELS } from "@/lib/constants/expenses";
+import { useParameters, useSettings } from "@/components/layout/SettingsProvider";
 import { toCentimes } from "@/lib/money";
 import { compressImageToWebP } from "@/lib/image-compressor";
 import { getPhotoUploadUrl } from "@/lib/actions/media";
@@ -15,8 +15,12 @@ interface ExpenseModalProps {
 }
 
 export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
+  const company = useSettings();
+  const { expenseCategories } = useParameters();
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState<ExpenseCategory>("TRANSPORT");
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const activeCategory =
+    expenseCategories.find((c) => c.id === categoryId) ?? expenseCategories[0] ?? null;
   const [amountDh, setAmountDh] = useState("");
   const [expenseDate, setExpenseDate] = useState(
     new Date().toISOString().split("T")[0]
@@ -81,6 +85,10 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
       setError("Veuillez saisir l'intitulé de la dépense.");
       return;
     }
+    if (activeCategory?.receiptRequired && !photoPreview) {
+      setError("Un justificatif (photo du reçu) est obligatoire pour cette catégorie.");
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -88,8 +96,10 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
 
       await recordExpense({
         title,
-        category,
+        category: activeCategory?.name ?? "Divers",
+        categoryId: activeCategory?.id ?? null,
         amountCents: toCentimes(parsedDh),
+        tvaRate: company.defaultVatRate,
         expenseDate: new Date(expenseDate).toISOString(),
         receiptPhotoUrl: photoPreview || undefined,
         notes: notes.trim() || undefined,
@@ -141,16 +151,22 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
               Catégorie de la dépense <span className="text-[#F7162D]">*</span>
             </label>
             <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
+              value={activeCategory?.id ?? ""}
+              onChange={(e) => setCategoryId(Number(e.target.value))}
               className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-[#F7162D]"
             >
-              {Object.entries(CATEGORY_LABELS).map(([catKey, label]) => (
-                <option key={catKey} value={catKey}>
-                  {label}
+              {expenseCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
             </select>
+            {activeCategory && (
+              <p className="text-[11px] text-gray-500 mt-1">
+                {activeCategory.vatDeductibleDefault ? "TVA déductible" : "TVA non déductible"}
+                {activeCategory.receiptRequired ? " • Justificatif obligatoire" : ""}
+              </p>
+            )}
           </div>
 
           <div>

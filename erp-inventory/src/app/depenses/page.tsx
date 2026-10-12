@@ -18,21 +18,19 @@ import {
   getExpenses,
   deleteExpense,
 } from "@/lib/actions/expenses";
-import {
-  ExpenseItem,
-  ExpenseCategory,
-  CATEGORY_LABELS,
-} from "@/lib/constants/expenses";
+import { ExpenseItem } from "@/lib/constants/expenses";
+import { useParameters } from "@/components/layout/SettingsProvider";
 
 import { formatMoney } from "@/lib/money";
 import { ExpenseModal } from "@/components/expenses/ExpenseModal";
 
 export default function DepensesPage() {
+  const { expenseCategories } = useParameters();
   const [expensesList, setExpensesList] = useState<ExpenseItem[]>([]);
   const [stats, setStats] = useState({
     todayTotalCents: 0,
     monthTotalCents: 0,
-    categoryTotals: {} as Record<ExpenseCategory, number>,
+    categoryTotals: {} as Record<string, number>,
   });
   const [period, setPeriod] = useState<"TODAY" | "THIS_WEEK" | "THIS_MONTH" | "ALL">("THIS_MONTH");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
@@ -67,21 +65,17 @@ export default function DepensesPage() {
     }
   };
 
-  const getCategoryBadgeClass = (cat: ExpenseCategory) => {
-    switch (cat) {
-      case "LOYER":
-        return "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300";
-      case "ELECTRICITE_EAU":
-        return "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
-      case "TRANSPORT":
-        return "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
-      case "REPAS_EQUIPE":
-        return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300";
-      case "FOURNITURES":
-        return "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300";
-      default:
-        return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
-    }
+  const categoryColors = [
+    "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300",
+    "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+    "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
+    "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+    "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300",
+    "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
+  ];
+  const getCategoryBadgeClass = (cat: string) => {
+    const idx = expenseCategories.findIndex((c) => c.name === cat);
+    return categoryColors[(idx >= 0 ? idx : 0) % categoryColors.length];
   };
 
   return (
@@ -185,9 +179,9 @@ export default function DepensesPage() {
             className="px-3 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#F7162D]"
           >
             <option value="ALL">Toutes les catégories</option>
-            {Object.entries(CATEGORY_LABELS).map(([catKey, label]) => (
-              <option key={catKey} value={catKey}>
-                {label}
+            {expenseCategories.map((c) => (
+              <option key={c.id} value={c.name}>
+                {c.name}
               </option>
             ))}
           </select>
@@ -228,7 +222,7 @@ export default function DepensesPage() {
                           item.category
                         )}`}
                       >
-                        {CATEGORY_LABELS[item.category] || item.category}
+                        {item.category}
                       </span>
                     </td>
 

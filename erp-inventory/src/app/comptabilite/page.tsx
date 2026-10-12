@@ -34,8 +34,10 @@ import { getAccountingPeriods, setPeriodLock, getAccountingCsv } from "@/lib/act
 import { getCustomerAging, type PartyAgingRow, type AgingBuckets } from "@/lib/actions/customers";
 import { getSupplierAging } from "@/lib/actions/suppliers";
 import { formatMoney } from "@/lib/money";
+import { useSettings } from "@/components/layout/SettingsProvider";
 
 export default function ComptabilitePage() {
+  const company = useSettings();
   const [activeTab, setActiveTab] = useState<"TVA" | "STOCK" | "MARGES" | "AGING">("TVA");
   const [tvaData, setTvaData] = useState<TvaAccountingExport | null>(null);
   const [stockData, setStockData] = useState<StockValuation | null>(null);
@@ -118,7 +120,7 @@ export default function ComptabilitePage() {
         <div>
           <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
             <BarChart3 className="w-7 h-7 text-[#F7162D]" />
-            Rapports, Marges & Export TVA 20%
+            Rapports, Marges & Déclaration TVA
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             Déclaration périodique de TVA pour l'expert-comptable, valorisation du stock et rentabilité par pièce.
@@ -201,7 +203,7 @@ export default function ComptabilitePage() {
           }`}
         >
           <Receipt className="w-4 h-4" />
-          Déclaration TVA 20% (Comptable)
+          Déclaration TVA (Comptable)
         </button>
 
         <button
@@ -250,7 +252,7 @@ export default function ComptabilitePage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 print:hidden">
             <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xs">
               <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                1. TVA Collectée (20%)
+                1. TVA Collectée
               </span>
               <div className="text-2xl font-black text-gray-900 dark:text-white mt-1">
                 {formatMoney(tvaData.tvaCollectedCents)}
@@ -262,7 +264,7 @@ export default function ComptabilitePage() {
 
             <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xs">
               <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                2. TVA Déductible (20%)
+                2. TVA Déductible
               </span>
               <div className="text-2xl font-black text-emerald-600 mt-1">
                 {formatMoney(tvaData.totalTvaDeductibleCents)}
@@ -291,13 +293,16 @@ export default function ComptabilitePage() {
             <div className="flex justify-between items-start border-b-2 border-gray-900 pb-5">
               <div>
                 <h2 className="text-xl font-black text-[#F7162D] tracking-tight">
-                  SARL BM MOTORS
+                  {company.raisonSociale || "—"}
                 </h2>
                 <p className="text-xs font-bold uppercase text-gray-700">
-                  Régime de la Taxe sur la Valeur Ajoutée (TVA) à 20%
+                  Régime de la Taxe sur la Valeur Ajoutée (TVA)
                 </p>
                 <p className="text-[11px] text-gray-600 mt-1">
-                  <strong>ICE:</strong> 001892837000045 • <strong>IF:</strong> 40291823 • <strong>RC:</strong> 39281 • <strong>TP:</strong> 37192801
+                  {company.ice && (<><strong>ICE:</strong> {company.ice}</>)}
+                  {company.identifiantFiscal && (<> • <strong>IF:</strong> {company.identifiantFiscal}</>)}
+                  {company.registreCommerce && (<> • <strong>RC:</strong> {company.registreCommerce}</>)}
+                  {company.taxeProfessionnelle && (<> • <strong>TP:</strong> {company.taxeProfessionnelle}</>)}
                 </p>
               </div>
 
@@ -318,7 +323,7 @@ export default function ComptabilitePage() {
             <div className="my-6 space-y-2">
               <div className="flex justify-between items-center">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-gray-800">
-                  A. Chiffre d'Affaires & TVA Collectée (20%) sur les Ventes
+                  A. Chiffre d'Affaires & TVA Collectée sur les Ventes
                 </h3>
                 <span className="text-xs font-bold text-gray-600">
                   Total Net HT : {formatMoney(tvaData.salesTaxableHtCents)}
@@ -335,7 +340,7 @@ export default function ComptabilitePage() {
                       <th className="py-2 px-3">ICE Client</th>
                       <th className="py-2 px-3 text-right">Net HT</th>
                       <th className="py-2 px-3 text-center">Taux</th>
-                      <th className="py-2 px-3 text-right">TVA 20%</th>
+                      <th className="py-2 px-3 text-right">TVA</th>
                       <th className="py-2 px-3 text-right">Total TTC</th>
                     </tr>
                   </thead>
@@ -351,7 +356,7 @@ export default function ComptabilitePage() {
                           {row.customerIce || "Particulier"}
                         </td>
                         <td className="py-2 px-3 text-right font-medium">{formatMoney(row.totalNetHtCents)}</td>
-                        <td className="py-2 px-3 text-center font-bold">20%</td>
+                        <td className="py-2 px-3 text-center font-bold">{row.tvaRate}%</td>
                         <td className="py-2 px-3 text-right font-bold text-gray-900">{formatMoney(row.tvaAmountCents)}</td>
                         <td className="py-2 px-3 text-right font-black text-[#F7162D]">{formatMoney(row.totalTtcCents)}</td>
                       </tr>
@@ -361,7 +366,7 @@ export default function ComptabilitePage() {
                     <tr className="bg-gray-50 font-black border-t-2 border-gray-300">
                       <td colSpan={4} className="py-2.5 px-3 uppercase text-right">Totaux Ventes :</td>
                       <td className="py-2.5 px-3 text-right">{formatMoney(tvaData.salesTaxableHtCents)}</td>
-                      <td className="py-2.5 px-3 text-center">20%</td>
+                      <td className="py-2.5 px-3 text-center">{tvaData.tvaCollectedRate}%</td>
                       <td className="py-2.5 px-3 text-right text-gray-900">{formatMoney(tvaData.tvaCollectedCents)}</td>
                       <td className="py-2.5 px-3 text-right text-[#F7162D]">{formatMoney(tvaData.salesTotalTtcCents)}</td>
                     </tr>
@@ -374,7 +379,7 @@ export default function ComptabilitePage() {
             <div className="my-6 space-y-2">
               <div className="flex justify-between items-center">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-gray-800">
-                  B. Achats de Pièces & TVA Déductible (20%)
+                  B. Achats de Pièces & TVA Déductible
                 </h3>
                 <span className="text-xs font-bold text-emerald-700">
                   Total Déductible : {formatMoney(tvaData.totalTvaDeductibleCents)}
@@ -391,7 +396,7 @@ export default function ComptabilitePage() {
                       <th className="py-2 px-3">ICE Fournisseur</th>
                       <th className="py-2 px-3 text-right">Base HT</th>
                       <th className="py-2 px-3 text-center">Taux</th>
-                      <th className="py-2 px-3 text-right">TVA 20%</th>
+                      <th className="py-2 px-3 text-right">TVA</th>
                       <th className="py-2 px-3 text-right">Total TTC</th>
                     </tr>
                   </thead>
@@ -407,7 +412,7 @@ export default function ComptabilitePage() {
                         <td className="py-2 px-3 font-semibold text-gray-800">{row.supplierName}</td>
                         <td className="py-2 px-3 font-mono text-gray-600">{row.supplierIce}</td>
                         <td className="py-2 px-3 text-right font-medium">{formatMoney(row.totalHtCents)}</td>
-                        <td className="py-2 px-3 text-center font-bold">20%</td>
+                        <td className="py-2 px-3 text-center font-bold">{row.tvaRate}%</td>
                         <td className="py-2 px-3 text-right font-bold text-emerald-700">{formatMoney(row.tvaAmountCents)}</td>
                         <td className="py-2 px-3 text-right font-black text-gray-900">{formatMoney(row.totalTtcCents)}</td>
                       </tr>
@@ -439,7 +444,7 @@ export default function ComptabilitePage() {
             </div>
 
             <div className="mt-8 pt-4 border-t border-gray-200 text-center text-[10px] text-gray-500">
-              Document comptable certifié conforme aux écritures du grand livre SARL BM Motors • Casablanca
+              Document comptable certifié conforme aux écritures du grand livre {company.raisonSociale}{company.city ? ` • ${company.city}` : ""}
             </div>
           </div>
         </div>
@@ -465,13 +470,13 @@ export default function ComptabilitePage() {
 
             <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xs">
               <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                Valeur Marchande (Détail TTC)
+                Valeur Marchande (Détail HT)
               </span>
               <div className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">
-                {formatMoney(stockData.totalRetailTtcCents)}
+                {formatMoney(stockData.totalRetailHtCents)}
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Potentiel de vente client particulier
+                Potentiel de vente au prix HT
               </p>
             </div>
 
@@ -521,7 +526,7 @@ export default function ComptabilitePage() {
                     <th className="py-3 px-4">Désignation</th>
                     <th className="py-3 px-4 text-center">Stock</th>
                     <th className="py-3 px-4 text-right">P.U. Achat HT</th>
-                    <th className="py-3 px-4 text-right">P.U. Vente TTC</th>
+                    <th className="py-3 px-4 text-right">P.U. Vente HT</th>
                     <th className="py-3 px-4 text-right">Capital Immobilisé HT</th>
                   </tr>
                 </thead>

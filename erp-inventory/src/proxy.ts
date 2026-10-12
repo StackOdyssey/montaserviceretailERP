@@ -13,12 +13,11 @@ function noIndex(res: NextResponse): NextResponse {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // 1. Chemins publics toujours autorisés
+  // 1. Chemins publics toujours autorisés (API NON publique : toute route /api exige une session)
   if (
     pathname === "/robots.txt" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/api") ||
     pathname === "/manifest.json" ||
     pathname === "/sw.js" ||
     pathname === "/bashan-logo.png" ||

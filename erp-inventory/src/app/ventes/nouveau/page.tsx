@@ -23,6 +23,7 @@ import { getProducts, ProductItem } from "@/lib/actions/products";
 import { createSalesDocument, SalesLineInput, SalesDocumentItem } from "@/lib/actions/sales";
 import { formatMoney, calculateDocumentTotals } from "@/lib/money";
 import { useSettings, useParameters } from "@/components/layout/SettingsProvider";
+import { useBusinessLine } from "@/components/layout/BusinessLineProvider";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
 
 interface CartLine extends SalesLineInput {
@@ -47,6 +48,7 @@ export default function NouveauBonDeLivraisonPage() {
   const router = useRouter();
   const company = useSettings();
   const { paymentMethods } = useParameters();
+  const { activeCode: businessLineCode } = useBusinessLine();
 
   // Liste des articles du panier
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -89,13 +91,13 @@ export default function NouveauBonDeLivraisonPage() {
 
     const timer = setTimeout(() => {
       startSearch(async () => {
-        const results = await getProducts({ search: searchTerm });
+        const results = await getProducts({ search: searchTerm, businessLineCode });
         setSearchResults(results.slice(0, 8)); // Top 8 résultats
       });
     }, 150);
 
     return () => clearTimeout(timer);
-  }, [searchTerm]);
+  }, [searchTerm, businessLineCode]);
 
   // Ajouter un article au panier
   const handleAddToCart = (product: ProductItem) => {
@@ -115,7 +117,7 @@ export default function NouveauBonDeLivraisonPage() {
           productName: product.name,
           sku: product.sku,
           oemCode: product.oemCode,
-          unitPriceHTCents: Math.round(product.salePriceRetailCents / 1.1), // Prix HT extrait du TTC à 10%
+          unitPriceHTCents: product.salePriceRetailCents, // prix de vente HT (la TVA est calculée par document)
           quantity: 1,
           currentStock: product.currentStock,
         },
@@ -177,6 +179,7 @@ export default function NouveauBonDeLivraisonPage() {
         paymentMethod,
         paidAmountCents: paymentMethod === "A_CREDIT" ? 0 : totals.totalTTC,
         notes: notes.trim() || undefined,
+        businessLineCode,
       });
 
       setCreatedDocument(doc);
@@ -206,7 +209,7 @@ export default function NouveauBonDeLivraisonPage() {
               {DOC_TITLES[docType]}
             </h1>
             <p className="text-xs text-[#6B7280]">
-              Saisie rapide au comptoir • TVA 20%
+              Saisie rapide au comptoir • TVA {company.defaultVatRate}%
             </p>
           </div>
         </div>

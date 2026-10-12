@@ -44,8 +44,8 @@ export interface StockValuation {
   totalItemsCount: number; // Quantité totale de pièces physiques
   totalCatalogReferences: number; // Nombre de références au catalogue
   totalCostHtCents: number; // Valeur totale du stock au prix d'achat HT
-  totalRetailTtcCents: number; // Valeur marchande totale au prix de vente détail TTC
-  totalWholesaleTtcCents: number; // Valeur au prix de vente gros TTC
+  totalRetailHtCents: number; // Valeur marchande totale au prix de vente détail HT
+  totalWholesaleHtCents: number; // Valeur au prix de vente gros HT
   latentMarginHtCents: number; // Marge brute potentielle
   latentMarginRatePercent: number;
   topValuedProducts: Array<{
@@ -81,7 +81,7 @@ export interface TvaAccountingExport {
   periodLabel: string;
   // Ventes (TVA Collectée)
   salesTaxableHtCents: number;
-  tvaCollectedRate: number; // 10%
+  tvaCollectedRate: number; // taux effectif (dérivé des documents)
   tvaCollectedCents: number;
   salesTotalTtcCents: number;
   salesLines: Array<{
@@ -92,13 +92,14 @@ export interface TvaAccountingExport {
     totalBrutHtCents: number;
     discountAmountCents: number;
     totalNetHtCents: number;
+    tvaRate: number;
     tvaAmountCents: number;
     totalTtcCents: number;
     paymentMethod: string;
   }>;
   // Achats (TVA Déductible)
   purchasesTaxableHtCents: number;
-  tvaDeductibleRate: number; // 10%
+  tvaDeductibleRate: number; // taux effectif (dérivé des bons de réception)
   tvaDeductiblePurchasesCents: number;
   tvaDeductibleExpensesCents: number;
   totalTvaDeductibleCents: number;
@@ -109,6 +110,7 @@ export interface TvaAccountingExport {
     supplierIce: string | null;
     invoiceNumber: string | null;
     totalHtCents: number;
+    tvaRate: number;
     tvaAmountCents: number;
     totalTtcCents: number;
   }>;
@@ -238,8 +240,8 @@ export async function getStockValuation(): Promise<StockValuation> {
 
   let totalItemsCount = 0;
   let totalCostHtCents = 0;
-  let totalRetailTtcCents = 0;
-  let totalWholesaleTtcCents = 0;
+  let totalRetailHtCents = 0;
+  let totalWholesaleHtCents = 0;
 
   const valuedProducts = prods.map((p) => {
     const stock = Math.max(0, p.currentStock);
@@ -249,8 +251,8 @@ export async function getStockValuation(): Promise<StockValuation> {
 
     totalItemsCount += stock;
     totalCostHtCents += cost;
-    totalRetailTtcCents += retail;
-    totalWholesaleTtcCents += wholesale;
+    totalRetailHtCents += retail;
+    totalWholesaleHtCents += wholesale;
 
     return {
       id: p.id,
@@ -263,7 +265,6 @@ export async function getStockValuation(): Promise<StockValuation> {
     };
   });
 
-  const totalRetailHtCents = totalRetailTtcCents;
   const latentMarginHtCents = Math.max(0, totalRetailHtCents - totalCostHtCents);
   const latentMarginRatePercent =
     totalRetailHtCents > 0
@@ -278,8 +279,8 @@ export async function getStockValuation(): Promise<StockValuation> {
     totalItemsCount,
     totalCatalogReferences: prods.length,
     totalCostHtCents,
-    totalRetailTtcCents,
-    totalWholesaleTtcCents,
+    totalRetailHtCents,
+    totalWholesaleHtCents,
     latentMarginHtCents,
     latentMarginRatePercent,
     topValuedProducts,
@@ -429,6 +430,7 @@ export async function getTvaAccountingExport(options?: {
       totalBrutHtCents: doc.totalBrutHtCents,
       discountAmountCents: doc.discountAmountCents,
       totalNetHtCents: doc.totalNetHtCents,
+      tvaRate: doc.tvaRate,
       tvaAmountCents: doc.tvaAmountCents,
       totalTtcCents: doc.totalTtcCents,
       paymentMethod: doc.paymentMethod || "ESPECES",
@@ -443,6 +445,7 @@ export async function getTvaAccountingExport(options?: {
       receiptDate: supplierReceipts.receiptDate,
       invoiceNumber: supplierReceipts.supplierInvoiceNumber,
       totalHtCents: supplierReceipts.totalHtCents,
+      tvaRate: supplierReceipts.tvaRate,
       tvaAmountCents: supplierReceipts.tvaAmountCents,
       totalTtcCents: supplierReceipts.totalTtcCents,
       supplierName: suppliers.name,
@@ -481,6 +484,7 @@ export async function getTvaAccountingExport(options?: {
     supplierIce: r.supplierIce ?? null,
     invoiceNumber: r.invoiceNumber,
     totalHtCents: r.totalHtCents,
+    tvaRate: r.tvaRate ?? 20,
     tvaAmountCents: r.tvaAmountCents,
     totalTtcCents: r.totalTtcCents,
   }));
@@ -488,15 +492,19 @@ export async function getTvaAccountingExport(options?: {
   const netTvaDueCents = tvaCollectedCents - totalTvaDeductibleCents;
   const isCreditTva = netTvaDueCents < 0;
 
+  const salesRate = salesTaxableHtCents > 0 ? Math.round((tvaCollectedCents / salesTaxableHtCents) * 100) : 20;
+  const purchaseRate =
+    purchasesTaxableHtCents > 0 ? Math.round((tvaDeductiblePurchasesCents / purchasesTaxableHtCents) * 100) : 20;
+
   return {
     periodLabel,
     salesTaxableHtCents,
-    tvaCollectedRate: 20,
+    tvaCollectedRate: salesRate,
     tvaCollectedCents,
     salesTotalTtcCents,
     salesLines,
     purchasesTaxableHtCents,
-    tvaDeductibleRate: 20,
+    tvaDeductibleRate: purchaseRate,
     tvaDeductiblePurchasesCents,
     tvaDeductibleExpensesCents,
     totalTvaDeductibleCents,

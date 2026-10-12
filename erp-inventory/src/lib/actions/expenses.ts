@@ -19,7 +19,8 @@ function mapExpense(r: ExpenseRow): ExpenseItem {
   return {
     id: r.id,
     title: r.title,
-    category: r.category as ExpenseCategory,
+    category: r.category,
+    categoryId: r.categoryId,
     amountCents: r.amountCents,
     amountHtCents: r.amountHtCents,
     tvaRate: r.tvaRate,
@@ -86,16 +87,9 @@ export async function getExpenses(options?: {
     .where(gte(expenses.expenseDate, startOfMonth))
     .groupBy(expenses.category);
 
-  const categoryTotals: Record<ExpenseCategory, number> = {
-    LOYER: 0,
-    ELECTRICITE_EAU: 0,
-    TRANSPORT: 0,
-    REPAS_EQUIPE: 0,
-    FOURNITURES: 0,
-    AUTRE: 0,
-  };
+  const categoryTotals: Record<string, number> = {};
   for (const r of catRows) {
-    categoryTotals[r.category as ExpenseCategory] = Number(r.total);
+    categoryTotals[r.category] = Number(r.total);
   }
 
   return {
@@ -113,7 +107,7 @@ export async function getExpenses(options?: {
  */
 export async function recordExpense(data: {
   title: string;
-  category: ExpenseCategory;
+  category: string;
   categoryId?: number | null;
   amountHtCents?: number;
   amountCents?: number; // legacy : TTC
