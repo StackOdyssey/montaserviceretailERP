@@ -1,0 +1,36 @@
+name: Nightly backup to R2
+
+# Sauvegarde quotidienne de la base (export JSON complet) vers Cloudflare R2,
+# avec manifeste SHA-256 enregistré dans archive_manifests.
+#
+# Secrets requis (Settings → Secrets and variables → Actions) :
+#   DATABASE_URL, R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+# Le bucket de sauvegarde doit être distinct du bucket média si l'object-lock est requis.
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # 02:00 UTC chaque nuit
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: erp-inventory
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: erp-inventory/package-lock.json
+      - run: npm ci
+      - name: Export + upload to R2
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: node scripts/backup-to-r2.mjs

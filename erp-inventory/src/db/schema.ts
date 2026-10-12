@@ -413,6 +413,10 @@ export const salesDocuments = pgTable("sales_documents", {
   notes: text("notes"),
   sourceBlId: integer("source_bl_id"), // Lien si facture ou avoir issu d'un BL
   avType: text("av_type"), // Avoir : RETOUR (marchandise reprise), COMMERCIAL (geste), CORRECTION
+  // Champs réservés DGI (Phase 9 — readiness, aucune intégration active)
+  dgiValidationId: text("dgi_validation_id"),
+  dgiStatus: text("dgi_status"),
+  dgiSignature: text("dgi_signature"),
   validatedAt: timestamp("validated_at"),
   cancelledAt: timestamp("cancelled_at"),
   deletedAt: timestamp("deleted_at"),
@@ -614,4 +618,17 @@ export const accountingPeriods = pgTable(
   },
   (table) => [unique("accounting_periods_year_month_unique").on(table.year, table.month)]
 );
+
+// ==========================================
+// 18. MANIFESTES D'ARCHIVAGE (PHASE 9)
+// ==========================================
+export const archiveManifests = pgTable("archive_manifests", {
+  id: serial("id").primaryKey(),
+  periodLabel: text("period_label").notNull(), // ex: "2026-10"
+  objectKey: text("object_key").notNull(), // clé objet (R2)
+  sha256: text("sha256").notNull(),
+  sizeBytes: integer("size_bytes").notNull().default(0),
+  docCount: integer("doc_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 

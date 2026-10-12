@@ -10,6 +10,7 @@ import {
   ReceiptText,
   RotateCcw,
   Ban,
+  FileDown,
   Loader2,
 } from "lucide-react";
 import {
@@ -19,6 +20,7 @@ import {
   cancelDocument,
   SalesDocumentItem,
 } from "@/lib/actions/sales";
+import { getDocumentUbl } from "@/lib/actions/dgi";
 import { formatMoney } from "@/lib/money";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
 import { useSettings } from "@/components/layout/SettingsProvider";
@@ -108,6 +110,21 @@ export default function VentesListPage() {
   const handleCancel = (doc: SalesDocumentItem) => {
     if (!confirm(`Annuler le ${doc.docNumber} ? L'opération est irréversible.`)) return;
     runAction(doc, () => cancelDocument(doc.id, "Annulation manuelle"));
+  };
+
+  const handleUbl = (doc: SalesDocumentItem) => {
+    runAction(doc, async () => {
+      const { filename, xml } = await getDocumentUbl(doc.id);
+      const blob = new Blob([xml], { type: "application/xml" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
   };
 
   return (
@@ -274,6 +291,16 @@ export default function VentesListPage() {
                                 className="p-2 bg-[#FFFBEB] hover:bg-[#FEF3C7] text-[#D97706] rounded-lg transition-colors"
                               >
                                 <RotateCcw size={14} />
+                              </button>
+                            )}
+
+                            {doc.status !== "ANNULE" && (
+                              <button
+                                onClick={() => handleUbl(doc)}
+                                title="Exporter UBL 2.1 (XML)"
+                                className="p-2 bg-[#F3F4F6] hover:bg-[#E5E7EB] text-[#4B5563] rounded-lg transition-colors"
+                              >
+                                <FileDown size={14} />
                               </button>
                             )}
 
