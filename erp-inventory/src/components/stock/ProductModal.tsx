@@ -6,6 +6,7 @@ import { ProductItem } from "@/lib/actions/products";
 import { compressImageToWebP } from "@/lib/image-compressor";
 import { getPhotoUploadUrl } from "@/lib/actions/media";
 import { toCentimes, toDirhams } from "@/lib/money";
+import { useSettings } from "@/components/layout/SettingsProvider";
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export function ProductModal({
   onSave,
   productToEdit,
 }: ProductModalProps) {
+  const company = useSettings();
   const [sku, setSku] = useState("");
   const [oemCode, setOemCode] = useState("");
   const [name, setName] = useState("");
@@ -152,7 +154,7 @@ export function ProductModal({
         purchasePriceCents: toCentimes(purchaseDH),
         salePriceRetailCents: toCentimes(saleRetailDH),
         salePriceWholesaleCents: saleWholesaleDH > 0 ? toCentimes(saleWholesaleDH) : null,
-        tvaRate: 10,
+        tvaRate: company.defaultVatRate,
         minStockAlert: parseInt(minStockAlert, 10) || 2,
         currentStock: parseInt(currentStock, 10) || 0,
         shelfLocation: shelfLocation.trim() || null,
@@ -178,7 +180,7 @@ export function ProductModal({
               {productToEdit ? "Modifier la Pièce Moto" : "Ajouter une Nouvelle Pièce Moto"}
             </h2>
             <p className="text-xs text-[#6B7280]">
-              Enregistrement dans le catalogue avec prix en Dirhams (MAD) et TVA 10%
+              Enregistrement dans le catalogue avec prix en Dirhams (MAD) et TVA {company.defaultVatRate}%
             </p>
           </div>
           <button

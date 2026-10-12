@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X, CheckCircle, Banknote, CreditCard, Building2, Calendar, FileText, ArrowRight } from "lucide-react";
 import { CustomerItem, recordCustomerPayment, getCustomerStatement } from "@/lib/actions/customers";
 import { formatMoney, toCentimes } from "@/lib/money";
+import { useParameters } from "@/components/layout/SettingsProvider";
 
 const MOROCCAN_BANKS = [
   "Attijariwafa Bank",
@@ -41,6 +42,7 @@ export function PaymentModal({
   );
   const [amountDh, setAmountDh] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<"ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT">("ESPECES");
+  const { paymentMethods } = useParameters();
   const [bankName, setBankName] = useState<string>("Attijariwafa Bank");
   const [referenceNumber, setReferenceNumber] = useState<string>("");
   const [chequeDueDate, setChequeDueDate] = useState<string>(
@@ -183,12 +185,7 @@ export function PaymentModal({
               Mode de paiement <span className="text-[#F7162D]">*</span>
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {[
-                { id: "ESPECES", label: "Espèces" },
-                { id: "CHEQUE", label: "Chèque" },
-                { id: "EFFET_LCN", label: "Effet LCN" },
-                { id: "VIREMENT", label: "Virement" },
-              ].map((m) => (
+              {paymentMethods.map((p) => ({ id: p.code, label: p.label })).map((m) => (
                 <button
                   type="button"
                   key={m.id}

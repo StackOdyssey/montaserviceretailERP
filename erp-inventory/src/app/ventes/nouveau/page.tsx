@@ -22,7 +22,7 @@ import {
 import { getProducts, ProductItem } from "@/lib/actions/products";
 import { createSalesDocument, SalesLineInput, SalesDocumentItem } from "@/lib/actions/sales";
 import { formatMoney, calculateDocumentTotals } from "@/lib/money";
-import { useSettings } from "@/components/layout/SettingsProvider";
+import { useSettings, useParameters } from "@/components/layout/SettingsProvider";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
 
 interface CartLine extends SalesLineInput {
@@ -46,6 +46,7 @@ const DOC_TITLES: Record<string, string> = {
 export default function NouveauBonDeLivraisonPage() {
   const router = useRouter();
   const company = useSettings();
+  const { paymentMethods } = useParameters();
 
   // Liste des articles du panier
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -549,10 +550,8 @@ export default function NouveauBonDeLivraisonPage() {
               </label>
               <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
                 {[
-                  { id: "ESPECES", label: "Espèces (Caisse)" },
+                  ...paymentMethods.map((p) => ({ id: p.code, label: p.label })),
                   { id: "A_CREDIT", label: "À Crédit (En compte)" },
-                  { id: "CHEQUE", label: "Chèque bancaire" },
-                  { id: "EFFET_LCN", label: "Effet (LCN)" },
                 ].map((m) => (
                   <button
                     key={m.id}

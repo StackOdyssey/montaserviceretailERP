@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X, CreditCard, Banknote, Building2 } from "lucide-react";
 import { SupplierItem, recordSupplierPayment } from "@/lib/actions/suppliers";
 import { toCentimes } from "@/lib/money";
+import { useParameters } from "@/components/layout/SettingsProvider";
 
 const MOROCCAN_BANKS = [
   "Attijariwafa Bank",
@@ -38,6 +39,7 @@ export function SupplierPaymentModal({
   );
   const [amountDh, setAmountDh] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<"CHEQUE" | "EFFET_LCN" | "VIREMENT" | "ESPECES">("CHEQUE");
+  const { paymentMethods } = useParameters();
   const [bankName, setBankName] = useState<string>("Attijariwafa Bank");
   const [referenceNumber, setReferenceNumber] = useState<string>("");
   const [dueDate, setDueDate] = useState<string>(
@@ -154,12 +156,7 @@ export function SupplierPaymentModal({
               Mode de paiement émis <span className="text-[#F7162D]">*</span>
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {[
-                { id: "CHEQUE", label: "Chèque" },
-                { id: "EFFET_LCN", label: "Effet LCN" },
-                { id: "VIREMENT", label: "Virement" },
-                { id: "ESPECES", label: "Espèces" },
-              ].map((m) => (
+              {paymentMethods.map((p) => ({ id: p.code, label: p.label })).map((m) => (
                 <button
                   type="button"
                   key={m.id}

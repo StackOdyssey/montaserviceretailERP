@@ -76,3 +76,33 @@ export function SettingsProvider({
 export function useSettings(): CompanySettings {
   return useContext(Ctx);
 }
+
+export interface Parameters {
+  vatRates: Array<{ id: number; label: string; ratePercent: number; isDefault: boolean }>;
+  expenseCategories: Array<{ id: number; name: string; vatDeductibleDefault: boolean; receiptRequired: boolean }>;
+  paymentMethods: Array<{ code: string; label: string }>;
+  priceLevels: Array<{ code: string; label: string }>;
+}
+
+const EMPTY_PARAMS: Parameters = {
+  vatRates: [],
+  expenseCategories: [],
+  paymentMethods: [],
+  priceLevels: [],
+};
+
+const ParamsCtx = createContext<Parameters>(EMPTY_PARAMS);
+
+export function ParametersProvider({
+  parameters,
+  children,
+}: {
+  parameters?: Parameters | null;
+  children: React.ReactNode;
+}) {
+  return <ParamsCtx.Provider value={parameters ?? EMPTY_PARAMS}>{children}</ParamsCtx.Provider>;
+}
+
+export function useParameters(): Parameters {
+  return useContext(ParamsCtx);
+}

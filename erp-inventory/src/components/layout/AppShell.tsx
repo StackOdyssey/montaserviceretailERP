@@ -31,7 +31,12 @@ import {
   BusinessLineSelect,
   type BusinessLine,
 } from "@/components/layout/BusinessLineProvider";
-import { SettingsProvider, type CompanySettingsInput } from "@/components/layout/SettingsProvider";
+import {
+  SettingsProvider,
+  ParametersProvider,
+  type CompanySettingsInput,
+  type Parameters,
+} from "@/components/layout/SettingsProvider";
 
 interface NavItem {
   label: string;
@@ -94,7 +99,7 @@ const navItems: NavItem[] = [
 ];
 
 
-export function AppShell({ children, lines, settings }: { children: React.ReactNode; lines: BusinessLine[]; settings?: CompanySettingsInput | null }) {
+export function AppShell({ children, lines, settings, parameters }: { children: React.ReactNode; lines: BusinessLine[]; settings?: CompanySettingsInput | null; parameters?: Parameters | null }) {
   const pathname = usePathname();
 
   // Sur la page de connexion, afficher l'écran plein écran sans la barre de navigation
@@ -121,6 +126,7 @@ export function AppShell({ children, lines, settings }: { children: React.ReactN
 
   return (
     <SettingsProvider settings={settings}>
+    <ParametersProvider parameters={parameters}>
     <BusinessLineProvider lines={lines}>
     <div className="min-h-screen bg-[#F8F9FA] text-[#111827] flex flex-col md:flex-row">
       {/* ======================================================== */}
@@ -467,6 +473,7 @@ export function AppShell({ children, lines, settings }: { children: React.ReactN
       </nav>
     </div>
     </BusinessLineProvider>
+    </ParametersProvider>
     </SettingsProvider>
   );
 }
