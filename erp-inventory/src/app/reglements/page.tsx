@@ -26,6 +26,7 @@ import {
   updatePaymentStatus,
 } from "@/lib/actions/customers";
 import { formatMoney } from "@/lib/money";
+import { nextStatuses, paymentStatusLabel, isTerminalStatus } from "@/lib/payments";
 import { PaymentModal } from "@/components/customers/PaymentModal";
 import { CustomerModal } from "@/components/customers/CustomerModal";
 import { CustomerStatementModal } from "@/components/customers/CustomerStatementModal";
@@ -66,13 +67,19 @@ export default function ReglementsPage() {
   // Totaux statistiques
   const totalCreances = customersList.reduce((sum, c) => sum + Math.max(0, c.balanceDueCents || 0), 0);
   const totalChequesEnAttente = chequesSchedule
-    .filter((c) => c.status === "EN_ATTENTE")
+    .filter((c) => !isTerminalStatus(c.status))
     .reduce((sum, c) => sum + c.amountCents, 0);
   const clientsAvecImpayesCount = customersList.filter((c) => (c.balanceDueCents || 0) > 0).length;
 
-  const handleUpdateChequeStatus = async (paymentId: number, newStatus: "ENCAISSE" | "REJETE") => {
-    await updatePaymentStatus(paymentId, newStatus);
-    loadData();
+  const handleUpdateChequeStatus = async (paymentId: number, newStatus: string) => {
+    startTransition(async () => {
+      try {
+        await updatePaymentStatus(paymentId, newStatus);
+        loadData();
+      } catch (e) {
+        alert((e as Error).message);
+      }
+    });
   };
 
   const handleOpenPayment = (customerId?: number) => {
@@ -336,7 +343,7 @@ export default function ReglementsPage() {
                     </tr>
                   ) : (
                     chequesSchedule.map((item) => {
-                      const isPending = item.status === "EN_ATTENTE";
+                      const isPending = !isTerminalStatus(item.status);
                       return (
                         <tr key={item.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition">
                           <td className="py-3 px-4">
@@ -391,39 +398,36 @@ export default function ReglementsPage() {
                           <td className="py-3 px-4 text-center">
                             <span
                               className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                item.status === "ENCAISSE"
+                                item.status === "ENCAISSE" || item.status === "PAYE"
                                   ? "bg-emerald-100 text-emerald-800"
-                                  : item.status === "EN_ATTENTE"
-                                  ? "bg-amber-100 text-amber-800"
-                                  : "bg-red-100 text-red-800"
+                                  : isTerminalStatus(item.status)
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-amber-100 text-amber-800"
                               }`}
                             >
-                              {item.status === "ENCAISSE"
-                                ? "Encaissé"
-                                : item.status === "EN_ATTENTE"
-                                ? "En attente"
-                                : "Impayé / Rejeté"}
+                              {paymentStatusLabel(item.status)}
                             </span>
                           </td>
 
                           <td className="py-3 px-4 text-center">
-                            {item.status === "EN_ATTENTE" && (
-                              <div className="flex items-center justify-center gap-1.5">
-                                <button
-                                  onClick={() => handleUpdateChequeStatus(item.id, "ENCAISSE")}
-                                  className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition"
-                                  title="Marquer comme encaissé en banque"
-                                >
-                                  <Check className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleUpdateChequeStatus(item.id, "REJETE")}
-                                  className="p-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition"
-                                  title="Marquer comme rejeté / impayé"
-                                >
-                                  <XCircle className="w-4 h-4" />
-                                </button>
-                              </div>
+                            {nextStatuses(item.paymentMethod, item.status).length > 0 ? (
+                              <select
+                                value=""
+                                onChange={(e) => {
+                                  if (e.target.value) handleUpdateChequeStatus(item.id, e.target.value);
+                                }}
+                                title="Changer le statut"
+                                className="px-2 py-1 text-[11px] font-semibold border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 outline-none focus:border-[#F7162D]"
+                              >
+                                <option value="">Changer…</option>
+                                {nextStatuses(item.paymentMethod, item.status).map((s) => (
+                                  <option key={s} value={s}>
+                                    {paymentStatusLabel(s)}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="text-[10px] text-gray-400">Clôturé</span>
                             )}
                           </td>
                         </tr>

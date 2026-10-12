@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { X, Printer, Share2, Phone, Building, CheckCircle2, Clock, AlertTriangle, FileText } from "lucide-react";
 import { CustomerAccountStatement, getCustomerStatement } from "@/lib/actions/customers";
 import { formatMoney } from "@/lib/money";
+import { paymentStatusLabel, isTerminalStatus } from "@/lib/payments";
 
 interface CustomerStatementModalProps {
   isOpen: boolean;
@@ -283,18 +284,14 @@ export function CustomerStatementModal({
                             <td className="py-2 px-3 text-center">
                               <span
                                 className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  pmt.status === "ENCAISSE"
+                                  pmt.status === "ENCAISSE" || pmt.status === "PAYE"
                                     ? "bg-emerald-100 text-emerald-800"
-                                    : pmt.status === "EN_ATTENTE"
-                                    ? "bg-amber-100 text-amber-800"
-                                    : "bg-red-100 text-red-800"
+                                    : isTerminalStatus(pmt.status)
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-amber-100 text-amber-800"
                                 }`}
                               >
-                                {pmt.status === "ENCAISSE"
-                                  ? "Encaissé"
-                                  : pmt.status === "EN_ATTENTE"
-                                  ? "En attente"
-                                  : "Rejeté"}
+                                {paymentStatusLabel(pmt.status)}
                               </span>
                             </td>
                           </tr>

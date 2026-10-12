@@ -4,6 +4,7 @@ import { and, asc, eq, ilike, isNull, ne, or, sql } from "drizzle-orm";
 import { customerPayments, customers, db, salesDocuments } from "@/db";
 import { assertAuthenticated } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
+import { initialStatusFor, statusesForMethod } from "@/lib/payments";
 import { getSalesDocuments, type SalesDocumentItem } from "./sales";
 
 export interface CustomerItem {
@@ -31,7 +32,7 @@ export interface CustomerPaymentItem {
   referenceNumber: string | null;
   chequeDueDate: string | null;
   bankName: string | null;
-  status: "ENCAISSE" | "EN_ATTENTE" | "REJETE";
+  status: string;
   notes: string | null;
   createdAt: string;
 }
@@ -55,7 +56,7 @@ export interface ChequeEffetAlert {
   referenceNumber: string;
   bankName: string;
   dueDate: string;
-  status: "ENCAISSE" | "EN_ATTENTE" | "REJETE";
+  status: string;
   urgency: "RETARD" | "AUJOURDHUI" | "PROCHE" | "FUTUR";
   daysRemaining: number;
 }
@@ -227,8 +228,7 @@ export async function recordCustomerPayment(data: {
   const customer = (await d.select().from(customers).where(eq(customers.id, data.customerId)).limit(1))[0];
   if (!customer) throw new Error("Client introuvable");
 
-  const initialStatus: CustomerPaymentItem["status"] =
-    data.paymentMethod === "ESPECES" || data.paymentMethod === "VIREMENT" ? "ENCAISSE" : "EN_ATTENTE";
+  const initialStatus = initialStatusFor(data.paymentMethod);
 
   let docNumber: string | null = null;
   let paymentId = 0;
@@ -300,19 +300,18 @@ export async function recordCustomerPayment(data: {
 /**
  * Met à jour le statut d'un chèque ou effet LCN.
  */
-export async function updatePaymentStatus(
-  paymentId: number,
-  newStatus: "ENCAISSE" | "EN_ATTENTE" | "REJETE"
-): Promise<CustomerPaymentItem> {
+export async function updatePaymentStatus(paymentId: number, newStatus: string): Promise<CustomerPaymentItem> {
   await assertAuthenticated();
   const d = requireDb();
 
+  const existing = (await d.select().from(customerPayments).where(eq(customerPayments.id, paymentId)).limit(1))[0];
+  if (!existing) throw new Error("Règlement introuvable");
+  if (!statusesForMethod(existing.paymentMethod).includes(newStatus)) {
+    throw new Error(`Statut invalide pour le moyen de paiement ${existing.paymentMethod}`);
+  }
+
   const updated = (
-    await d
-      .update(customerPayments)
-      .set({ status: newStatus })
-      .where(eq(customerPayments.id, paymentId))
-      .returning()
+    await d.update(customerPayments).set({ status: newStatus }).where(eq(customerPayments.id, paymentId)).returning()
   )[0];
   if (!updated) throw new Error("Règlement introuvable");
 
