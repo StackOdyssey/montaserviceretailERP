@@ -23,11 +23,13 @@ import {
   Sparkles,
 } from "lucide-react";
 import { formatMoney } from "@/lib/money";
+import { useSettings } from "@/components/layout/SettingsProvider";
 import { DashboardMetrics, getDashboardMetrics } from "@/lib/actions/analytics";
 import { SalesDocumentItem } from "@/lib/actions/sales";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
 
 export default function TableauDeBordPage() {
+  const company = useSettings();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDocForPrint, setSelectedDocForPrint] = useState<SalesDocumentItem | null>(null);
@@ -54,10 +56,10 @@ export default function TableauDeBordPage() {
     const total = formatMoney(doc.totalTtcCents);
     const message = encodeURIComponent(
       `Bonjour ${doc.customerName},\n\n` +
-      `Votre Bon de Livraison N° ${doc.docNumber} est prêt chez SARL BM Motors.\n` +
+      `Votre Bon de Livraison N° ${doc.docNumber} est prêt chez ${company.raisonSociale}.\n` +
       `• Total TTC : ${total}\n` +
       `• Date : ${new Date(doc.docDate).toLocaleDateString("fr-FR")}\n\n` +
-      `Merci pour votre fidélité !\nSARL BM Motors - Casablanca`
+      `Merci pour votre fidélité !\n${company.raisonSociale} - ${company.city}`
     );
 
     const url = phone

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSettings } from "@/components/layout/SettingsProvider";
 import {
   Mail,
   Inbox,
@@ -30,6 +31,7 @@ import {
 } from "@/lib/actions/emails";
 
 export default function CourrielPage() {
+  const company = useSettings();
   const [emails, setEmails] = useState<SupplierEmailItem[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<SupplierEmailItem | null>(null);
   const [activeFolder, setActiveFolder] = useState<"ALL" | "INBOX" | "SENT">("INBOX");
@@ -102,7 +104,7 @@ export default function CourrielPage() {
     if (!supp) return;
 
     if (templateType === "DEVIS") {
-      setComposeSubject(`Demande de Devis & Disponibilité Pièces - SARL BM Motors`);
+      setComposeSubject(`Demande de Devis & Disponibilité Pièces - ${company.raisonSociale}`);
       setComposeBody(`Salam / Bonjour ${supp.name},
 
 Nous souhaitons vérifier la disponibilité en stock ainsi que vos meilleurs tarifs pour le réassort suivant :
@@ -113,20 +115,20 @@ Nous souhaitons vérifier la disponibilité en stock ainsi que vos meilleurs tar
 Merci de nous faire parvenir votre devis chiffré ainsi que le délai de livraison prévu.
 
 Cordialement,
-Alexis - Gérant SARL BM Motors
+Alexis - Gérant ${company.raisonSociale}
 Derb Ghallef, Casablanca`);
     } else if (templateType === "COMMANDE") {
-      setComposeSubject(`Bon de Commande Pièces Moto BC-2026-${Math.floor(100 + Math.random() * 900)} - BM Motors`);
+      setComposeSubject(`Bon de Commande Pièces Moto BC-2026-${Math.floor(100 + Math.random() * 900)} - ${company.raisonSociale}`);
       setComposeBody(`Bonjour ${supp.name},
 
 Veuillez trouver ci-joint notre Bon de Commande officiel validé pour les pièces de rechange convenues.
 Merci de bien vouloir accuser réception de cette commande et nous préparer la facture proforma.
 
 Salutations distinguées,
-Alexis - SARL BM Motors`);
+Alexis - ${company.raisonSociale}`);
       setComposeAttachments([{ name: "Bon_de_Commande_BC-2026.pdf", size: "215 Ko" }]);
     } else if (templateType === "VIREMENT") {
-      setComposeSubject(`Avis de Règlement / Virement Bancaire - SARL BM Motors`);
+      setComposeSubject(`Avis de Règlement / Virement Bancaire - ${company.raisonSociale}`);
       setComposeBody(`Bonjour ${supp.name},
 
 Nous vous informons avoir émis le règlement correspondant à la facture en cours :
@@ -137,7 +139,7 @@ Nous vous informons avoir émis le règlement correspondant à la facture en cou
 Le justificatif bancaire est joint au présent courriel.
 
 Cordialement,
-Comptabilité - SARL BM Motors`);
+Comptabilité - ${company.raisonSociale}`);
       setComposeAttachments([{ name: "Ordre_Virement_Banque.pdf", size: "180 Ko" }]);
     }
   };

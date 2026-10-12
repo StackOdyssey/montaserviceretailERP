@@ -4,6 +4,7 @@ import "./globals.css";
 import { AppShell } from "@/components/layout/AppShell";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { getBusinessLines } from "@/lib/actions/business-lines";
+import { getPublicSettings } from "@/lib/actions/settings";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -54,11 +55,12 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const lines = await getBusinessLines();
+  const settings = await getPublicSettings();
   return (
     <html lang="fr" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="min-h-full flex flex-col bg-[#F8F9FA] text-[#111827]" suppressHydrationWarning>
         <ServiceWorkerRegister />
-        <AppShell lines={lines}>{children}</AppShell>
+        <AppShell lines={lines} settings={settings}>{children}</AppShell>
       </body>
     </html>
 

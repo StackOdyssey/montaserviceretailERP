@@ -87,3 +87,27 @@ export async function getVatRates() {
   const d = requireDb();
   return d.select().from(vatRates).orderBy(asc(vatRates.ratePercent));
 }
+
+export type PublicSettings = SettingsRow & { defaultVatRate: number };
+
+/**
+ * Lecture publique (affichage) des paramètres société — sans session, sûre au build.
+ * Retourne `null` si la base n'est pas joignable.
+ */
+export async function getPublicSettings(): Promise<PublicSettings | null> {
+  try {
+    if (!db) return null;
+    const s = (await db.select().from(settings).limit(1))[0];
+    if (!s) return null;
+    let defaultVatRate = 20;
+    if (s.defaultVatRateId) {
+      const v = (
+        await db.select({ r: vatRates.ratePercent }).from(vatRates).where(eq(vatRates.id, s.defaultVatRateId)).limit(1)
+      )[0];
+      if (v) defaultVatRate = v.r;
+    }
+    return { ...s, defaultVatRate };
+  } catch {
+    return null;
+  }
+}

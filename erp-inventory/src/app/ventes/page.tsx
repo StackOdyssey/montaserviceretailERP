@@ -21,6 +21,7 @@ import {
 } from "@/lib/actions/sales";
 import { formatMoney } from "@/lib/money";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
+import { useSettings } from "@/components/layout/SettingsProvider";
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   BL: "Bon de Livraison",
@@ -39,6 +40,7 @@ const DOC_TYPE_BADGE: Record<string, string> = {
 };
 
 export default function VentesListPage() {
+  const company = useSettings();
   const [documents, setDocuments] = useState<SalesDocumentItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -107,7 +109,7 @@ export default function VentesListPage() {
               <ShoppingCart size={14} />
               Ventes & Documents commerciaux
             </span>
-            <span className="text-xs text-[#6B7280]">SARL BM Motors</span>
+            <span className="text-xs text-[#6B7280]">{company.raisonSociale}</span>
           </div>
           <h1 className="text-xl md:text-2xl font-bold text-[#111827] mt-1.5 tracking-tight">
             Historique des documents

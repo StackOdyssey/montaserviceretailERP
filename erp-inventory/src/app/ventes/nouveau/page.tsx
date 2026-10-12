@@ -22,6 +22,7 @@ import {
 import { getProducts, ProductItem } from "@/lib/actions/products";
 import { createSalesDocument, SalesLineInput, SalesDocumentItem } from "@/lib/actions/sales";
 import { formatMoney, calculateDocumentTotals } from "@/lib/money";
+import { useSettings } from "@/components/layout/SettingsProvider";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
 
 interface CartLine extends SalesLineInput {
@@ -44,6 +45,7 @@ const DOC_TITLES: Record<string, string> = {
 
 export default function NouveauBonDeLivraisonPage() {
   const router = useRouter();
+  const company = useSettings();
 
   // Liste des articles du panier
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -525,7 +527,7 @@ export default function NouveauBonDeLivraisonPage() {
 
               {/* 4. TVA 10% */}
               <div className="flex justify-between text-[#4B5563]">
-                <span>TVA (10% SARL) :</span>
+                <span>TVA ({company.defaultVatRate}%) :</span>
                 <span className="font-mono font-bold text-[#111827]">
                   {formatMoney(totals.tvaAmount)}
                 </span>

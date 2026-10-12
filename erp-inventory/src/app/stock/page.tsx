@@ -30,6 +30,7 @@ import { ProductModal } from "@/components/stock/ProductModal";
 import { StockAdjustmentModal } from "@/components/stock/StockAdjustmentModal";
 import { CsvModal } from "@/components/stock/CsvModal";
 import { useBusinessLine } from "@/components/layout/BusinessLineProvider";
+import { useSettings } from "@/components/layout/SettingsProvider";
 
 export default function StockCataloguePage() {
   const [productsList, setProductsList] = useState<ProductItem[]>([]);
@@ -48,6 +49,7 @@ export default function StockCataloguePage() {
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
 
   const { activeCode, activeLine } = useBusinessLine();
+  const company = useSettings();
 
   // Charger les pièces avec recherche instantanée
   const fetchProducts = () => {
@@ -105,7 +107,7 @@ export default function StockCataloguePage() {
               <Boxes size={14} />
               Catalogue Pièces Moto Bashan
             </span>
-            <span className="text-xs text-[#6B7280]">SARL BM Motors</span>
+            <span className="text-xs text-[#6B7280]">{company.raisonSociale}</span>
           </div>
           <h1 className="text-xl md:text-2xl font-bold text-[#111827] mt-1.5 tracking-tight">
             Gestion du Stock & Catalogue
