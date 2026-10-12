@@ -19,6 +19,8 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   AlertCircle,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import {
   TvaAccountingExport,
@@ -28,6 +30,7 @@ import {
   getStockValuation,
   getProfitMarginsReport,
 } from "@/lib/actions/analytics";
+import { getAccountingPeriods, setPeriodLock, getAccountingCsv } from "@/lib/actions/accounting";
 import { formatMoney } from "@/lib/money";
 
 export default function ComptabilitePage() {
@@ -37,18 +40,25 @@ export default function ComptabilitePage() {
   const [marginsData, setMarginsData] = useState<ProfitMarginsReport | null>(null);
   const [marginsPeriod, setMarginsPeriod] = useState<"THIS_MONTH" | "LAST_MONTH" | "ALL">("THIS_MONTH");
   const [loading, setLoading] = useState(true);
+  const now = new Date();
+  const [periodYear, setPeriodYear] = useState(now.getFullYear());
+  const [periodMonth, setPeriodMonth] = useState(now.getMonth() + 1); // 1..12
+  const [periodStatus, setPeriodStatus] = useState<"OPEN" | "LOCKED">("OPEN");
+  const [isLocking, setIsLocking] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [tva, stock, margins] = await Promise.all([
-        getTvaAccountingExport(),
+      const [tva, stock, margins, periods] = await Promise.all([
+        getTvaAccountingExport({ year: periodYear, month: periodMonth - 1 }),
         getStockValuation(),
         getProfitMarginsReport(marginsPeriod),
+        getAccountingPeriods(periodYear),
       ]);
       setTvaData(tva);
       setStockData(stock);
       setMarginsData(margins);
+      setPeriodStatus(periods.find((x) => x.month === periodMonth)?.status ?? "OPEN");
     } finally {
       setLoading(false);
     }
@@ -56,76 +66,37 @@ export default function ComptabilitePage() {
 
   useEffect(() => {
     loadData();
-  }, [marginsPeriod]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [marginsPeriod, periodYear, periodMonth]);
 
-  // Export CSV normalisé pour l'expert-comptable
-  const handleExportCsv = () => {
-    if (!tvaData) return;
+  const toggleLock = async () => {
+    setIsLocking(true);
+    try {
+      const locked = periodStatus !== "LOCKED";
+      await setPeriodLock(periodYear, periodMonth, locked);
+      setPeriodStatus(locked ? "LOCKED" : "OPEN");
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setIsLocking(false);
+    }
+  };
 
-    const headers = [
-      "Type Document",
-      "Date",
-      "N° Piece",
-      "Tiers (Client / Fournisseur)",
-      "ICE Tiers",
-      "Total Brut HT (MAD)",
-      "Remise (MAD)",
-      "Total Net HT (MAD)",
-      "Taux TVA",
-      "Montant TVA (MAD)",
-      "Total TTC (MAD)",
-      "Mode Reglement",
-    ];
-
-    const salesRows = tvaData.salesLines.map((l) => [
-      "VENTE_BL",
-      new Date(l.date).toLocaleDateString("fr-FR"),
-      l.docNumber,
-      `"${l.customerName.replace(/"/g, '""')}"`,
-      l.customerIce || "PARTICULIER",
-      (l.totalBrutHtCents / 100).toFixed(2),
-      (l.discountAmountCents / 100).toFixed(2),
-      (l.totalNetHtCents / 100).toFixed(2),
-      "10%",
-      (l.tvaAmountCents / 100).toFixed(2),
-      (l.totalTtcCents / 100).toFixed(2),
-      l.paymentMethod,
-    ]);
-
-    const purchaseRows = tvaData.purchaseLines.map((p) => [
-      "ACHAT_BR",
-      new Date(p.date).toLocaleDateString("fr-FR"),
-      p.receiptNumber,
-      `"${p.supplierName.replace(/"/g, '""')}"`,
-      p.supplierIce || "",
-      (p.totalHtCents / 100).toFixed(2),
-      "0.00",
-      (p.totalHtCents / 100).toFixed(2),
-      "10%",
-      (p.tvaAmountCents / 100).toFixed(2),
-      (p.totalTtcCents / 100).toFixed(2),
-      "VIREMENT/CHEQUE",
-    ]);
-
-    const csvContent =
-      "\uFEFF" +
-      [
-        headers.join(";"),
-        ...salesRows.map((r) => r.join(";")),
-        ...purchaseRows.map((r) => r.join(";")),
-      ].join("\r\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `Export_TVA_BM_Motors_${tvaData.periodLabel.replace(/\s+/g, "_")}.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // Export CSV comptable (généré côté serveur, autoritatif)
+  const handleExportCsv = async () => {
+    try {
+      const { filename, csv } = await getAccountingCsv({ year: periodYear, month: periodMonth });
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (e) {
+      alert((e as Error).message);
+    }
   };
 
   const handlePrintA4 = () => {
@@ -139,7 +110,7 @@ export default function ComptabilitePage() {
         <div>
           <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
             <BarChart3 className="w-7 h-7 text-[#F7162D]" />
-            Rapports, Marges & Export TVA 10%
+            Rapports, Marges & Export TVA 20%
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             Déclaration périodique de TVA pour l'expert-comptable, valorisation du stock et rentabilité par pièce.
@@ -168,6 +139,49 @@ export default function ComptabilitePage() {
         </div>
       </div>
 
+      {/* Barre de période comptable (clôture / réouverture) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-gray-900 p-3 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-xs print:hidden">
+        <div className="flex items-center gap-2 text-xs font-bold">
+          <Calendar className="w-4 h-4 text-[#F7162D]" />
+          <span className="text-gray-500">Période :</span>
+          <select
+            value={periodMonth}
+            onChange={(e) => setPeriodMonth(Number(e.target.value))}
+            className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 outline-none focus:border-[#F7162D]"
+          >
+            {["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"].map((m, i) => (
+              <option key={i} value={i + 1}>
+                {m}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            value={periodYear}
+            onChange={(e) => setPeriodYear(Number(e.target.value))}
+            className="w-24 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 outline-none focus:border-[#F7162D]"
+          />
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              periodStatus === "LOCKED" ? "bg-red-50 text-[#F7162D]" : "bg-emerald-50 text-emerald-700"
+            }`}
+          >
+            {periodStatus === "LOCKED" ? "Clôturée" : "Ouverte"}
+          </span>
+        </div>
+
+        <button
+          onClick={toggleLock}
+          disabled={isLocking}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-2 text-white disabled:opacity-60 ${
+            periodStatus === "LOCKED" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-[#111827] hover:bg-black"
+          }`}
+        >
+          {periodStatus === "LOCKED" ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+          <span>{periodStatus === "LOCKED" ? "Rouvrir la période" : "Clôturer la période"}</span>
+        </button>
+      </div>
+
       {/* Onglets de navigation */}
       <div className="flex border-b border-gray-200 dark:border-gray-800 gap-6 print:hidden">
         <button
@@ -179,7 +193,7 @@ export default function ComptabilitePage() {
           }`}
         >
           <Receipt className="w-4 h-4" />
-          Déclaration TVA 10% (Comptable)
+          Déclaration TVA 20% (Comptable)
         </button>
 
         <button
@@ -208,7 +222,7 @@ export default function ComptabilitePage() {
       </div>
 
       {/* ======================================================== */}
-      {/* ONGLET 1 : DÉCLARATION & ÉTAT DE TVA 10%                 */}
+      {/* ONGLET 1 : DÉCLARATION & ÉTAT DE TVA 20%                 */}
       {/* ======================================================== */}
       {activeTab === "TVA" && tvaData && (
         <div className="space-y-6">
@@ -216,7 +230,7 @@ export default function ComptabilitePage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 print:hidden">
             <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xs">
               <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                1. TVA Collectée (10%)
+                1. TVA Collectée (20%)
               </span>
               <div className="text-2xl font-black text-gray-900 dark:text-white mt-1">
                 {formatMoney(tvaData.tvaCollectedCents)}
@@ -228,7 +242,7 @@ export default function ComptabilitePage() {
 
             <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xs">
               <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                2. TVA Déductible (10%)
+                2. TVA Déductible (20%)
               </span>
               <div className="text-2xl font-black text-emerald-600 mt-1">
                 {formatMoney(tvaData.totalTvaDeductibleCents)}
@@ -260,7 +274,7 @@ export default function ComptabilitePage() {
                   SARL BM MOTORS
                 </h2>
                 <p className="text-xs font-bold uppercase text-gray-700">
-                  Régime de la Taxe sur la Valeur Ajoutée (TVA) à 10%
+                  Régime de la Taxe sur la Valeur Ajoutée (TVA) à 20%
                 </p>
                 <p className="text-[11px] text-gray-600 mt-1">
                   <strong>ICE:</strong> 001892837000045 • <strong>IF:</strong> 40291823 • <strong>RC:</strong> 39281 • <strong>TP:</strong> 37192801
@@ -284,7 +298,7 @@ export default function ComptabilitePage() {
             <div className="my-6 space-y-2">
               <div className="flex justify-between items-center">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-gray-800">
-                  A. Chiffre d'Affaires & TVA Collectée (10%) sur les Ventes
+                  A. Chiffre d'Affaires & TVA Collectée (20%) sur les Ventes
                 </h3>
                 <span className="text-xs font-bold text-gray-600">
                   Total Net HT : {formatMoney(tvaData.salesTaxableHtCents)}
@@ -301,7 +315,7 @@ export default function ComptabilitePage() {
                       <th className="py-2 px-3">ICE Client</th>
                       <th className="py-2 px-3 text-right">Net HT</th>
                       <th className="py-2 px-3 text-center">Taux</th>
-                      <th className="py-2 px-3 text-right">TVA 10%</th>
+                      <th className="py-2 px-3 text-right">TVA 20%</th>
                       <th className="py-2 px-3 text-right">Total TTC</th>
                     </tr>
                   </thead>
@@ -317,7 +331,7 @@ export default function ComptabilitePage() {
                           {row.customerIce || "Particulier"}
                         </td>
                         <td className="py-2 px-3 text-right font-medium">{formatMoney(row.totalNetHtCents)}</td>
-                        <td className="py-2 px-3 text-center font-bold">10%</td>
+                        <td className="py-2 px-3 text-center font-bold">20%</td>
                         <td className="py-2 px-3 text-right font-bold text-gray-900">{formatMoney(row.tvaAmountCents)}</td>
                         <td className="py-2 px-3 text-right font-black text-[#F7162D]">{formatMoney(row.totalTtcCents)}</td>
                       </tr>
@@ -327,7 +341,7 @@ export default function ComptabilitePage() {
                     <tr className="bg-gray-50 font-black border-t-2 border-gray-300">
                       <td colSpan={4} className="py-2.5 px-3 uppercase text-right">Totaux Ventes :</td>
                       <td className="py-2.5 px-3 text-right">{formatMoney(tvaData.salesTaxableHtCents)}</td>
-                      <td className="py-2.5 px-3 text-center">10%</td>
+                      <td className="py-2.5 px-3 text-center">20%</td>
                       <td className="py-2.5 px-3 text-right text-gray-900">{formatMoney(tvaData.tvaCollectedCents)}</td>
                       <td className="py-2.5 px-3 text-right text-[#F7162D]">{formatMoney(tvaData.salesTotalTtcCents)}</td>
                     </tr>
@@ -340,7 +354,7 @@ export default function ComptabilitePage() {
             <div className="my-6 space-y-2">
               <div className="flex justify-between items-center">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-gray-800">
-                  B. Achats de Pièces & TVA Déductible (10%)
+                  B. Achats de Pièces & TVA Déductible (20%)
                 </h3>
                 <span className="text-xs font-bold text-emerald-700">
                   Total Déductible : {formatMoney(tvaData.totalTvaDeductibleCents)}
@@ -357,7 +371,7 @@ export default function ComptabilitePage() {
                       <th className="py-2 px-3">ICE Fournisseur</th>
                       <th className="py-2 px-3 text-right">Base HT</th>
                       <th className="py-2 px-3 text-center">Taux</th>
-                      <th className="py-2 px-3 text-right">TVA 10%</th>
+                      <th className="py-2 px-3 text-right">TVA 20%</th>
                       <th className="py-2 px-3 text-right">Total TTC</th>
                     </tr>
                   </thead>
@@ -373,7 +387,7 @@ export default function ComptabilitePage() {
                         <td className="py-2 px-3 font-semibold text-gray-800">{row.supplierName}</td>
                         <td className="py-2 px-3 font-mono text-gray-600">{row.supplierIce}</td>
                         <td className="py-2 px-3 text-right font-medium">{formatMoney(row.totalHtCents)}</td>
-                        <td className="py-2 px-3 text-center font-bold">10%</td>
+                        <td className="py-2 px-3 text-center font-bold">20%</td>
                         <td className="py-2 px-3 text-right font-bold text-emerald-700">{formatMoney(row.tvaAmountCents)}</td>
                         <td className="py-2 px-3 text-right font-black text-gray-900">{formatMoney(row.totalTtcCents)}</td>
                       </tr>
