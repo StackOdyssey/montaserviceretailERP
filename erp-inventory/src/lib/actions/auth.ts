@@ -7,6 +7,7 @@ import {
   verifyAdminPin,
   SESSION_COOKIE_NAME,
 } from "@/lib/auth";
+import { logEvent, logWarn } from "@/lib/observability";
 
 export interface AuthResult {
   success: boolean;
@@ -25,6 +26,7 @@ export async function loginWithPin(pin: string): Promise<AuthResult> {
   }
 
   if (!verifyAdminPin(pin)) {
+    logWarn("auth.pin_failed");
     return {
       success: false,
       message: "Code PIN incorrect. Veuillez réessayer.",
@@ -42,6 +44,7 @@ export async function loginWithPin(pin: string): Promise<AuthResult> {
     path: "/",
   });
 
+  logEvent("auth.pin_success");
   return { success: true };
 }
 

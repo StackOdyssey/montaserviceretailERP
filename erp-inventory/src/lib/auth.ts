@@ -86,4 +86,26 @@ export function verifyAdminPin(pin: string): boolean {
   return timingSafeEqual(pin.trim(), configured);
 }
 
+export interface SessionInfo {
+  user: string;
+  role: string;
+  exp: number;
+}
+
+/**
+ * Décode le payload d'une session **sans vérifier la signature**.
+ * À n'utiliser qu'après `verifyToken()` (défense en profondeur : signature puis rôle).
+ */
+export function parseSession(token: string): SessionInfo | null {
+  try {
+    const [payload] = token.split(".");
+    if (!payload) return null;
+    const data = JSON.parse(atob(payload));
+    if (typeof data.exp !== "number" || Date.now() > data.exp) return null;
+    return { user: String(data.user ?? ""), role: String(data.role ?? ""), exp: data.exp };
+  } catch {
+    return null;
+  }
+}
+
 export { SESSION_COOKIE_NAME };

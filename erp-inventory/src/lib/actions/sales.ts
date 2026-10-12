@@ -233,6 +233,26 @@ export async function createSalesDocument(data: {
     )[0];
     if (!line) throw new Error("LIGNE_METIER_INTROUVABLE");
 
+    // Snapshot §6A de la visibilité TVA au moment de la validation.
+    const settingsKey = docType === "FACTURE" ? "FAC" : docType === "AVOIR" ? "AV" : docType;
+    const vatCfg = (
+      await tx
+        .select()
+        .from(businessLineDocumentSettings)
+        .where(
+          and(
+            eq(businessLineDocumentSettings.businessLineId, line.id),
+            eq(businessLineDocumentSettings.docType, settingsKey)
+          )
+        )
+        .limit(1)
+    )[0];
+    const vatDisplay = vatCfg ? (vatCfg.showVat ? "SHOWN" : "HIDDEN") : "SHOWN";
+    const priceBasis = vatCfg?.priceBasis ?? "TTC";
+    if ((docType === "FACTURE" || docType === "AVOIR") && vatDisplay === "HIDDEN") {
+      throw new Error("TVA_OBLIGATOIRE_FAC_AV: FAC et AV doivent afficher la TVA");
+    }
+
     const totals = calculateDocumentTotals(
       data.lines.map((l) => ({ unitPriceHT: l.unitPriceHTCents, quantity: l.quantity })),
       data.discountPercent,
@@ -306,6 +326,8 @@ export async function createSalesDocument(data: {
           paidAmountCents: isFullyPaid ? totals.totalTTC : data.paidAmountCents ?? 0,
           paymentMethod: data.paymentMethod,
           notes: data.notes ?? null,
+          vatDisplay,
+          priceBasis,
           validatedAt: new Date(),
         })
         .returning({ id: salesDocuments.id })
@@ -578,6 +600,8 @@ export async function convertBlToFacture(
           paidAmountCents: 0,
           paymentMethod: head.paymentMethod,
           notes: `Facture issue des BL : ${active.map((b) => b.docNumber).join(", ")}`,
+          vatDisplay: "SHOWN",
+          priceBasis: "TTC",
           validatedAt: new Date(),
         })
         .returning({ id: salesDocuments.id })
@@ -703,6 +727,8 @@ export async function createAvoir(data: {
           paymentMethod: source.paymentMethod,
           notes: data.notes ?? `Avoir sur ${source.docNumber}`,
           avType,
+          vatDisplay: "SHOWN",
+          priceBasis: "TTC",
           validatedAt: new Date(),
         })
         .returning({ id: salesDocuments.id })

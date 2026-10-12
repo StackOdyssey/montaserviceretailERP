@@ -417,12 +417,22 @@ export const salesDocuments = pgTable("sales_documents", {
   dgiValidationId: text("dgi_validation_id"),
   dgiStatus: text("dgi_status"),
   dgiSignature: text("dgi_signature"),
+  vatDisplay: text("vat_display").notNull().default("SHOWN"), // snapshot §6A : SHOWN | HIDDEN
+  priceBasis: text("price_basis").notNull().default("TTC"), // snapshot §6A : TTC | HT
   validatedAt: timestamp("validated_at"),
   cancelledAt: timestamp("cancelled_at"),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+},
+  (table) => [
+    // Invariant §5.4 : FACTURE et AVOIR ne peuvent jamais masquer la TVA.
+    check(
+      "sales_documents_fac_av_show_vat",
+      sql`${table.docType} NOT IN ('FACTURE','AVOIR') OR ${table.vatDisplay} = 'SHOWN'`
+    ),
+  ]
+);
 
 // ==========================================
 // 9. LIGNES DU DOCUMENT COMMERCIAL

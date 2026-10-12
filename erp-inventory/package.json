@@ -11,7 +11,8 @@
     "db:migrate": "node --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs migrate",
     "db:push": "node --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs push",
     "db:import-stock": "node --env-file=.env.local scripts/import-stock.mjs",
-    "db:verify-stock": "node --env-file=.env.local scripts/verify-stock.mjs"
+    "db:verify-stock": "node --env-file=.env.local scripts/verify-stock.mjs",
+    "db:verify-vat-lock": "node --env-file=.env.local scripts/verify-vat-lock.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

@@ -1,0 +1,3 @@
+ALTER TABLE "sales_documents" ADD COLUMN "vat_display" text DEFAULT 'SHOWN' NOT NULL;--> statement-breakpoint
+ALTER TABLE "sales_documents" ADD COLUMN "price_basis" text DEFAULT 'TTC' NOT NULL;--> statement-breakpoint
+ALTER TABLE "sales_documents" ADD CONSTRAINT "sales_documents_fac_av_show_vat" CHECK ("sales_documents"."doc_type" NOT IN ('FACTURE','AVOIR') OR "sales_documents"."vat_display" = 'SHOWN');
