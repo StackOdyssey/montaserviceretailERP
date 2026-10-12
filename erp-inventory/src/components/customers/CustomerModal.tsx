@@ -237,6 +237,10 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
                 Client Professionnel (ICE obligatoire — B2B)
               </span>
             </label>
+            <p className="text-[11px] text-gray-500">
+              Particulier : seuls le nom et le téléphone sont nécessaires (aucun numéro de pièce d'identité n'est
+              demandé — décision CNDP en attente, Q14).
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

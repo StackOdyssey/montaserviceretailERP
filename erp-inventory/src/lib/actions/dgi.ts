@@ -14,6 +14,16 @@ function requireDb() {
 }
 
 /**
+ * Question ouverte « DGI-e-invoicing » : l'intégration DGI est DÉSACTIVÉE par
+ * défaut (fail-closed). Aucun envoi réseau n'a lieu tant que le périmètre et la
+ * date d'entrée en vigueur ne sont pas confirmés par le comptable. L'export UBL
+ * reste purement local et ne dépend pas de ce drapeau.
+ */
+export async function isDgiIntegrationEnabled(): Promise<boolean> {
+  return process.env.DGI_ENABLED === "true";
+}
+
+/**
  * Export UBL 2.1 d'un document validé (couche isolée, readiness DGI).
  * Aucun envoi vers la DGI : le XML est produit et retourné tel quel.
  */
@@ -96,6 +106,8 @@ export async function getArchiveManifests(limit = 50): Promise<ArchiveManifestIt
 /**
  * Enregistre un manifeste d'archivage : SHA-256 calculé côté serveur sur le
  * contenu exporté (jamais fourni par le client).
+ * Question ouverte « Retention-Q4 » : archivage append-only, aucune purge tant
+ * que la durée de conservation n'est pas tranchée.
  */
 export async function createArchiveManifest(data: {
   periodLabel: string;

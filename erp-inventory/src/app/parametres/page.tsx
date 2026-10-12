@@ -15,12 +15,14 @@ import {
   Smartphone,
   Server,
   Cloud,
+  HelpCircle,
 } from "lucide-react";
 import { getSettings, saveSettings, getVatRates } from "@/lib/actions/settings";
+import { OPEN_QUESTIONS } from "@/lib/open-questions";
 
 export default function ParametresPage() {
   const [activeTab, setActiveTab] = useState<
-    "SOCIETE" | "FISCAL" | "BANQUE" | "SECURITE" | "NUMEROTATION" | "CLOUD"
+    "SOCIETE" | "FISCAL" | "BANQUE" | "SECURITE" | "NUMEROTATION" | "CLOUD" | "DECISIONS"
   >("SOCIETE");
 
   const [savedNotification, setSavedNotification] = useState(false);
@@ -193,6 +195,7 @@ export default function ParametresPage() {
           { id: "SECURITE", label: "Code PIN & Biométrie", icon: Lock },
           { id: "NUMEROTATION", label: "Numérotation BL", icon: Hash },
           { id: "CLOUD", label: "Infrastructure Cloud", icon: Server },
+          { id: "DECISIONS", label: "Décisions & Questions", icon: HelpCircle },
         ].map((tab) => {
           const Icon = tab.icon;
           return (
@@ -708,7 +711,67 @@ export default function ParametresPage() {
           </div>
         )}
 
+        {/* ========================================================================= */}
+        {/* 7. DECISIONS & QUESTIONS OUVERTES (câblage des points en attente)         */}
+        {/* ========================================================================= */}
+        {activeTab === "DECISIONS" && (
+          <div className="space-y-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-xs">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-[#F7162D]" />
+                Décisions & Questions ouvertes
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Points en attente de décision (comptable / propriétaire). Le système applique déjà un comportement sûr
+                par défaut. Aucune de ces décisions ne doit être prise par un développeur.
+              </p>
+            </div>
+
+            {OPEN_QUESTIONS.map((q) => (
+              <div
+                key={q.code}
+                className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-xs"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white">{q.title}</h3>
+                  <span
+                    className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      q.status === "BLOQUE" ? "bg-[#FEF2F2] text-[#F7162D]" : "bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {q.status === "BLOQUE" ? "Bloquant" : "À décider"}
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] font-mono text-gray-400">{q.code}</p>
+                <dl className="mt-3 space-y-2 text-xs">
+                  <div>
+                    <dt className="font-bold text-gray-700 dark:text-gray-300">Contexte</dt>
+                    <dd className="text-gray-500">{q.contexte}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-bold text-gray-700 dark:text-gray-300">Impact</dt>
+                    <dd className="text-gray-500">{q.impact}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-bold text-gray-700 dark:text-gray-300">Décision requise</dt>
+                    <dd className="text-gray-500">{q.decisionRequise}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-bold text-emerald-700 dark:text-emerald-400">Défaut appliqué (sûr)</dt>
+                    <dd className="text-gray-500">{q.defautActuel}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-bold text-gray-700 dark:text-gray-300">Câblage (code)</dt>
+                    <dd className="text-gray-500 font-mono text-[11px]">{q.cablage}</dd>
+                  </div>
+                </dl>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Bouton d'enregistrement global */}
+        {activeTab !== "DECISIONS" && (
         <div className="flex justify-end">
           <button
             type="submit"
@@ -718,6 +781,7 @@ export default function ParametresPage() {
             Enregistrer les Paramètres
           </button>
         </div>
+        )}
       </form>
     </div>
   );

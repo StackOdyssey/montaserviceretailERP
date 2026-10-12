@@ -193,6 +193,8 @@ export async function createSalesDocument(data: {
   paidAmountCents?: number;
   notes?: string;
   businessLineCode?: string;
+  /** Motif d'un prix négocié hors catalogue (question ouverte Prix-negocie). */
+  overrideReason?: string;
 }): Promise<SalesDocumentItem> {
   await assertAuthenticated();
   const d = requireDb();
@@ -275,6 +277,25 @@ export async function createSalesDocument(data: {
     for (const l of data.lines) {
       const p = (await tx.select().from(products).where(eq(products.id, l.productId)).limit(1))[0];
       if (!p) throw new Error(`PIECE_INTROUVABLE: ${l.sku}`);
+
+      // Question ouverte « Prix-negocie » : le prix est résolu côté serveur depuis
+      // la base. Un prix hors catalogue est refusé (fail-closed) sauf motif tracé.
+      const catalogPrices = [p.salePriceHtCents].filter((v) => v > 0);
+      const isOffCatalog = catalogPrices.length > 0 && !catalogPrices.includes(l.unitPriceHTCents);
+      if (isOffCatalog) {
+        if (!data.overrideReason?.trim()) {
+          throw new Error(
+            `PRIX_HORS_CATALOGUE: ${p.sku}. Un prix négocié doit être justifié (prix fixé audité).`
+          );
+        }
+        await tx.insert(auditLogs).values({
+          action: "PRIX_FIXE",
+          entityType: "PRODUCT",
+          entityId: p.id,
+          details: `${p.sku}: prix catalogue ${catalogPrices.join("/")} → ${l.unitPriceHTCents} — motif: ${data.overrideReason.trim()}`,
+        });
+      }
+
       const state: CmupState = { quantity: p.currentStock, cmupCents: p.cmupCents };
       const { state: next } = applyMovement(state, -l.quantity, 0);
       if (affectsStock && next.quantity < 0 && !negativeAllowed) throw new Error(`STOCK_NEGATIF_INTERDIT: ${p.sku}`);
