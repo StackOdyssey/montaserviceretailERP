@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Building2,
   Percent,
@@ -16,6 +16,7 @@ import {
   Server,
   Cloud,
 } from "lucide-react";
+import { getSettings, saveSettings, getVatRates } from "@/lib/actions/settings";
 
 export default function ParametresPage() {
   const [activeTab, setActiveTab] = useState<
@@ -71,10 +72,94 @@ export default function ParametresPage() {
     biometricEnabled: true,
   });
 
-  const handleSave = (e: React.FormEvent) => {
+  const [vatRates, setVatRates] = useState<Array<{ id: number; ratePercent: number; label: string }>>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [s, rates] = await Promise.all([getSettings(), getVatRates()]);
+        setVatRates(rates.map((r) => ({ id: r.id, ratePercent: r.ratePercent, label: r.label })));
+        if (!s) return;
+        setCompanyInfo((c) => ({
+          ...c,
+          name: s.raisonSociale || c.name,
+          tradeName: s.tradeName || c.tradeName,
+          legalForm: s.legalForm || c.legalForm,
+          capital: s.capitalCents ? `${(s.capitalCents / 100).toLocaleString("fr-FR")} DH` : c.capital,
+          ice: s.ice || c.ice,
+          identifiantFiscal: s.identifiantFiscal || c.identifiantFiscal,
+          registreCommerce: s.registreCommerce || c.registreCommerce,
+          taxeProfessionnelle: s.taxeProfessionnelle || c.taxeProfessionnelle,
+          cnss: s.cnss || c.cnss,
+          address: s.address || c.address,
+          city: s.city || c.city,
+          phone: s.phone || c.phone,
+          mobileWhatsApp: s.mobileWhatsapp || c.mobileWhatsApp,
+          email: s.email || c.email,
+        }));
+        const rate = rates.find((r) => r.id === s.defaultVatRateId)?.ratePercent;
+        setFiscalSettings((f) => ({
+          ...f,
+          defaultTvaRate: rate ?? f.defaultTvaRate,
+          currency: s.currency || f.currency,
+          enableNegativeStock: s.negativeStockAllowed,
+          displayDiscountUnderBrut: s.displayDiscountUnderBrut,
+          defaultPaymentDueDays: s.defaultPaymentDueDays,
+          invoiceFooterNote: s.footerText || f.invoiceFooterNote,
+        }));
+        setBankSettings((b) => ({
+          ...b,
+          bank1Name: s.bankName || b.bank1Name,
+          bank1Agency: s.bankAgency || b.bank1Agency,
+          bank1Rib: s.bankRib || b.bank1Rib,
+          bank2Name: s.bank2Name || b.bank2Name,
+          bank2Agency: s.bank2Agency || b.bank2Agency,
+          bank2Rib: s.bank2Rib || b.bank2Rib,
+        }));
+      } catch {
+        // base non joignable : conserver les valeurs par défaut du formulaire
+      }
+    })();
+  }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSavedNotification(true);
-    setTimeout(() => setSavedNotification(false), 3000);
+    const capitalCents = Number(companyInfo.capital.replace(/[^\d]/g, "")) * 100;
+    const vatId = vatRates.find((r) => r.ratePercent === fiscalSettings.defaultTvaRate)?.id ?? null;
+    try {
+      await saveSettings({
+        raisonSociale: companyInfo.name,
+        tradeName: companyInfo.tradeName,
+        legalForm: companyInfo.legalForm,
+        capitalCents,
+        ice: companyInfo.ice,
+        identifiantFiscal: companyInfo.identifiantFiscal,
+        registreCommerce: companyInfo.registreCommerce,
+        taxeProfessionnelle: companyInfo.taxeProfessionnelle,
+        cnss: companyInfo.cnss,
+        address: companyInfo.address,
+        city: companyInfo.city,
+        phone: companyInfo.phone,
+        mobileWhatsapp: companyInfo.mobileWhatsApp,
+        email: companyInfo.email,
+        footerText: fiscalSettings.invoiceFooterNote,
+        defaultVatRateId: vatId,
+        currency: fiscalSettings.currency,
+        negativeStockAllowed: fiscalSettings.enableNegativeStock,
+        defaultPaymentDueDays: fiscalSettings.defaultPaymentDueDays,
+        displayDiscountUnderBrut: fiscalSettings.displayDiscountUnderBrut,
+        bankName: bankSettings.bank1Name,
+        bankAgency: bankSettings.bank1Agency,
+        bankRib: bankSettings.bank1Rib,
+        bank2Name: bankSettings.bank2Name,
+        bank2Agency: bankSettings.bank2Agency,
+        bank2Rib: bankSettings.bank2Rib,
+      });
+      setSavedNotification(true);
+      setTimeout(() => setSavedNotification(false), 3000);
+    } catch (err) {
+      alert((err as Error).message);
+    }
   };
 
   return (

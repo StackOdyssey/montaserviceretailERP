@@ -34,6 +34,14 @@ export const settings = pgTable("settings", {
   website: text("website").default(""),
   logoUrl: text("logo_url"),
   footerText: text("footer_text").default(""),
+  mobileWhatsapp: text("mobile_whatsapp").default(""),
+  // Coordonnées bancaires (figurant sur les documents)
+  bankName: text("bank_name").default(""),
+  bankAgency: text("bank_agency").default(""),
+  bankRib: text("bank_rib").default(""),
+  bank2Name: text("bank2_name").default(""),
+  bank2Agency: text("bank2_agency").default(""),
+  bank2Rib: text("bank2_rib").default(""),
   // Fiscalité & paramètres généraux
   defaultVatRateId: integer("default_vat_rate_id").references(() => vatRates.id),
   vatRegime: text("vat_regime").notNull().default("ENCAISSEMENTS"), // ENCAISSEMENTS | DEDITS
@@ -42,6 +50,8 @@ export const settings = pgTable("settings", {
   localeSecondary: text("locale_secondary").notNull().default("en"),
   timezone: text("timezone").notNull().default("Africa/Casablanca"),
   negativeStockAllowed: boolean("negative_stock_allowed").notNull().default(false),
+  defaultPaymentDueDays: integer("default_payment_due_days").notNull().default(30),
+  displayDiscountUnderBrut: boolean("display_discount_under_brut").notNull().default(true),
   cashDailyThresholdCents: integer("cash_daily_threshold_cents").notNull().default(500000),
   cashMonthlyThresholdCents: integer("cash_monthly_threshold_cents").notNull().default(5000000),
   yearStartMonth: integer("year_start_month").notNull().default(1),
