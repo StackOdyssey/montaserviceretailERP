@@ -6,6 +6,7 @@ import { recordExpense } from "@/lib/actions/expenses";
 import { ExpenseCategory, CATEGORY_LABELS } from "@/lib/constants/expenses";
 import { toCentimes } from "@/lib/money";
 import { compressImageToWebP } from "@/lib/image-compressor";
+import { getPhotoUploadUrl } from "@/lib/actions/media";
 
 interface ExpenseModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoInfo, setPhotoInfo] = useState<string | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,17 +36,31 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    e.target.value = "";
 
     try {
       setIsCompressing(true);
       setError(null);
       const compressed = await compressImageToWebP(file, 1000, 1000, 0.8);
-      setPhotoPreview(compressed.previewUrl);
-      setPhotoInfo(`WebP optimisé (${compressed.sizeKb} Ko)`);
-    } catch (err: any) {
-      setError("Erreur lors de la compression de la photo du reçu.");
+      setPhotoInfo(`WebP (${compressed.sizeKb} Ko)`);
+
+      // Dépôt direct vers Cloudflare R2 via URL présignée (les octets ne passent pas par Cloud Run)
+      setIsCompressing(false);
+      setIsUploading(true);
+      const contentType = compressed.file.type || "image/webp";
+      const { uploadUrl, publicUrl } = await getPhotoUploadUrl({ contentType, sizeBytes: compressed.file.size });
+      const put = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "content-type": contentType },
+        body: compressed.file,
+      });
+      if (!put.ok) throw new Error(`téléversement refusé (${put.status})`);
+      setPhotoPreview(publicUrl);
+    } catch (err) {
+      setError(err instanceof Error ? `Échec du reçu : ${err.message}` : "Erreur lors de l'ajout du reçu.");
     } finally {
       setIsCompressing(false);
+      setIsUploading(false);
     }
   };
 
@@ -223,12 +239,12 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isCompressing}
+                disabled={isCompressing || isUploading}
                 className="w-full py-4 border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-[#F7162D] rounded-xl flex flex-col items-center justify-center gap-1.5 text-gray-500 hover:text-[#F7162D] transition bg-gray-50/50 dark:bg-gray-800/30"
               >
                 <Camera className="w-5 h-5" />
                 <span className="text-xs font-bold">
-                  {isCompressing ? "Compression WebP en cours..." : "Prendre en photo le ticket / reçu"}
+                  {isCompressing ? "Compression..." : isUploading ? "Téléversement..." : "Prendre en photo le ticket / reçu"}
                 </span>
                 <span className="text-[10px] text-gray-400">
                   Optimisé automatiquement pour iPhone (&lt; 80 Ko)
@@ -260,7 +276,7 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploading}
               className="px-6 py-2.5 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition disabled:opacity-50"
             >
               {isSubmitting ? "Validation..." : "Enregistrer la dépense"}
