@@ -19,7 +19,10 @@ export interface ExpenseItem {
   id: number;
   title: string;
   category: ExpenseCategory;
-  amountCents: number;
+  amountCents: number; // Total TTC
+  amountHtCents?: number;
+  tvaRate?: number;
+  tvaAmountCents?: number;
   expenseDate: string;
   receiptPhotoUrl?: string | null;
   notes?: string | null;

@@ -6,8 +6,8 @@ import { getCustomers } from "./customers";
 import { getSuppliers, SupplierItem } from "./suppliers";
 import { getExpenses } from "./expenses";
 import { formatMoney } from "@/lib/money";
-import { and, eq, gte, lte, ne } from "drizzle-orm";
-import { db, supplierReceipts, suppliers } from "@/db";
+import { and, eq, gte, lte, ne, sql } from "drizzle-orm";
+import { db, expenseCategories, expenses, supplierReceipts, suppliers } from "@/db";
 
 function requireDb() {
   if (!db) throw new Error("BASE_INDISPONIBLE: DATABASE_URL non configurée");
@@ -460,7 +460,18 @@ export async function getTvaAccountingExport(options?: {
 
   const purchasesTaxableHtCents = receiptRows.reduce((s, r) => s + r.totalHtCents, 0);
   const tvaDeductiblePurchasesCents = receiptRows.reduce((s, r) => s + r.tvaAmountCents, 0);
-  const tvaDeductibleExpensesCents = 0;
+  const expTvaRows = await d
+    .select({ n: sql<string>`coalesce(sum(${expenses.tvaAmountCents}),0)::bigint` })
+    .from(expenses)
+    .leftJoin(expenseCategories, eq(expenses.categoryId, expenseCategories.id))
+    .where(
+      and(
+        gte(expenses.expenseDate, new Date(startOfMonth)),
+        lte(expenses.expenseDate, new Date(endOfMonth)),
+        eq(expenseCategories.vatDeductibleDefault, true)
+      )
+    );
+  const tvaDeductibleExpensesCents = Number(expTvaRows[0]?.n ?? 0);
   const totalTvaDeductibleCents = tvaDeductiblePurchasesCents + tvaDeductibleExpensesCents;
 
   const purchaseLines = receiptRows.map((r) => ({

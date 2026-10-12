@@ -519,7 +519,11 @@ export const expenses = pgTable("expenses", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(), // ex: "Loyer magasin", "Électricité", "Transport pièces"
   category: text("category").notNull().default("AUTRE"), // LOYER, ELECTRICITE_EAU, TRANSPORT, REPAS_EQUIPE, FOURNITURES, AUTRE
-  amountCents: integer("amount_cents").notNull(),
+  categoryId: integer("category_id").references(() => expenseCategories.id),
+  amountCents: integer("amount_cents").notNull(), // Total TTC
+  amountHtCents: integer("amount_ht_cents").notNull().default(0),
+  tvaRate: integer("tva_rate").notNull().default(20),
+  tvaAmountCents: integer("tva_amount_cents").notNull().default(0),
   expenseDate: timestamp("expense_date").defaultNow(),
   receiptPhotoUrl: text("receipt_photo_url"),
   notes: text("notes"),

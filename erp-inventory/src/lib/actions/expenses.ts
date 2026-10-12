@@ -21,6 +21,9 @@ function mapExpense(r: ExpenseRow): ExpenseItem {
     title: r.title,
     category: r.category as ExpenseCategory,
     amountCents: r.amountCents,
+    amountHtCents: r.amountHtCents,
+    tvaRate: r.tvaRate,
+    tvaAmountCents: r.tvaAmountCents,
     expenseDate: (r.expenseDate ?? r.createdAt ?? new Date()).toISOString(),
     receiptPhotoUrl: r.receiptPhotoUrl,
     notes: r.notes,
@@ -111,7 +114,10 @@ export async function getExpenses(options?: {
 export async function recordExpense(data: {
   title: string;
   category: ExpenseCategory;
-  amountCents: number;
+  categoryId?: number | null;
+  amountHtCents?: number;
+  amountCents?: number; // legacy : TTC
+  tvaRate?: number;
   expenseDate?: string;
   receiptPhotoUrl?: string;
   notes?: string;
@@ -121,7 +127,21 @@ export async function recordExpense(data: {
   await assertPeriodOpen(data.expenseDate ? new Date(data.expenseDate) : new Date());
 
   if (!data.title.trim()) throw new Error("L'intitulé de la dépense est obligatoire");
-  if (data.amountCents <= 0) throw new Error("Le montant de la dépense doit être supérieur à 0");
+
+  const rate = data.tvaRate ?? 20;
+  let ht: number;
+  let tva: number;
+  let ttc: number;
+  if (typeof data.amountHtCents === "number") {
+    ht = data.amountHtCents;
+    tva = Math.round((ht * rate) / 100);
+    ttc = ht + tva;
+  } else {
+    ttc = data.amountCents ?? 0;
+    ht = Math.round(ttc / (1 + rate / 100));
+    tva = ttc - ht;
+  }
+  if (ttc <= 0) throw new Error("Le montant de la dépense doit être supérieur à 0");
 
   const row = (
     await d
@@ -129,7 +149,11 @@ export async function recordExpense(data: {
       .values({
         title: data.title.trim(),
         category: data.category,
-        amountCents: data.amountCents,
+        categoryId: data.categoryId ?? null,
+        amountCents: ttc,
+        amountHtCents: ht,
+        tvaRate: rate,
+        tvaAmountCents: tva,
         expenseDate: data.expenseDate ? new Date(data.expenseDate) : new Date(),
         receiptPhotoUrl: data.receiptPhotoUrl ?? null,
         notes: data.notes ?? null,

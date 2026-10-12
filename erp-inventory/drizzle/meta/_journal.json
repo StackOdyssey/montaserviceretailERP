@@ -71,6 +71,13 @@
       "when": 1791754438227,
       "tag": "0009_accounting_periods",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791821719156,
+      "tag": "0010_expense_vat",
+      "breakpoints": true
     }
   ]
 }
