@@ -86,11 +86,21 @@ export default function VentesListPage() {
   };
 
   const handleAvoir = (doc: SalesDocumentItem) => {
-    if (!confirm(`Créer un avoir total sur ${doc.docNumber} ? (marchandise remise en stock)`)) return;
+    const choice = window.prompt(
+      `Type d'avoir pour ${doc.docNumber} :\n1 = Retour (marchandise reprise en stock)\n2 = Commercial (geste, sans reprise)\n3 = Correction (erreur de facturation)`,
+      "1"
+    );
+    if (choice === null) return;
+    const avType: "RETOUR" | "COMMERCIAL" | "CORRECTION" =
+      choice.trim() === "2" ? "COMMERCIAL" : choice.trim() === "3" ? "CORRECTION" : "RETOUR";
+    const label =
+      avType === "RETOUR" ? "retour, stock réintégré" : avType === "COMMERCIAL" ? "geste commercial" : "correction";
+    if (!confirm(`Créer un avoir total (${label}) sur ${doc.docNumber} ?`)) return;
     runAction(doc, () =>
       createAvoir({
         sourceDocumentId: doc.id,
         returns: doc.lines.map((l) => ({ lineId: l.id, quantity: l.quantity })),
+        avType,
       })
     );
   };

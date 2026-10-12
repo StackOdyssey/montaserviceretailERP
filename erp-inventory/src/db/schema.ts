@@ -412,6 +412,7 @@ export const salesDocuments = pgTable("sales_documents", {
   paymentMethod: text("payment_method"),
   notes: text("notes"),
   sourceBlId: integer("source_bl_id"), // Lien si facture ou avoir issu d'un BL
+  avType: text("av_type"), // Avoir : RETOUR (marchandise reprise), COMMERCIAL (geste), CORRECTION
   validatedAt: timestamp("validated_at"),
   cancelledAt: timestamp("cancelled_at"),
   deletedAt: timestamp("deleted_at"),
