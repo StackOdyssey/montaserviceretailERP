@@ -1,9 +1,10 @@
 "use server";
 
-import { and, asc, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import {
   db,
   products,
+  settings,
   stockMovements,
   supplierPayments,
   supplierReceiptLines,
@@ -357,7 +358,7 @@ export async function recordSupplierPayment(data: {
   dueDate?: string;
   bankName?: string;
   notes?: string;
-}): Promise<SupplierPaymentItem> {
+}): Promise<SupplierPaymentItem & { warning?: string }> {
   await assertAuthenticated();
   const d = requireDb();
   await assertPeriodOpen();
@@ -399,7 +400,42 @@ export async function recordSupplierPayment(data: {
     });
 
   const row = (await d.select().from(supplierPayments).where(eq(supplierPayments.id, paymentId)).limit(1))[0];
-  return mapPayment(row, supplier.name, receiptNumber);
+
+  // Seuils de déduction des paiements en espèces (CGI) — avertissement non bloquant
+  let warning: string | undefined;
+  if (data.paymentMethod === "ESPECES") {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const s = (await d.select().from(settings).limit(1))[0];
+    const dailyLimit = s?.cashDailyThresholdCents ?? 500000;
+    const monthlyLimit = s?.cashMonthlyThresholdCents ?? 5000000;
+    const sumCash = async (from: Date): Promise<number> =>
+      Number(
+        (
+          await d
+            .select({ n: sql<string>`coalesce(sum(${supplierPayments.amountCents}),0)::bigint` })
+            .from(supplierPayments)
+            .where(
+              and(
+                eq(supplierPayments.supplierId, data.supplierId),
+                eq(supplierPayments.paymentMethod, "ESPECES"),
+                ne(supplierPayments.status, "REJETE"),
+                gte(supplierPayments.paymentDate, from)
+              )
+            )
+        )[0]?.n ?? 0
+      );
+    const dayTotal = await sumCash(startOfToday);
+    const monthTotal = await sumCash(startOfMonth);
+    if (dayTotal > dailyLimit) {
+      warning = `Paiement espèces du jour (${(dayTotal / 100).toFixed(2)} DH) au-delà du seuil déductible de ${(dailyLimit / 100).toFixed(2)} DH/jour pour ce fournisseur.`;
+    } else if (monthTotal > monthlyLimit) {
+      warning = `Paiement espèces du mois (${(monthTotal / 100).toFixed(2)} DH) au-delà du seuil déductible de ${(monthlyLimit / 100).toFixed(2)} DH/mois pour ce fournisseur.`;
+    }
+  }
+
+  return { ...mapPayment(row, supplier.name, receiptNumber), warning };
 }
 
 /**
