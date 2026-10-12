@@ -30,7 +30,14 @@ import {
   getStockValuation,
   getProfitMarginsReport,
 } from "@/lib/actions/analytics";
-import { getAccountingPeriods, setPeriodLock, getAccountingCsv } from "@/lib/actions/accounting";
+import {
+  getAccountingPeriods,
+  setPeriodStatus as setPeriodStatusAction,
+  getAccountingCsv,
+  getValidationIssues,
+  type ValidationIssue,
+  type PeriodStatus,
+} from "@/lib/actions/accounting";
 import { getCustomerAging, type PartyAgingRow, type AgingBuckets } from "@/lib/actions/customers";
 import { getSupplierAging } from "@/lib/actions/suppliers";
 import { formatMoney } from "@/lib/money";
@@ -38,7 +45,7 @@ import { useSettings } from "@/components/layout/SettingsProvider";
 
 export default function ComptabilitePage() {
   const company = useSettings();
-  const [activeTab, setActiveTab] = useState<"TVA" | "STOCK" | "MARGES" | "AGING">("TVA");
+  const [activeTab, setActiveTab] = useState<"TVA" | "STOCK" | "MARGES" | "AGING" | "VALIDATION">("TVA");
   const [tvaData, setTvaData] = useState<TvaAccountingExport | null>(null);
   const [stockData, setStockData] = useState<StockValuation | null>(null);
   const [marginsData, setMarginsData] = useState<ProfitMarginsReport | null>(null);
@@ -47,28 +54,31 @@ export default function ComptabilitePage() {
   const now = new Date();
   const [periodYear, setPeriodYear] = useState(now.getFullYear());
   const [periodMonth, setPeriodMonth] = useState(now.getMonth() + 1); // 1..12
-  const [periodStatus, setPeriodStatus] = useState<"OPEN" | "LOCKED">("OPEN");
+  const [periodStatus, setPeriodStatusState] = useState<PeriodStatus>("OPEN");
   const [isLocking, setIsLocking] = useState(false);
+  const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
   const [customerAging, setCustomerAging] = useState<{ rows: PartyAgingRow[]; totals: AgingBuckets } | null>(null);
   const [supplierAging, setSupplierAging] = useState<{ rows: PartyAgingRow[]; totals: AgingBuckets } | null>(null);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [tva, stock, margins, periods, custAging, supAging] = await Promise.all([
+      const [tva, stock, margins, periods, custAging, supAging, issues] = await Promise.all([
         getTvaAccountingExport({ year: periodYear, month: periodMonth - 1 }),
         getStockValuation(),
         getProfitMarginsReport(marginsPeriod),
         getAccountingPeriods(periodYear),
         getCustomerAging(),
         getSupplierAging(),
+        getValidationIssues({ year: periodYear, month: periodMonth }),
       ]);
       setTvaData(tva);
       setStockData(stock);
       setMarginsData(margins);
-      setPeriodStatus(periods.find((x) => x.month === periodMonth)?.status ?? "OPEN");
+      setPeriodStatusState(periods.find((x) => x.month === periodMonth)?.status ?? "OPEN");
       setCustomerAging(custAging);
       setSupplierAging(supAging);
+      setValidationIssues(issues);
     } finally {
       setLoading(false);
     }
@@ -79,17 +89,22 @@ export default function ComptabilitePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [marginsPeriod, periodYear, periodMonth]);
 
-  const toggleLock = async () => {
+  const changeStatus = async (status: PeriodStatus) => {
     setIsLocking(true);
     try {
-      const locked = periodStatus !== "LOCKED";
-      await setPeriodLock(periodYear, periodMonth, locked);
-      setPeriodStatus(locked ? "LOCKED" : "OPEN");
+      await setPeriodStatusAction(periodYear, periodMonth, status);
+      setPeriodStatusState(status);
     } catch (e) {
       alert((e as Error).message);
     } finally {
       setIsLocking(false);
     }
+  };
+  const STATUS_LABELS: Record<PeriodStatus, string> = {
+    OPEN: "Ouverte",
+    REVIEWED: "Revue",
+    EXPORTED: "Exportée",
+    LOCKED: "Clôturée",
   };
 
   // Export CSV comptable (généré côté serveur, autoritatif)
@@ -176,20 +191,25 @@ export default function ComptabilitePage() {
               periodStatus === "LOCKED" ? "bg-red-50 text-[#F7162D]" : "bg-emerald-50 text-emerald-700"
             }`}
           >
-            {periodStatus === "LOCKED" ? "Clôturée" : "Ouverte"}
+            {STATUS_LABELS[periodStatus]}
           </span>
         </div>
 
-        <button
-          onClick={toggleLock}
-          disabled={isLocking}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-2 text-white disabled:opacity-60 ${
-            periodStatus === "LOCKED" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-[#111827] hover:bg-black"
-          }`}
-        >
-          {periodStatus === "LOCKED" ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-          <span>{periodStatus === "LOCKED" ? "Rouvrir la période" : "Clôturer la période"}</span>
-        </button>
+        <div className="flex items-center gap-2 text-xs font-bold">
+          {periodStatus === "LOCKED" ? <Lock className="w-4 h-4 text-[#F7162D]" /> : <Unlock className="w-4 h-4 text-emerald-600" />}
+          <span className="text-gray-500 hidden sm:inline">Statut :</span>
+          <select
+            value={periodStatus}
+            disabled={isLocking}
+            onChange={(e) => changeStatus(e.target.value as PeriodStatus)}
+            className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 outline-none focus:border-[#F7162D] disabled:opacity-60"
+          >
+            <option value="OPEN">Ouverte (brouillon)</option>
+            <option value="REVIEWED">Revue</option>
+            <option value="EXPORTED">Exportée</option>
+            <option value="LOCKED">Clôturée (verrouillée)</option>
+          </select>
+        </div>
       </div>
 
       {/* Onglets de navigation */}
@@ -240,6 +260,23 @@ export default function ComptabilitePage() {
         >
           <Calendar className="w-4 h-4" />
           Balance Âgée
+        </button>
+
+        <button
+          onClick={() => setActiveTab("VALIDATION")}
+          className={`pb-3 text-sm font-bold flex items-center gap-2 border-b-2 transition ${
+            activeTab === "VALIDATION"
+              ? "border-[#F7162D] text-[#F7162D]"
+              : "border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white"
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          Contrôle &amp; Validation
+          {validationIssues.some((i) => i.severity === "ERROR") && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black bg-[#FEF2F2] text-[#F7162D]">
+              {validationIssues.filter((i) => i.severity === "ERROR").reduce((s, i) => s + i.count, 0)}
+            </span>
+          )}
         </button>
       </div>
 
@@ -758,6 +795,56 @@ export default function ComptabilitePage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* ONGLET 5 : CONTRÔLE & VALIDATION AVANT CLÔTURE           */}
+      {/* ======================================================== */}
+      {activeTab === "VALIDATION" && (
+        <div className="space-y-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-xs">
+            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-[#F7162D]" />
+              Contrôle de cohérence avant clôture
+            </h3>
+            <p className="text-xs text-gray-500 mt-1">
+              Période {String(periodMonth).padStart(2, "0")}/{periodYear}. Corrigez les anomalies bloquantes avant de
+              clôturer la période.
+            </p>
+          </div>
+
+          {validationIssues.length === 0 ? (
+            <div className="p-6 rounded-2xl bg-emerald-50 text-emerald-700 font-bold flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5" />
+              Aucune anomalie détectée pour cette période.
+            </div>
+          ) : (
+            validationIssues.map((iss) => (
+              <div key={iss.type} className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 shadow-xs">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <AlertCircle className={`w-4 h-4 ${iss.severity === "ERROR" ? "text-[#F7162D]" : "text-amber-600"}`} />
+                    {iss.label}
+                  </span>
+                  <span
+                    className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      iss.severity === "ERROR" ? "bg-[#FEF2F2] text-[#F7162D]" : "bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {iss.severity === "ERROR" ? "Bloquant" : "Avertissement"} • {iss.count}
+                  </span>
+                </div>
+                {iss.samples.length > 0 && (
+                  <ul className="mt-2 text-xs text-gray-500 list-disc list-inside space-y-0.5">
+                    {iss.samples.map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>

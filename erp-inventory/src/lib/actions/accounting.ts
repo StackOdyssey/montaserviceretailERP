@@ -1,15 +1,25 @@
 "use server";
 
-import { and, asc, eq } from "drizzle-orm";
-import { accountingPeriods, db } from "@/db";
+import { and, asc, eq, gt, gte, isNull, lt, lte, ne, or } from "drizzle-orm";
+import {
+  accountingPeriods,
+  customerPayments,
+  db,
+  expenseCategories,
+  expenses,
+  products,
+  salesDocuments,
+} from "@/db";
 import { assertAuthenticated } from "@/lib/action-guard";
 import { getTvaAccountingExport } from "./analytics";
+
+export type PeriodStatus = "OPEN" | "REVIEWED" | "EXPORTED" | "LOCKED";
 
 export interface AccountingPeriodItem {
   id: number;
   year: number;
   month: number;
-  status: "OPEN" | "LOCKED";
+  status: PeriodStatus;
   lockedAt: string | null;
   notes: string | null;
 }
@@ -24,7 +34,7 @@ function toItem(r: typeof accountingPeriods.$inferSelect): AccountingPeriodItem 
     id: r.id,
     year: r.year,
     month: r.month,
-    status: r.status as "OPEN" | "LOCKED",
+    status: r.status as PeriodStatus,
     lockedAt: r.lockedAt ? r.lockedAt.toISOString() : null,
     notes: r.notes,
   };
@@ -42,16 +52,22 @@ export async function getAccountingPeriods(year?: number): Promise<AccountingPer
   return rows.map(toItem);
 }
 
-/** Verrouille (clôture) ou déverrouille une période comptable. */
-export async function setPeriodLock(
+/**
+ * Fait avancer/reculer le statut d'une période comptable :
+ * OPEN (brouillon) → REVIEWED (revue) → EXPORTED (exportée) → LOCKED (clôturée).
+ * Seul LOCKED bloque les écritures.
+ */
+export async function setPeriodStatus(
   year: number,
   month: number,
-  locked: boolean,
+  status: PeriodStatus,
   notes?: string
 ): Promise<AccountingPeriodItem> {
   await assertAuthenticated();
   const d = requireDb();
-  const status = locked ? "LOCKED" : "OPEN";
+  const allowed: PeriodStatus[] = ["OPEN", "REVIEWED", "EXPORTED", "LOCKED"];
+  if (!allowed.includes(status)) throw new Error("STATUT_PERIODE_INVALIDE");
+
   const existing = (
     await d
       .select()
@@ -64,7 +80,7 @@ export async function setPeriodLock(
     const updated = (
       await d
         .update(accountingPeriods)
-        .set({ status, lockedAt: locked ? new Date() : null, notes: notes ?? existing.notes })
+        .set({ status, lockedAt: status === "LOCKED" ? new Date() : null, notes: notes ?? existing.notes })
         .where(eq(accountingPeriods.id, existing.id))
         .returning()
     )[0];
@@ -74,10 +90,144 @@ export async function setPeriodLock(
   const inserted = (
     await d
       .insert(accountingPeriods)
-      .values({ year, month, status, lockedAt: locked ? new Date() : null, notes: notes ?? null })
+      .values({ year, month, status, lockedAt: status === "LOCKED" ? new Date() : null, notes: notes ?? null })
       .returning()
   )[0];
   return toItem(inserted);
+}
+
+/** Verrouille (clôture = LOCKED) ou rouvre (OPEN) une période comptable. */
+export async function setPeriodLock(
+  year: number,
+  month: number,
+  locked: boolean,
+  notes?: string
+): Promise<AccountingPeriodItem> {
+  return setPeriodStatus(year, month, locked ? "LOCKED" : "OPEN", notes);
+}
+
+export interface ValidationIssue {
+  type: string;
+  label: string;
+  severity: "ERROR" | "WARNING";
+  count: number;
+  samples: string[];
+}
+
+/**
+ * Contrôle de cohérence avant clôture (Phase 8) : ICE manquant, justificatifs,
+ * stock négatif, échéances manquantes, surpaiements.
+ */
+export async function getValidationIssues(options?: { year?: number; month?: number }): Promise<ValidationIssue[]> {
+  await assertAuthenticated();
+  const d = requireDb();
+  const now = new Date();
+  const year = options?.year ?? now.getFullYear();
+  const month = options?.month ?? now.getMonth() + 1; // 1..12
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0, 23, 59, 59);
+
+  const issues: ValidationIssue[] = [];
+
+  const noIce = await d
+    .select({ n: salesDocuments.docNumber, name: salesDocuments.customerName })
+    .from(salesDocuments)
+    .where(
+      and(
+        eq(salesDocuments.docType, "FACTURE"),
+        ne(salesDocuments.status, "ANNULE"),
+        isNull(salesDocuments.deletedAt),
+        gte(salesDocuments.docDate, start),
+        lte(salesDocuments.docDate, end),
+        or(isNull(salesDocuments.customerIce), eq(salesDocuments.customerIce, ""))!
+      )
+    );
+  if (noIce.length) {
+    issues.push({
+      type: "FACTURE_SANS_ICE",
+      label: "Factures sans ICE client",
+      severity: "ERROR",
+      count: noIce.length,
+      samples: noIce.slice(0, 5).map((r) => `${r.n} — ${r.name}`),
+    });
+  }
+
+  const noReceipt = await d
+    .select({ title: expenses.title })
+    .from(expenses)
+    .innerJoin(expenseCategories, eq(expenses.categoryId, expenseCategories.id))
+    .where(
+      and(
+        eq(expenseCategories.receiptRequired, true),
+        isNull(expenses.receiptPhotoUrl),
+        gte(expenses.expenseDate, start),
+        lte(expenses.expenseDate, end)
+      )
+    );
+  if (noReceipt.length) {
+    issues.push({
+      type: "DEPENSE_SANS_JUSTIFICATIF",
+      label: "Dépenses sans justificatif (catégorie l'exigeant)",
+      severity: "WARNING",
+      count: noReceipt.length,
+      samples: noReceipt.slice(0, 5).map((r) => r.title),
+    });
+  }
+
+  const neg = await d
+    .select({ sku: products.sku, q: products.currentStock })
+    .from(products)
+    .where(lt(products.currentStock, 0));
+  if (neg.length) {
+    issues.push({
+      type: "STOCK_NEGATIF",
+      label: "Articles en stock négatif",
+      severity: "ERROR",
+      count: neg.length,
+      samples: neg.slice(0, 5).map((r) => `${r.sku} (${r.q})`),
+    });
+  }
+
+  const noDue = await d
+    .select({ id: customerPayments.id })
+    .from(customerPayments)
+    .where(
+      and(
+        or(eq(customerPayments.paymentMethod, "CHEQUE"), eq(customerPayments.paymentMethod, "EFFET_LCN"))!,
+        isNull(customerPayments.chequeDueDate)
+      )
+    );
+  if (noDue.length) {
+    issues.push({
+      type: "ECHEANCE_MANQUANTE",
+      label: "Chèques / effets sans date d'échéance",
+      severity: "WARNING",
+      count: noDue.length,
+      samples: noDue.slice(0, 5).map((r) => `Règlement #${r.id}`),
+    });
+  }
+
+  const overpaid = await d
+    .select({ n: salesDocuments.docNumber })
+    .from(salesDocuments)
+    .where(
+      and(
+        gt(salesDocuments.paidAmountCents, salesDocuments.totalTtcCents),
+        isNull(salesDocuments.deletedAt),
+        ne(salesDocuments.status, "ANNULE")
+      )
+    );
+  if (overpaid.length) {
+    issues.push({
+      type: "SURPAIEMENT",
+      label: "Documents encaissés au-delà du total (lettrage incohérent)",
+      severity: "ERROR",
+      count: overpaid.length,
+      samples: overpaid.slice(0, 5).map((r) => r.n),
+    });
+  }
+
+  return issues;
 }
 
 function money(cents: number): string {
