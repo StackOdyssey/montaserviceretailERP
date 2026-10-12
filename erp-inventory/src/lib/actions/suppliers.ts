@@ -12,6 +12,7 @@ import {
 } from "@/db";
 import { assertAuthenticated } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
+import type { AgingBuckets, PartyAgingRow } from "./customers";
 import { nextDocumentNumber } from "@/lib/numbering";
 import { applyMovement, type CmupState } from "@/lib/stock";
 
@@ -436,4 +437,56 @@ export async function saveSupplier(data: {
 
   if (!saved) throw new Error("Fournisseur introuvable");
   return mapSupplier(saved);
+}
+
+/**
+ * Balance âgée des dettes fournisseurs (par ancienneté de la réception impayée).
+ */
+export async function getSupplierAging(): Promise<{ rows: PartyAgingRow[]; totals: AgingBuckets }> {
+  await assertAuthenticated();
+  const d = requireDb();
+
+  const receipts = await d.select().from(supplierReceipts).where(ne(supplierReceipts.status, "ANNULE"));
+  const sups = await d.select({ id: suppliers.id, name: suppliers.name }).from(suppliers);
+  const nameById = new Map(sups.map((s) => [s.id, s.name]));
+  const now = Date.now();
+
+  const empty = (): AgingBuckets => ({ b0_30: 0, b31_60: 0, b61_90: 0, b90_plus: 0, total: 0 });
+  const key = (days: number): keyof AgingBuckets =>
+    days <= 30 ? "b0_30" : days <= 60 ? "b31_60" : days <= 90 ? "b61_90" : "b90_plus";
+
+  const map = new Map<number, { name: string; buckets: AgingBuckets; count: number; oldest: Date | null }>();
+  for (const r of receipts) {
+    const remaining = Math.max(0, r.totalTtcCents - r.paidAmountCents);
+    if (remaining <= 0) continue;
+    const date = new Date(r.receiptDate ?? r.createdAt ?? new Date());
+    const days = Math.floor((now - date.getTime()) / 86400000);
+    const e = map.get(r.supplierId) ?? { name: nameById.get(r.supplierId) ?? "", buckets: empty(), count: 0, oldest: null };
+    e.buckets[key(days)] += remaining;
+    e.buckets.total += remaining;
+    e.count += 1;
+    if (!e.oldest || date < e.oldest) e.oldest = date;
+    map.set(r.supplierId, e);
+  }
+
+  const rows = Array.from(map.entries())
+    .map(([id, e]) => ({
+      id,
+      name: e.name,
+      buckets: e.buckets,
+      documentsCount: e.count,
+      oldest: e.oldest ? e.oldest.toISOString() : null,
+    }))
+    .sort((a, b) => b.buckets.total - a.buckets.total);
+
+  const totals = rows.reduce((acc, r) => {
+    acc.b0_30 += r.buckets.b0_30;
+    acc.b31_60 += r.buckets.b31_60;
+    acc.b61_90 += r.buckets.b61_90;
+    acc.b90_plus += r.buckets.b90_plus;
+    acc.total += r.buckets.total;
+    return acc;
+  }, empty());
+
+  return { rows, totals };
 }

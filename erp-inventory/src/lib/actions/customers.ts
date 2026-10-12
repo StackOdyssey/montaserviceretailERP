@@ -408,3 +408,90 @@ export async function saveCustomer(data: {
   if (!saved) throw new Error("Client introuvable");
   return mapCustomer(saved);
 }
+
+export interface AgingBuckets {
+  b0_30: number;
+  b31_60: number;
+  b61_90: number;
+  b90_plus: number;
+  total: number;
+}
+
+export interface PartyAgingRow {
+  id: number;
+  name: string;
+  buckets: AgingBuckets;
+  documentsCount: number;
+  oldest: string | null;
+}
+
+function emptyAging(): AgingBuckets {
+  return { b0_30: 0, b31_60: 0, b61_90: 0, b90_plus: 0, total: 0 };
+}
+
+function agingKey(days: number): keyof AgingBuckets {
+  if (days <= 30) return "b0_30";
+  if (days <= 60) return "b31_60";
+  if (days <= 90) return "b61_90";
+  return "b90_plus";
+}
+
+/**
+ * Balance âgée des créances clients (par ancienneté du document impayé).
+ */
+export async function getCustomerAging(): Promise<{ rows: PartyAgingRow[]; totals: AgingBuckets }> {
+  await assertAuthenticated();
+  const d = requireDb();
+
+  const docs = await d
+    .select()
+    .from(salesDocuments)
+    .where(
+      and(
+        isNull(salesDocuments.deletedAt),
+        ne(salesDocuments.status, "ANNULE"),
+        ne(salesDocuments.status, "PAYE")
+      )
+    );
+  const custs = await d.select({ id: customers.id, name: customers.name }).from(customers);
+  const nameById = new Map(custs.map((c) => [c.id, c.name]));
+  const now = Date.now();
+
+  const map = new Map<number, { name: string; buckets: AgingBuckets; count: number; oldest: Date | null }>();
+  for (const doc of docs) {
+    if (!doc.customerId) continue;
+    const remaining = Math.max(0, doc.totalTtcCents - doc.paidAmountCents);
+    if (remaining <= 0) continue;
+    const date = new Date(doc.docDate ?? doc.createdAt ?? new Date());
+    const days = Math.floor((now - date.getTime()) / 86400000);
+    const e =
+      map.get(doc.customerId) ??
+      { name: nameById.get(doc.customerId) ?? doc.customerName, buckets: emptyAging(), count: 0, oldest: null };
+    e.buckets[agingKey(days)] += remaining;
+    e.buckets.total += remaining;
+    e.count += 1;
+    if (!e.oldest || date < e.oldest) e.oldest = date;
+    map.set(doc.customerId, e);
+  }
+
+  const rows = Array.from(map.entries())
+    .map(([id, e]) => ({
+      id,
+      name: e.name,
+      buckets: e.buckets,
+      documentsCount: e.count,
+      oldest: e.oldest ? e.oldest.toISOString() : null,
+    }))
+    .sort((a, b) => b.buckets.total - a.buckets.total);
+
+  const totals = rows.reduce((acc, r) => {
+    acc.b0_30 += r.buckets.b0_30;
+    acc.b31_60 += r.buckets.b31_60;
+    acc.b61_90 += r.buckets.b61_90;
+    acc.b90_plus += r.buckets.b90_plus;
+    acc.total += r.buckets.total;
+    return acc;
+  }, emptyAging());
+
+  return { rows, totals };
+}

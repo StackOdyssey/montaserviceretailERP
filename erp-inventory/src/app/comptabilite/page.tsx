@@ -31,10 +31,12 @@ import {
   getProfitMarginsReport,
 } from "@/lib/actions/analytics";
 import { getAccountingPeriods, setPeriodLock, getAccountingCsv } from "@/lib/actions/accounting";
+import { getCustomerAging, type PartyAgingRow, type AgingBuckets } from "@/lib/actions/customers";
+import { getSupplierAging } from "@/lib/actions/suppliers";
 import { formatMoney } from "@/lib/money";
 
 export default function ComptabilitePage() {
-  const [activeTab, setActiveTab] = useState<"TVA" | "STOCK" | "MARGES">("TVA");
+  const [activeTab, setActiveTab] = useState<"TVA" | "STOCK" | "MARGES" | "AGING">("TVA");
   const [tvaData, setTvaData] = useState<TvaAccountingExport | null>(null);
   const [stockData, setStockData] = useState<StockValuation | null>(null);
   const [marginsData, setMarginsData] = useState<ProfitMarginsReport | null>(null);
@@ -45,20 +47,26 @@ export default function ComptabilitePage() {
   const [periodMonth, setPeriodMonth] = useState(now.getMonth() + 1); // 1..12
   const [periodStatus, setPeriodStatus] = useState<"OPEN" | "LOCKED">("OPEN");
   const [isLocking, setIsLocking] = useState(false);
+  const [customerAging, setCustomerAging] = useState<{ rows: PartyAgingRow[]; totals: AgingBuckets } | null>(null);
+  const [supplierAging, setSupplierAging] = useState<{ rows: PartyAgingRow[]; totals: AgingBuckets } | null>(null);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [tva, stock, margins, periods] = await Promise.all([
+      const [tva, stock, margins, periods, custAging, supAging] = await Promise.all([
         getTvaAccountingExport({ year: periodYear, month: periodMonth - 1 }),
         getStockValuation(),
         getProfitMarginsReport(marginsPeriod),
         getAccountingPeriods(periodYear),
+        getCustomerAging(),
+        getSupplierAging(),
       ]);
       setTvaData(tva);
       setStockData(stock);
       setMarginsData(margins);
       setPeriodStatus(periods.find((x) => x.month === periodMonth)?.status ?? "OPEN");
+      setCustomerAging(custAging);
+      setSupplierAging(supAging);
     } finally {
       setLoading(false);
     }
@@ -218,6 +226,18 @@ export default function ComptabilitePage() {
         >
           <Percent className="w-4 h-4" />
           Marges & Rentabilité
+        </button>
+
+        <button
+          onClick={() => setActiveTab("AGING")}
+          className={`pb-3 text-sm font-bold flex items-center gap-2 border-b-2 transition ${
+            activeTab === "AGING"
+              ? "border-[#F7162D] text-[#F7162D]"
+              : "border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white"
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          Balance Âgée
         </button>
       </div>
 
@@ -667,6 +687,72 @@ export default function ComptabilitePage() {
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* ONGLET 4 : BALANCE ÂGÉE (CRÉANCES / DETTES)              */}
+      {/* ======================================================== */}
+      {activeTab === "AGING" && (
+        <div className="space-y-6">
+          {[
+            { title: "Créances Clients (à encaisser)", data: customerAging },
+            { title: "Dettes Fournisseurs (à payer)", data: supplierAging },
+          ].map((block, i) => (
+            <div
+              key={i}
+              className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-xs"
+            >
+              <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+                <h3 className="font-bold text-gray-900 dark:text-white">{block.title}</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-gray-800/60 text-gray-500 uppercase font-bold tracking-wider">
+                      <th className="py-2.5 px-4">Tiers</th>
+                      <th className="py-2.5 px-3 text-right">0-30 j</th>
+                      <th className="py-2.5 px-3 text-right">31-60 j</th>
+                      <th className="py-2.5 px-3 text-right">61-90 j</th>
+                      <th className="py-2.5 px-3 text-right">90+ j</th>
+                      <th className="py-2.5 px-3 text-right">Total dû</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {(block.data?.rows ?? []).map((r) => (
+                      <tr key={r.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40">
+                        <td className="py-2.5 px-4 font-semibold text-gray-800 dark:text-gray-200">{r.name}</td>
+                        <td className="py-2.5 px-3 text-right font-mono">{formatMoney(r.buckets.b0_30)}</td>
+                        <td className="py-2.5 px-3 text-right font-mono">{formatMoney(r.buckets.b31_60)}</td>
+                        <td className="py-2.5 px-3 text-right font-mono">{formatMoney(r.buckets.b61_90)}</td>
+                        <td className="py-2.5 px-3 text-right font-mono text-[#F7162D]">{formatMoney(r.buckets.b90_plus)}</td>
+                        <td className="py-2.5 px-3 text-right font-black">{formatMoney(r.buckets.total)}</td>
+                      </tr>
+                    ))}
+                    {(block.data?.rows ?? []).length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-6 px-4 text-center text-gray-400">
+                          Aucun encours.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  {block.data && block.data.rows.length > 0 && (
+                    <tfoot>
+                      <tr className="bg-gray-50 font-black border-t-2 border-gray-300">
+                        <td className="py-2.5 px-4 uppercase text-right">Totaux :</td>
+                        <td className="py-2.5 px-3 text-right font-mono">{formatMoney(block.data.totals.b0_30)}</td>
+                        <td className="py-2.5 px-3 text-right font-mono">{formatMoney(block.data.totals.b31_60)}</td>
+                        <td className="py-2.5 px-3 text-right font-mono">{formatMoney(block.data.totals.b61_90)}</td>
+                        <td className="py-2.5 px-3 text-right font-mono">{formatMoney(block.data.totals.b90_plus)}</td>
+                        <td className="py-2.5 px-3 text-right">{formatMoney(block.data.totals.total)}</td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
