@@ -17,13 +17,10 @@ if (!account || !bucket || !accessKeyId || !secretAccessKey) {
   throw new Error("Configuration R2 incomplète (R2_ACCOUNT_ID / R2_BUCKET / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY)");
 }
 
-// Question ouverte « Retention-Q4 » : archivage append-only. Tant que la durée de
-// conservation n'est pas tranchée par le comptable, ce script NE PURGE RIEN.
-if (process.env.BACKUP_RETENTION_DAYS) {
-  console.warn(
-    "[backup] BACKUP_RETENTION_DAYS ignoré — durée de conservation non tranchée (Q4). Aucune purge effectuée."
-  );
-}
+// Décision « Retention-Q4 » : conservation 10 ans. L'archivage reste append-only :
+// ce script n'effectue AUCUNE purge. La suppression des objets de plus de 10 ans
+// relève d'une règle de cycle de vie du bucket R2, jamais de l'application.
+const RETENTION_YEARS = 10;
 
 const sql = neon(url);
 const client = new AwsClient({ accessKeyId, secretAccessKey, service: "s3", region: "auto" });
@@ -70,4 +67,5 @@ console.log(`Sauvegarde OK : ${key}`);
 console.log(`  tables     : ${tableRows.length}`);
 console.log(`  taille     : ${(sizeBytes / 1024).toFixed(1)} Ko`);
 console.log(`  documents  : ${docCount}`);
+console.log(`  rétention  : ${RETENTION_YEARS} ans (append-only, aucune purge)`);
 console.log(`  sha256     : ${sha256}`);

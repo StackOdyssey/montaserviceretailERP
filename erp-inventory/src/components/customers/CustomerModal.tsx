@@ -20,6 +20,7 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
   const [city, setCity] = useState(customer?.city || "Casablanca");
   const [address, setAddress] = useState(customer?.address || "");
   const [ice, setIce] = useState(customer?.ice || "");
+  const [identityNumber, setIdentityNumber] = useState(customer?.identityNumber || "");
   const [isWholesale, setIsWholesale] = useState(customer?.isWholesale ?? false);
   const [notes, setNotes] = useState(customer?.notes || "");
   const { priceLevels } = useParameters();
@@ -56,6 +57,7 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
         city,
         address,
         ice,
+        identityNumber,
         isWholesale,
         isProfessional,
         defaultPriceLevelId: priceLevelId,
@@ -194,6 +196,24 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
                   value={ice}
                   onChange={(e) => setIce(e.target.value)}
                   placeholder="001892837000045"
+                  className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-[#F7162D]"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
+                Pièce d'identité (CIN / passeport) — optionnel
+              </label>
+              <div className="relative">
+                <FileText className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={identityNumber}
+                  onChange={(e) => setIdentityNumber(e.target.value)}
+                  placeholder="Facultatif — ne bloque pas l'enregistrement"
                   className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-[#F7162D]"
                 />
               </div>

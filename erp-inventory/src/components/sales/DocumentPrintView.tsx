@@ -36,9 +36,12 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
 
   const company = ctx?.company ?? null;
   const docLabel = ctx?.docLabel ?? (doc.docType === "FACTURE" ? "FACTURE" : "BON DE LIVRAISON");
-  const showVat = ctx?.vatDisplay.showVat ?? true;
+  // Décision propriétaire (Q13–Q16) : seule la remise est affichée sur les documents.
+  // La TVA reste saisie dans les paramètres mais n'est jamais affichée sur un document
+  // (BL, FAC, BC, DEVIS, AV).
+  const showVat = false;
   const priceBasis = ctx?.vatDisplay.priceBasis ?? "TTC";
-  const showDiscount = ctx?.vatDisplay.showDiscount ?? true;
+  const showDiscount = true;
   const rate = doc.tvaRate || 20;
 
   const lineDisplay = (line: SalesDocumentItem["lines"][number]) => {

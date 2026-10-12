@@ -88,6 +88,31 @@ export async function getVatRates() {
   return d.select().from(vatRates).orderBy(asc(vatRates.ratePercent));
 }
 
+/** Crée ou met à jour un taux de TVA (paramétrable, non codé en dur). */
+export async function saveVatRate(data: { id?: number; ratePercent: number; label?: string; isDefault?: boolean }) {
+  await assertAuthenticated();
+  const d = requireDb();
+  if (!Number.isFinite(data.ratePercent) || data.ratePercent < 0 || data.ratePercent > 100) {
+    throw new Error("Taux de TVA invalide (0–100).");
+  }
+  const label = data.label?.trim() || `TVA ${data.ratePercent}%`;
+
+  if (data.id) {
+    const updated = (
+      await d.update(vatRates).set({ ratePercent: data.ratePercent, label }).where(eq(vatRates.id, data.id)).returning()
+    )[0];
+    if (!updated) throw new Error("Taux de TVA introuvable");
+    return updated;
+  }
+  const inserted = (
+    await d
+      .insert(vatRates)
+      .values({ ratePercent: data.ratePercent, label, isDefault: data.isDefault ?? false })
+      .returning()
+  )[0];
+  return inserted;
+}
+
 export type PublicSettings = SettingsRow & { defaultVatRate: number };
 
 /**

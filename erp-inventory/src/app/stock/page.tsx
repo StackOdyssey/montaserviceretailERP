@@ -16,7 +16,6 @@ import {
   Tag,
   Package,
   ClipboardList,
-  Car,
 } from "lucide-react";
 import {
   getProducts,
@@ -128,14 +127,6 @@ export default function StockCataloguePage() {
           >
             <ClipboardList size={16} className="text-[#4338CA]" />
             <span>Inventaire</span>
-          </Link>
-
-          <Link
-            href="/stock/vehicules"
-            className="flex items-center gap-2 px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
-          >
-            <Car size={16} className="text-[#4338CA]" />
-            <span>Véhicules</span>
           </Link>
 
           <button

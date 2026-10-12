@@ -351,6 +351,7 @@ export const customers = pgTable("customers", {
   city: text("city").default("Casablanca"),
   address: text("address"),
   ice: text("ice"), // obligatoire uniquement si is_professional (B2B)
+  identityNumber: text("identity_number"), // CIN / passeport — OPTIONNEL (particulier, Q14)
   isWholesale: boolean("is_wholesale").default(false), // Grossiste ou détail
   isProfessional: boolean("is_professional").default(false), // professionnel (ICE requis) vs particulier
   defaultPriceLevelId: integer("default_price_level_id").references(() => priceLevels.id),

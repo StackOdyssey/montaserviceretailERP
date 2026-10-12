@@ -15,6 +15,7 @@ export interface CustomerItem {
   city: string;
   address: string | null;
   ice: string | null;
+  identityNumber: string | null;
   isWholesale: boolean;
   isProfessional: boolean;
   defaultPriceLevelId: number | null;
@@ -84,6 +85,7 @@ function mapCustomer(r: CustomerRow): CustomerItem {
     city: r.city ?? "",
     address: r.address,
     ice: r.ice,
+    identityNumber: r.identityNumber,
     isWholesale: r.isWholesale ?? false,
     isProfessional: r.isProfessional ?? false,
     defaultPriceLevelId: r.defaultPriceLevelId ?? null,
@@ -413,6 +415,7 @@ export async function saveCustomer(data: {
   city?: string;
   address?: string;
   ice?: string;
+  identityNumber?: string;
   isWholesale?: boolean;
   isProfessional?: boolean;
   defaultPriceLevelId?: number | null;
@@ -453,6 +456,7 @@ export async function saveCustomer(data: {
     city: data.city || "Casablanca",
     address: data.address || null,
     ice: iceValue,
+    identityNumber: data.identityNumber?.trim() || null,
     isWholesale: data.isWholesale ?? false,
     isProfessional,
     defaultPriceLevelId: data.defaultPriceLevelId ?? null,

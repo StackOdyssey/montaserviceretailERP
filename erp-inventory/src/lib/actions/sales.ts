@@ -1,10 +1,11 @@
 "use server";
 
-import { and, desc, eq, inArray, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ilike, isNull, ne, or, sql } from "drizzle-orm";
 import {
   auditLogs,
   businessLineDocumentSettings,
   businessLines,
+  customerPayments,
   customers,
   db,
   documentLinks,
@@ -15,6 +16,7 @@ import {
   stockMovements,
   supplierReceiptLines,
   supplierReceipts,
+  vatRates,
 } from "@/db";
 import { calculateDocumentTotals } from "@/lib/money";
 import { nextDocumentNumber } from "@/lib/numbering";
@@ -206,7 +208,16 @@ export async function createSalesDocument(data: {
 
   const docType = data.docType ?? "BL";
   const year = new Date().getFullYear();
-  const tvaRate = 20; // TVA 20% (CGI pièces détachées)
+
+  // Taux de TVA par défaut, paramétrable (settings.defaultVatRateId → vat_rates), repli 20%.
+  const vatRow = (
+    await d
+      .select({ rate: vatRates.ratePercent })
+      .from(settings)
+      .leftJoin(vatRates, eq(settings.defaultVatRateId, vatRates.id))
+      .limit(1)
+  )[0];
+  const tvaRate = vatRow?.rate ?? 20;
 
   // Exit gate Phase 3 : une facture à un client professionnel exige son ICE.
   if (docType === "FACTURE") {
@@ -386,6 +397,38 @@ export async function createSalesDocument(data: {
           .update(products)
           .set({ currentStock: e.nextStock, cmupCents: e.nextCmup, updatedAt: new Date() })
           .where(eq(products.id, e.productId));
+      }
+    }
+
+    // Acomptes clients (question ouverte Acomptes-Q19, réponse : oui) : impute les
+    // règlements non affectés du client sur le nouveau document (FIFO par date).
+    if (data.customerId && affectsStock) {
+      const credits = await tx
+        .select()
+        .from(customerPayments)
+        .where(
+          and(
+            eq(customerPayments.customerId, data.customerId),
+            isNull(customerPayments.documentId),
+            ne(customerPayments.status, "REJETE")
+          )
+        )
+        .orderBy(asc(customerPayments.paymentDate));
+      const docPaid = isFullyPaid ? totals.totalTTC : data.paidAmountCents ?? 0;
+      let remainingDue = Math.max(0, totals.totalTTC - docPaid);
+      let applied = 0;
+      for (const p of credits) {
+        if (remainingDue <= 0) break;
+        await tx.update(customerPayments).set({ documentId: docId }).where(eq(customerPayments.id, p.id));
+        applied += p.amountCents;
+        remainingDue -= p.amountCents;
+      }
+      if (applied > 0) {
+        const newPaid = Math.min(totals.totalTTC, docPaid + applied);
+        await tx
+          .update(salesDocuments)
+          .set({ paidAmountCents: newPaid, status: newPaid >= totals.totalTTC ? "PAYE" : "VALIDE" })
+          .where(eq(salesDocuments.id, docId));
       }
     }
   });

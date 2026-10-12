@@ -17,7 +17,7 @@ import {
   Cloud,
   HelpCircle,
 } from "lucide-react";
-import { getSettings, saveSettings, getVatRates } from "@/lib/actions/settings";
+import { getSettings, saveSettings, getVatRates, saveVatRate } from "@/lib/actions/settings";
 import { OPEN_QUESTIONS } from "@/lib/open-questions";
 
 export default function ParametresPage() {
@@ -47,7 +47,7 @@ export default function ParametresPage() {
 
   // Paramètres fiscaux
   const [fiscalSettings, setFiscalSettings] = useState({
-    defaultTvaRate: 10,
+    defaultTvaRate: 20,
     currency: "MAD",
     enableNegativeStock: true,
     displayDiscountUnderBrut: true,
@@ -75,6 +75,8 @@ export default function ParametresPage() {
   });
 
   const [vatRates, setVatRates] = useState<Array<{ id: number; ratePercent: number; label: string }>>([]);
+  const [newVatRate, setNewVatRate] = useState("");
+  const [newVatLabel, setNewVatLabel] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -164,6 +166,24 @@ export default function ParametresPage() {
     }
   };
 
+  const handleAddVatRate = async () => {
+    const rate = parseFloat(newVatRate.replace(",", "."));
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
+      alert("Taux de TVA invalide (0–100).");
+      return;
+    }
+    try {
+      const saved = await saveVatRate({ ratePercent: rate, label: newVatLabel });
+      const rates = await getVatRates();
+      setVatRates(rates.map((r) => ({ id: r.id, ratePercent: r.ratePercent, label: r.label })));
+      setFiscalSettings((f) => ({ ...f, defaultTvaRate: saved.ratePercent }));
+      setNewVatRate("");
+      setNewVatLabel("");
+    } catch (err) {
+      alert((err as Error).message);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* En-tête */}
@@ -174,7 +194,7 @@ export default function ParametresPage() {
             Paramètres de la Société & Système
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Identifiants légaux marocains (ICE, IF, RC), TVA 10%, coordonnées bancaires et sécurité d'accès.
+            Identifiants légaux marocains (ICE, IF, RC), taux de TVA paramétrable, coordonnées bancaires et sécurité d'accès.
           </p>
         </div>
 
@@ -397,13 +417,47 @@ export default function ParametresPage() {
                   Taux de TVA par Défaut
                 </label>
                 <div className="flex items-center gap-2">
+                  <select
+                    value={fiscalSettings.defaultTvaRate}
+                    onChange={(e) => setFiscalSettings({ ...fiscalSettings, defaultTvaRate: Number(e.target.value) })}
+                    className="w-40 px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-[#F7162D]"
+                  >
+                    {vatRates.length === 0 && (
+                      <option value={fiscalSettings.defaultTvaRate}>{fiscalSettings.defaultTvaRate}%</option>
+                    )}
+                    {vatRates.map((r) => (
+                      <option key={r.id} value={r.ratePercent}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-sm font-bold text-[#F7162D]">% applicable</span>
+                </div>
+                <div className="mt-2 flex items-center gap-2">
                   <input
                     type="number"
-                    value={fiscalSettings.defaultTvaRate}
-                    disabled
-                    className="w-24 px-3.5 py-2.5 bg-gray-100 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-bold text-gray-900 dark:text-white cursor-not-allowed"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={newVatRate}
+                    onChange={(e) => setNewVatRate(e.target.value)}
+                    placeholder="Taux"
+                    className="w-20 px-2.5 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-bold"
                   />
-                  <span className="text-sm font-bold text-[#F7162D]">% (Régime pièces auto/moto Maroc)</span>
+                  <input
+                    type="text"
+                    value={newVatLabel}
+                    onChange={(e) => setNewVatLabel(e.target.value)}
+                    placeholder="Libellé (ex: TVA 20%)"
+                    className="flex-1 px-2.5 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-medium"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddVatRate}
+                    className="px-3 py-2 bg-[#F7162D] hover:bg-[#d81023] text-white text-xs font-bold rounded-lg transition"
+                  >
+                    Ajouter
+                  </button>
                 </div>
               </div>
 
@@ -429,7 +483,7 @@ export default function ParametresPage() {
                       Règle de Calcul de la Remise Commerciale (%)
                     </h3>
                     <p className="text-xs text-amber-800 dark:text-amber-300/80 mt-1 leading-relaxed">
-                      Conformément à la convention de SARL BM Motors, la remise (%) est déduite directement du <strong>Total Brut HT</strong> pour obtenir le <strong>Total Net HT</strong>, sur lequel s'applique ensuite la TVA de 10%.
+                      Conformément à la convention de SARL BM Motors, la remise (%) est déduite directement du <strong>Total Brut HT</strong> pour obtenir le <strong>Total Net HT</strong>, sur lequel s'applique ensuite la TVA de {fiscalSettings.defaultTvaRate}%.
                     </p>
                   </div>
                 </div>
@@ -736,13 +790,22 @@ export default function ParametresPage() {
                   <h3 className="text-sm font-bold text-gray-900 dark:text-white">{q.title}</h3>
                   <span
                     className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      q.status === "BLOQUE" ? "bg-[#FEF2F2] text-[#F7162D]" : "bg-amber-50 text-amber-700"
+                      q.status === "BLOQUE"
+                        ? "bg-[#FEF2F2] text-[#F7162D]"
+                        : q.status === "REPONDU"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-amber-50 text-amber-700"
                     }`}
                   >
-                    {q.status === "BLOQUE" ? "Bloquant" : "À décider"}
+                    {q.status === "BLOQUE" ? "Bloquant" : q.status === "REPONDU" ? "Répondu" : "À décider"}
                   </span>
                 </div>
                 <p className="mt-2 text-[11px] font-mono text-gray-400">{q.code}</p>
+                {q.answer && (
+                  <p className="mt-2 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg px-3 py-2">
+                    Réponse : {q.answer}
+                  </p>
+                )}
                 <dl className="mt-3 space-y-2 text-xs">
                   <div>
                     <dt className="font-bold text-gray-700 dark:text-gray-300">Contexte</dt>
