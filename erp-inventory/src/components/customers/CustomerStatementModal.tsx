@@ -111,7 +111,7 @@ export function CustomerStatementModal({
                     SARL BM MOTORS
                   </h1>
                   <p className="text-xs font-bold uppercase tracking-wider text-gray-700">
-                    Importation & Distribution Pièces Détachées Motos & Quads
+                    Pièces Détachées Motos
                   </p>
                   <p className="text-xs text-gray-600 mt-1">
                     Casablanca • Tél: 05 22 00 00 00 • Email: contact@bmmotors.ma

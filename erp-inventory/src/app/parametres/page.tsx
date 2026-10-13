@@ -30,7 +30,7 @@ export default function ParametresPage() {
   // Formulaire d'information société
   const [companyInfo, setCompanyInfo] = useState({
     name: "SARL BM Motors",
-    tradeName: "BM Motors - Pièces Motos & Quads Bashan",
+    tradeName: "BM Motors - Pièces Motos Bashan",
     legalForm: "SARL (Société à Responsabilité Limitée)",
     capital: "100 000 DH",
     ice: "001892345000088", // 15 chiffres

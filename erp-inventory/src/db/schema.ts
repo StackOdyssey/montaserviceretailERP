@@ -67,11 +67,11 @@ export const settings = pgTable("settings", {
 });
 
 // ==========================================
-// 1b. LIGNES MÉTIER (SIDE 1 PIECES / SIDE 2 VEHICULES)
+// 1b. LIGNE MÉTIER (PIECES — pièces moto uniquement ; la ligne quads/vehicules a été retirée)
 // ==========================================
 export const businessLines = pgTable("business_lines", {
   id: serial("id").primaryKey(),
-  code: text("code").notNull().unique(), // PIECES, VEHICULES
+  code: text("code").notNull().unique(), // PIECES (ligne unique)
   displayName: text("display_name").notNull(),
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),

@@ -9,10 +9,7 @@ export interface BusinessLineDTO {
   displayName: string;
 }
 
-const FALLBACK: BusinessLineDTO[] = [
-  { id: 1, code: "PIECES", displayName: "Pièces moto" },
-  { id: 2, code: "VEHICULES", displayName: "Quads & Buggy" },
-];
+const FALLBACK: BusinessLineDTO[] = [{ id: 1, code: "PIECES", displayName: "Pièces moto" }];
 
 /** Lignes métier actives (avec repli sûr si la base n'est pas joignable). */
 export async function getBusinessLines(): Promise<BusinessLineDTO[]> {
