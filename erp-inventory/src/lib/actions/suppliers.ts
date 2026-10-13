@@ -544,3 +544,53 @@ export async function getSupplierAging(): Promise<{ rows: PartyAgingRow[]; total
 
   return { rows, totals };
 }
+
+// Seuils de déductibilité des règlements en espèces à un fournisseur
+// (CGI art. 11, décisions §8) : 5 000 DH/jour et 50 000 DH/mois par fournisseur.
+const CASH_DAY_LIMIT_CENTS = 500_000;
+const CASH_MONTH_LIMIT_CENTS = 5_000_000;
+
+export interface CashSupplierUsage {
+  todayCents: number;
+  monthCents: number;
+  dayLimitCents: number;
+  monthLimitCents: number;
+}
+
+/**
+ * Cumul des règlements en espèces déjà versés à un fournisseur (jour courant + mois
+ * courant), pour avertir l'utilisateur avant de franchir les seuils CGI.
+ */
+export async function getCashToSupplierUsage(supplierId: number): Promise<CashSupplierUsage> {
+  await assertAuthenticated();
+  const d = requireDb();
+  const now = new Date();
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const rows = await d
+    .select({ paymentDate: supplierPayments.paymentDate, amountCents: supplierPayments.amountCents })
+    .from(supplierPayments)
+    .where(
+      and(
+        eq(supplierPayments.supplierId, supplierId),
+        eq(supplierPayments.paymentMethod, "ESPECES"),
+        ne(supplierPayments.status, "REJETE"),
+        gte(supplierPayments.paymentDate, monthStart)
+      )
+    );
+
+  let todayCents = 0;
+  let monthCents = 0;
+  for (const r of rows) {
+    monthCents += r.amountCents;
+    if ((r.paymentDate ?? now) >= dayStart) todayCents += r.amountCents;
+  }
+
+  return {
+    todayCents,
+    monthCents,
+    dayLimitCents: CASH_DAY_LIMIT_CENTS,
+    monthLimitCents: CASH_MONTH_LIMIT_CENTS,
+  };
+}

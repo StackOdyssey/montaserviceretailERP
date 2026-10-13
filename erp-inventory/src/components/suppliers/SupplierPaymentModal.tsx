@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { X, CreditCard, Banknote, Building2 } from "lucide-react";
-import { SupplierItem, recordSupplierPayment } from "@/lib/actions/suppliers";
-import { toCentimes } from "@/lib/money";
+import { useState, useEffect } from "react";
+import { X, CreditCard, Banknote, Building2, AlertTriangle } from "lucide-react";
+import {
+  SupplierItem,
+  recordSupplierPayment,
+  getCashToSupplierUsage,
+  type CashSupplierUsage,
+} from "@/lib/actions/suppliers";
+import { toCentimes, formatMoney } from "@/lib/money";
 import { useParameters } from "@/components/layout/SettingsProvider";
 
 const MOROCCAN_BANKS = [
@@ -48,8 +53,36 @@ export function SupplierPaymentModal({
   const [notes, setNotes] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cashUsage, setCashUsage] = useState<CashSupplierUsage | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    getCashToSupplierUsage(selectedSupplierId)
+      .then((u) => {
+        if (active) setCashUsage(u);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [isOpen, selectedSupplierId]);
 
   if (!isOpen) return null;
+
+  const amountCents = Math.round((parseFloat(amountDh.replace(",", ".")) || 0) * 100);
+  const cashWarning = (() => {
+    if (paymentMethod !== "ESPECES" || !cashUsage || amountCents <= 0) return null;
+    const projectedDay = cashUsage.todayCents + amountCents;
+    const projectedMonth = cashUsage.monthCents + amountCents;
+    if (projectedDay > cashUsage.dayLimitCents)
+      return `Seuil espèces journalier dépassé (${formatMoney(cashUsage.dayLimitCents)}/jour et par fournisseur) : la charge n'est plus déductible au-delà.`;
+    if (projectedMonth > cashUsage.monthLimitCents)
+      return `Seuil espèces mensuel dépassé (${formatMoney(cashUsage.monthLimitCents)}/mois et par fournisseur) : la charge n'est plus déductible au-delà.`;
+    if (projectedDay > cashUsage.dayLimitCents * 0.8 || projectedMonth > cashUsage.monthLimitCents * 0.8)
+      return `Vous approchez des seuils espèces (déjà ${formatMoney(cashUsage.todayCents)} aujourd'hui, ${formatMoney(cashUsage.monthCents)} ce mois pour ce fournisseur).`;
+    return null;
+  })();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,6 +144,13 @@ export function SupplierPaymentModal({
           {error && (
             <div className="p-3 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 rounded-xl text-sm border border-red-200 dark:border-red-900">
               {error}
+            </div>
+          )}
+
+          {cashWarning && (
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 rounded-xl text-xs font-semibold border border-amber-200 dark:border-amber-800/60 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{cashWarning}</span>
             </div>
           )}
 
