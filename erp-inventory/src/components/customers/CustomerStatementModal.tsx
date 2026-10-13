@@ -5,6 +5,7 @@ import { X, Printer, Share2, Phone, Building, CheckCircle2, Clock, AlertTriangle
 import { CustomerAccountStatement, getCustomerStatement } from "@/lib/actions/customers";
 import { formatMoney } from "@/lib/money";
 import { paymentStatusLabel, isTerminalStatus } from "@/lib/payments";
+import { useSettings } from "@/components/layout/SettingsProvider";
 
 interface CustomerStatementModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export function CustomerStatementModal({
 }: CustomerStatementModalProps) {
   const [statement, setStatement] = useState<CustomerAccountStatement | null>(null);
   const [loading, setLoading] = useState(true);
+  const company = useSettings();
 
   useEffect(() => {
     if (!isOpen || !customerId) return;
@@ -108,16 +110,21 @@ export function CustomerStatementModal({
               <div className="flex justify-between items-start border-b-2 border-gray-900 pb-5">
                 <div>
                   <h1 className="text-2xl font-black text-[#F7162D] tracking-tight">
-                    SARL BM MOTORS
+                    {company.raisonSociale || "—"}
                   </h1>
                   <p className="text-xs font-bold uppercase tracking-wider text-gray-700">
                     Pièces Détachées Motos
                   </p>
                   <p className="text-xs text-gray-600 mt-1">
-                    Casablanca • Tél: 05 22 00 00 00 • Email: contact@bmmotors.ma
+                    {company.city || ""}
+                    {company.phone ? ` • Tél: ${company.phone}` : ""}
+                    {company.email ? ` • Email: ${company.email}` : ""}
                   </p>
                   <p className="text-[11px] text-gray-500 mt-0.5">
-                    <strong>ICE:</strong> 001892837000045 • <strong>IF:</strong> 40291823 • <strong>RC:</strong> 39281 • <strong>TP:</strong> 37192801
+                    {company.ice && (<><strong>ICE:</strong> {company.ice}</>)}
+                    {company.identifiantFiscal && (<> • <strong>IF:</strong> {company.identifiantFiscal}</>)}
+                    {company.registreCommerce && (<> • <strong>RC:</strong> {company.registreCommerce}</>)}
+                    {company.taxeProfessionnelle && (<> • <strong>TP:</strong> {company.taxeProfessionnelle}</>)}
                   </p>
                 </div>
 
@@ -302,10 +309,67 @@ export function CustomerStatementModal({
                 )}
               </div>
 
+              {/* Relevé chronologique Débit / Crédit / Solde */}
+              <div className="space-y-2 mb-6">
+                <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wider">
+                  3. Relevé de compte (Débit / Crédit / Solde)
+                </h3>
+                {statement.ledger.length === 0 ? (
+                  <p className="text-xs text-gray-500 italic">Aucun mouvement enregistré.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left border-collapse">
+                      <thead>
+                        <tr className="bg-gray-100 text-gray-600 uppercase border-y border-gray-200">
+                          <th className="py-2 px-3">Date</th>
+                          <th className="py-2 px-3">Opération</th>
+                          <th className="py-2 px-3 text-right">Débit</th>
+                          <th className="py-2 px-3 text-right">Crédit</th>
+                          <th className="py-2 px-3 text-right">Solde</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        <tr>
+                          <td className="py-2 px-3 text-gray-500" colSpan={4}>
+                            Solde précédent
+                          </td>
+                          <td className="py-2 px-3 text-right">0,00 DH</td>
+                        </tr>
+                        {statement.ledger.map((l, i) => (
+                          <tr key={i} className="hover:bg-gray-50">
+                            <td className="py-2 px-3 text-gray-600">
+                              {new Date(l.date).toLocaleDateString("fr-FR")}
+                            </td>
+                            <td className="py-2 px-3 text-gray-800">{l.label}</td>
+                            <td className="py-2 px-3 text-right">{l.debitCents ? formatMoney(l.debitCents) : ""}</td>
+                            <td className="py-2 px-3 text-right text-emerald-600">
+                              {l.creditCents ? formatMoney(l.creditCents) : ""}
+                            </td>
+                            <td className="py-2 px-3 text-right font-bold">{formatMoney(l.balanceCents)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t-2 border-gray-800 font-bold bg-gray-50">
+                          <td className="py-2 px-3" colSpan={4}>
+                            Solde du mois
+                          </td>
+                          <td className="py-2 px-3 text-right">{formatMoney(statement.balanceDueCents)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </div>
+
               {/* Pied de page du relevé */}
               <div className="pt-6 border-t border-gray-200 text-center text-[10px] text-gray-500">
-                <p>Document généré électroniquement par le système de gestion SARL BM Motors.</p>
-                <p className="mt-0.5 font-medium">Pour toute réclamation, veuillez contacter le service comptabilité au 05 22 00 00 00.</p>
+                <p>Document généré électroniquement par le système de gestion {company.raisonSociale}.</p>
+                {company.phone && (
+                  <p className="mt-0.5 font-medium">
+                    Pour toute réclamation, veuillez contacter le service comptabilité au {company.phone}.
+                  </p>
+                )}
               </div>
             </div>
           )}

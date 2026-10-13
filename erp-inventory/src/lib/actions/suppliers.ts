@@ -2,6 +2,7 @@
 
 import { and, asc, desc, eq, gte, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import {
+  auditLogs,
   db,
   products,
   settings,
@@ -593,4 +594,80 @@ export async function getCashToSupplierUsage(supplierId: number): Promise<CashSu
     dayLimitCents: CASH_DAY_LIMIT_CENTS,
     monthLimitCents: CASH_MONTH_LIMIT_CENTS,
   };
+}
+
+/**
+ * Avoir prix fournisseur SANS retour physique (décisions §G.8, CGNC : l'avoir reçu
+ * débite 4411 Fournisseurs et crédite 6111 Achats + 34552 TVA récupérable).
+ * Sans mouvement de quantité : la valeur du stock restant diminue, donc le CMUP est
+ * recalculé (nouveau CMUP = (qté × CMUP − avoir HT) / qté). Le total du bon de
+ * réception est réduit en HT, TVA et TTC.
+ */
+export async function createSupplierPriceCreditNote(data: {
+  receiptId: number;
+  lines: Array<{ lineId: number; amountHtCents: number }>;
+  reason?: string;
+}): Promise<{ success: boolean; totalCreditHtCents: number }> {
+  await assertAuthenticated();
+  const d = requireDb();
+  await assertPeriodOpen();
+
+  const receipt = (await d.select().from(supplierReceipts).where(eq(supplierReceipts.id, data.receiptId)).limit(1))[0];
+  if (!receipt) throw new Error("Bon de réception introuvable");
+  const lines = await d.select().from(supplierReceiptLines).where(eq(supplierReceiptLines.receiptId, data.receiptId));
+  const byId = new Map(lines.map((l) => [l.id, l]));
+
+  let totalCreditHt = 0;
+  await d.transaction(async (tx) => {
+    for (const r of data.lines) {
+      const line = byId.get(r.lineId);
+      if (!line || !line.productId) continue;
+      const credit = Math.max(0, Math.round(r.amountHtCents));
+      if (credit <= 0) continue;
+      if (credit > line.totalCostCents) throw new Error("AVOIR_PRIX_SUPERIEUR_LIGNE");
+
+      const p = (await tx.select().from(products).where(eq(products.id, line.productId)).limit(1))[0];
+      if (!p || p.currentStock <= 0) continue;
+
+      const stockValue = p.currentStock * p.cmupCents;
+      const newCmup = Math.max(0, Math.round((stockValue - credit) / p.currentStock));
+
+      await tx.insert(stockMovements).values({
+        productId: p.id,
+        businessLineId: p.businessLineId,
+        movementType: "AVOIR_PRIX_FOURNISSEUR",
+        quantity: 0, // ajustement de valeur uniquement, aucun mouvement physique
+        unitCostCents: newCmup,
+        sourceDocumentId: receipt.id,
+        sourceDocumentType: "AVOIR_PRIX_BR",
+        reason: `${data.reason ?? "Avoir prix fournisseur"} ${receipt.receiptNumber} : -${(credit / 100).toFixed(2)} DH (CMUP ${(p.cmupCents / 100).toFixed(2)} → ${(newCmup / 100).toFixed(2)})`,
+      });
+      await tx
+        .update(products)
+        .set({ cmupCents: newCmup, updatedAt: new Date() })
+        .where(eq(products.id, p.id));
+
+      totalCreditHt += credit;
+    }
+    if (totalCreditHt === 0) throw new Error("Aucun montant valide à créditer");
+
+    const creditTva = Math.round((totalCreditHt * receipt.tvaRate) / 100);
+    await tx
+      .update(supplierReceipts)
+      .set({
+        totalHtCents: Math.max(0, receipt.totalHtCents - totalCreditHt),
+        tvaAmountCents: Math.max(0, receipt.tvaAmountCents - creditTva),
+        totalTtcCents: Math.max(0, receipt.totalTtcCents - totalCreditHt - creditTva),
+      })
+      .where(eq(supplierReceipts.id, receipt.id));
+
+    await tx.insert(auditLogs).values({
+      action: "AVOIR_PRIX_FOURNISSEUR",
+      entityType: "SUPPLIER_RECEIPT",
+      entityId: receipt.id,
+      details: `Avoir prix (sans retour) ${receipt.receiptNumber} : ${(totalCreditHt / 100).toFixed(2)} DH HT`,
+    });
+  });
+
+  return { success: true, totalCreditHtCents: totalCreditHt };
 }

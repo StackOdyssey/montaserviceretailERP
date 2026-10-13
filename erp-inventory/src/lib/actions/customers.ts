@@ -44,6 +44,14 @@ export interface CustomerPaymentItem {
   createdAt: string;
 }
 
+export interface CustomerLedgerLine {
+  date: string;
+  label: string;
+  debitCents: number;
+  creditCents: number;
+  balanceCents: number;
+}
+
 export interface CustomerAccountStatement {
   customer: CustomerItem;
   totalBilledTtcCents: number;
@@ -52,6 +60,8 @@ export interface CustomerAccountStatement {
   unpaidDocumentsCount: number;
   documents: Array<SalesDocumentItem & { remainingDueCents: number }>;
   payments: CustomerPaymentItem[];
+  /** Relevé chronologique Débit / Crédit / Solde (factures, avoirs, règlements). */
+  ledger: CustomerLedgerLine[];
 }
 
 export interface ChequeEffetAlert {
@@ -210,6 +220,31 @@ export async function getCustomerStatement(customerId: number): Promise<Customer
   const totalPaidCents = payments.filter((p) => p.status !== "REJETE").reduce((s, p) => s + p.amountCents, 0);
   const unpaidDocumentsCount = documents.filter((doc) => doc.status !== "PAYE").length;
 
+  // Relevé de compte (débit/crédit/solde) : factures = débit, avoirs + règlements = crédit.
+  const entries: Array<{ date: string; label: string; debit: number; credit: number }> = [];
+  for (const doc of documents) {
+    if (doc.docType === "FACTURE") {
+      entries.push({ date: doc.docDate, label: `Facture ${doc.docNumber}`, debit: doc.totalTtcCents, credit: 0 });
+    } else if (doc.docType === "AVOIR") {
+      entries.push({ date: doc.docDate, label: `Avoir ${doc.docNumber}`, debit: 0, credit: doc.totalTtcCents });
+    }
+  }
+  for (const p of payments) {
+    if (p.status === "REJETE") continue;
+    entries.push({
+      date: p.paymentDate,
+      label: `Règlement ${p.referenceNumber ? p.referenceNumber + " " : ""}(${p.paymentMethod})`,
+      debit: 0,
+      credit: p.amountCents,
+    });
+  }
+  entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  let running = 0;
+  const ledger = entries.map((e) => {
+    running += e.debit - e.credit;
+    return { date: e.date, label: e.label, debitCents: e.debit, creditCents: e.credit, balanceCents: running };
+  });
+
   return {
     customer,
     totalBilledTtcCents,
@@ -218,6 +253,7 @@ export async function getCustomerStatement(customerId: number): Promise<Customer
     unpaidDocumentsCount,
     documents,
     payments,
+    ledger,
   };
 }
 

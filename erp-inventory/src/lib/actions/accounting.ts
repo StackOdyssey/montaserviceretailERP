@@ -3,12 +3,15 @@
 import { and, asc, eq, gt, gte, isNull, lt, lte, ne, or } from "drizzle-orm";
 import {
   accountingPeriods,
+  customers,
   customerPayments,
   db,
   expenseCategories,
   expenses,
   products,
   salesDocuments,
+  suppliers,
+  supplierPayments,
 } from "@/db";
 import { assertAuthenticated } from "@/lib/action-guard";
 import { getTvaAccountingExport } from "./analytics";
@@ -248,6 +251,7 @@ export async function getAccountingCsv(options?: {
   month?: number;
 }): Promise<{ filename: string; csv: string }> {
   await assertAuthenticated();
+  const d = requireDb();
   const monthIdx = options?.month !== undefined ? options.month - 1 : new Date().getMonth();
   const tva = await getTvaAccountingExport({ year: options?.year, month: monthIdx });
 
@@ -290,6 +294,84 @@ export async function getAccountingCsv(options?: {
       ].join(";")
     );
   }
+
+  // ---- Journaux de trésorerie (livre-journal auxiliaire : caisse et banque) ----
+  const csvYear = options?.year ?? new Date().getFullYear();
+  const csvMonth = options?.month !== undefined ? options.month - 1 : new Date().getMonth();
+  const mStart = new Date(csvYear, csvMonth, 1);
+  const mEnd = new Date(csvYear, csvMonth + 1, 0, 23, 59, 59);
+  const [custPays, supPays] = await Promise.all([
+    d
+      .select({
+        date: customerPayments.paymentDate,
+        method: customerPayments.paymentMethod,
+        ref: customerPayments.referenceNumber,
+        amount: customerPayments.amountCents,
+        name: customers.name,
+      })
+      .from(customerPayments)
+      .innerJoin(customers, eq(customerPayments.customerId, customers.id))
+      .where(
+        and(
+          gte(customerPayments.paymentDate, mStart),
+          lte(customerPayments.paymentDate, mEnd),
+          ne(customerPayments.status, "REJETE")
+        )
+      )
+      .orderBy(asc(customerPayments.paymentDate)),
+    d
+      .select({
+        date: supplierPayments.paymentDate,
+        method: supplierPayments.paymentMethod,
+        ref: supplierPayments.referenceNumber,
+        amount: supplierPayments.amountCents,
+        name: suppliers.name,
+      })
+      .from(supplierPayments)
+      .innerJoin(suppliers, eq(supplierPayments.supplierId, suppliers.id))
+      .where(
+        and(
+          gte(supplierPayments.paymentDate, mStart),
+          lte(supplierPayments.paymentDate, mEnd),
+          ne(supplierPayments.status, "REJETE")
+        )
+      )
+      .orderBy(asc(supplierPayments.paymentDate)),
+  ]);
+
+  const writeTreasuryJournal = (title: string, cash: boolean) => {
+    out.push("");
+    out.push(title);
+    out.push("Date;Libelle;Reference;Encaissement;Decaissement");
+    const rowsT = [
+      ...custPays
+        .filter((p) => ((p.method ?? "") === "ESPECES") === cash)
+        .map((p) => ({ date: p.date, label: `Client ${p.name}`, ref: p.ref, enc: p.amount, dec: 0 })),
+      ...supPays
+        .filter((p) => ((p.method ?? "") === "ESPECES") === cash)
+        .map((p) => ({ date: p.date, label: `Fournisseur ${p.name}`, ref: p.ref, enc: 0, dec: p.amount })),
+    ].sort((a, b) => new Date(a.date ?? 0).getTime() - new Date(b.date ?? 0).getTime());
+
+    let enc = 0;
+    let dec = 0;
+    for (const r of rowsT) {
+      enc += r.enc;
+      dec += r.dec;
+      out.push(
+        [
+          fmtDate((r.date ?? new Date()).toISOString()),
+          esc(r.label),
+          esc(r.ref ?? ""),
+          r.enc ? money(r.enc) : "",
+          r.dec ? money(r.dec) : "",
+        ].join(";")
+      );
+    }
+    out.push(`TOTAUX;;;${money(enc)};${money(dec)}`);
+    out.push(`SOLDE ${cash ? "CAISSE" : "BANQUE"};;;${money(enc - dec)};`);
+  };
+  writeTreasuryJournal("Journal de Caisse (especes)", true);
+  writeTreasuryJournal("Journal de Banque (cheque / effet / virement)", false);
 
   out.push("");
   out.push("Bilan TVA");
