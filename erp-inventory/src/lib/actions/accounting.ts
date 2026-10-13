@@ -253,7 +253,7 @@ export async function getAccountingCsv(options?: {
 
   const out: string[] = [];
   out.push("Journal des Ventes (TVA collectee)");
-  out.push("Date;N°;Client;ICE;H.T.;Remise;Net H.T.;TVA;T.T.C.;Reglement");
+  out.push("Date;N°;Client;ICE;Ligne;H.T.;Remise;Net H.T.;TVA;T.T.C.;Reglement");
   for (const s of tva.salesLines) {
     out.push(
       [
@@ -261,6 +261,7 @@ export async function getAccountingCsv(options?: {
         s.docNumber,
         esc(s.customerName),
         s.customerIce ?? "",
+        s.businessLine,
         money(s.totalBrutHtCents),
         money(s.discountAmountCents),
         money(s.totalNetHtCents),
@@ -273,7 +274,7 @@ export async function getAccountingCsv(options?: {
 
   out.push("");
   out.push("Journal des Achats (TVA deductible)");
-  out.push("Date;N° BR;Fournisseur;ICE;N° Facture;H.T.;TVA;T.T.C.");
+  out.push("Date;N° BR;Fournisseur;ICE;Ligne;N° Facture;H.T.;TVA;T.T.C.");
   for (const p of tva.purchaseLines) {
     out.push(
       [
@@ -281,6 +282,7 @@ export async function getAccountingCsv(options?: {
         p.receiptNumber,
         esc(p.supplierName),
         p.supplierIce ?? "",
+        p.businessLine,
         p.invoiceNumber ?? "",
         money(p.totalHtCents),
         money(p.tvaAmountCents),

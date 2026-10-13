@@ -6,8 +6,17 @@ import { getCustomers } from "./customers";
 import { getSuppliers, SupplierItem } from "./suppliers";
 import { getExpenses } from "./expenses";
 import { formatMoney } from "@/lib/money";
-import { and, eq, gte, lte, ne, sql } from "drizzle-orm";
-import { db, expenseCategories, expenses, supplierReceipts, suppliers } from "@/db";
+import { and, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
+import {
+  db,
+  businessLines,
+  expenseCategories,
+  expenses,
+  products,
+  supplierReceiptLines,
+  supplierReceipts,
+  suppliers,
+} from "@/db";
 
 function requireDb() {
   if (!db) throw new Error("BASE_INDISPONIBLE: DATABASE_URL non configurée");
@@ -96,6 +105,7 @@ export interface TvaAccountingExport {
     tvaAmountCents: number;
     totalTtcCents: number;
     paymentMethod: string;
+    businessLine: string;
   }>;
   // Achats (TVA Déductible)
   purchasesTaxableHtCents: number;
@@ -113,6 +123,7 @@ export interface TvaAccountingExport {
     tvaRate: number;
     tvaAmountCents: number;
     totalTtcCents: number;
+    businessLine: string;
   }>;
   // Bilan TVA
   netTvaDueCents: number; // Collectée - Déductible (Si positif : à payer ; si négatif : crédit)
@@ -413,6 +424,10 @@ export async function getTvaAccountingExport(options?: {
     return time >= startOfMonth && time <= endOfMonth;
   });
 
+  const d = requireDb();
+  const blRows = await d.select({ id: businessLines.id, code: businessLines.code }).from(businessLines);
+  const blMap = new Map(blRows.map((b) => [b.id, b.code]));
+
   let salesTaxableHtCents = 0;
   let tvaCollectedCents = 0;
   let salesTotalTtcCents = 0;
@@ -434,13 +449,14 @@ export async function getTvaAccountingExport(options?: {
       tvaAmountCents: doc.tvaAmountCents,
       totalTtcCents: doc.totalTtcCents,
       paymentMethod: doc.paymentMethod || "ESPECES",
+      businessLine: blMap.get(doc.businessLineId ?? 0) ?? "",
     };
   });
 
   // Achats et TVA déductible réels (bons de réception du mois)
-  const d = requireDb();
   const receiptRows = await d
     .select({
+      id: supplierReceipts.id,
       receiptNumber: supplierReceipts.receiptNumber,
       receiptDate: supplierReceipts.receiptDate,
       invoiceNumber: supplierReceipts.supplierInvoiceNumber,
@@ -477,6 +493,21 @@ export async function getTvaAccountingExport(options?: {
   const tvaDeductibleExpensesCents = Number(expTvaRows[0]?.n ?? 0);
   const totalTvaDeductibleCents = tvaDeductiblePurchasesCents + tvaDeductibleExpensesCents;
 
+  // Ligne métier d'un bon de réception : déduite de la ligne métier du 1er produit reçu.
+  const receiptIds = receiptRows.map((r) => r.id);
+  const receiptLineBl = new Map<number, string>();
+  if (receiptIds.length > 0) {
+    const lineRows = await d
+      .select({ receiptId: supplierReceiptLines.receiptId, code: businessLines.code })
+      .from(supplierReceiptLines)
+      .innerJoin(products, eq(supplierReceiptLines.productId, products.id))
+      .innerJoin(businessLines, eq(products.businessLineId, businessLines.id))
+      .where(inArray(supplierReceiptLines.receiptId, receiptIds));
+    for (const r of lineRows) {
+      if (!receiptLineBl.has(r.receiptId)) receiptLineBl.set(r.receiptId, r.code);
+    }
+  }
+
   const purchaseLines = receiptRows.map((r) => ({
     date: (r.receiptDate ?? new Date()).toISOString(),
     receiptNumber: r.receiptNumber,
@@ -487,6 +518,7 @@ export async function getTvaAccountingExport(options?: {
     tvaRate: r.tvaRate ?? 20,
     tvaAmountCents: r.tvaAmountCents,
     totalTtcCents: r.totalTtcCents,
+    businessLine: receiptLineBl.get(r.id) ?? "",
   }));
 
   const netTvaDueCents = tvaCollectedCents - totalTvaDeductibleCents;
