@@ -671,3 +671,35 @@ export async function createSupplierPriceCreditNote(data: {
 
   return { success: true, totalCreditHtCents: totalCreditHt };
 }
+
+/** Bons de réception (avec leurs lignes) pour un fournisseur donné (ou tous). */
+export async function getSupplierReceipts(supplierId?: number): Promise<SupplierReceiptItem[]> {
+  await assertAuthenticated();
+  const d = requireDb();
+  const receipts = await d
+    .select()
+    .from(supplierReceipts)
+    .where(supplierId ? eq(supplierReceipts.supplierId, supplierId) : undefined)
+    .orderBy(desc(supplierReceipts.id))
+    .limit(200);
+  if (receipts.length === 0) return [];
+
+  const ids = receipts.map((r) => r.id);
+  const lineRows = await d.select().from(supplierReceiptLines).where(inArray(supplierReceiptLines.receiptId, ids));
+
+  const supIds = Array.from(new Set(receipts.map((r) => r.supplierId)));
+  const supRows = await d
+    .select({ id: suppliers.id, name: suppliers.name })
+    .from(suppliers)
+    .where(inArray(suppliers.id, supIds));
+  const nameById = new Map(supRows.map((s) => [s.id, s.name]));
+
+  const linesByReceipt = new Map<number, ReceiptLineRow[]>();
+  for (const l of lineRows) {
+    const arr = linesByReceipt.get(l.receiptId) ?? [];
+    arr.push(l);
+    linesByReceipt.set(l.receiptId, arr);
+  }
+
+  return receipts.map((r) => mapReceipt(r, nameById.get(r.supplierId) ?? "", linesByReceipt.get(r.id) ?? []));
+}

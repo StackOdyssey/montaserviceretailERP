@@ -13,12 +13,14 @@ import {
   AlertCircle,
   CheckCircle2,
   FileText,
+  ReceiptText,
 } from "lucide-react";
 import { SupplierItem, getSuppliers, SupplierReceiptItem } from "@/lib/actions/suppliers";
 import { formatMoney } from "@/lib/money";
 import { SupplierModal } from "@/components/suppliers/SupplierModal";
 import { SupplierReceiptModal } from "@/components/suppliers/SupplierReceiptModal";
 import { SupplierPaymentModal } from "@/components/suppliers/SupplierPaymentModal";
+import { SupplierPriceCreditModal } from "@/components/suppliers/SupplierPriceCreditModal";
 
 export default function FournisseursPage() {
   const [activeTab, setActiveTab] = useState<"FOURNISSEURS" | "RECEPTIONS">("FOURNISSEURS");
@@ -30,6 +32,7 @@ export default function FournisseursPage() {
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isPriceCreditModalOpen, setIsPriceCreditModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
   const [preselectedSupplierId, setPreselectedSupplierId] = useState<number | undefined>(undefined);
 
@@ -256,6 +259,17 @@ export default function FournisseursPage() {
                         </button>
                         <button
                           onClick={() => {
+                            setPreselectedSupplierId(supplier.id);
+                            setIsPriceCreditModalOpen(true);
+                          }}
+                          className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-2xs"
+                          title="Avoir prix fournisseur (sans retour de marchandise)"
+                        >
+                          <ReceiptText className="w-3.5 h-3.5" />
+                          <span>Avoir prix</span>
+                        </button>
+                        <button
+                          onClick={() => {
                             setEditingSupplier(supplier);
                             setIsSupplierModalOpen(true);
                           }}
@@ -296,6 +310,14 @@ export default function FournisseursPage() {
       <SupplierPaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
+        onSaved={loadData}
+        suppliers={suppliersList}
+        preselectedSupplierId={preselectedSupplierId}
+      />
+
+      <SupplierPriceCreditModal
+        isOpen={isPriceCreditModalOpen}
+        onClose={() => setIsPriceCreditModalOpen(false)}
         onSaved={loadData}
         suppliers={suppliersList}
         preselectedSupplierId={preselectedSupplierId}
