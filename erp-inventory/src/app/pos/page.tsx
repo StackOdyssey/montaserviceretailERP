@@ -141,13 +141,14 @@ export default function POSPage() {
   };
 
   // Calculate totals
+  // Régime global : non-assujetti ⇒ taux effectif 0 (TVA ni calculée ni affichée).
   const totals = calculateDocumentTotals(
     cart.map((c) => ({
       unitPriceHT: c.unitPriceHTCents,
       quantity: c.quantity,
     })),
     discountPercent,
-    company.defaultVatRate
+    company.vatLiable ? company.defaultVatRate : 0
   );
 
   // Open payment modal

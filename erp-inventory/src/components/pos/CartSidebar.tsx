@@ -252,10 +252,12 @@ export function CartSidebar({
               <span>Total Net HT</span>
               <span className="font-mono">{formatMoney(totals.totalNetHT)}</span>
             </div>
-            <div className="flex justify-between text-gray-600">
-              <span>TVA ({totals.tvaRate}%)</span>
-              <span className="font-mono">{formatMoney(totals.tvaAmount)}</span>
-            </div>
+            {totals.tvaRate > 0 && (
+              <div className="flex justify-between text-gray-600">
+                <span>TVA ({totals.tvaRate}%)</span>
+                <span className="font-mono">{formatMoney(totals.tvaAmount)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-lg font-bold text-gray-900 pt-2 border-t border-gray-200">
               <span>Total TTC</span>
               <span className="font-mono text-[#F7162D]">

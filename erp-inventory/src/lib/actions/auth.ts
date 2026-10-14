@@ -7,6 +7,7 @@ import {
   verifyAdminPin,
   SESSION_COOKIE_NAME,
 } from "@/lib/auth";
+import { auditLogs, db } from "@/db";
 import { logEvent, logWarn } from "@/lib/observability";
 
 export interface AuthResult {
@@ -45,6 +46,18 @@ export async function loginWithPin(pin: string): Promise<AuthResult> {
   });
 
   logEvent("auth.pin_success");
+  // Marqueur d'ouverture de session dans le journal des opérations.
+  try {
+    if (db) {
+      await db.insert(auditLogs).values({
+        action: "CONNEXION",
+        entityType: "SESSION",
+        details: "Ouverture de session (PIN gérant).",
+      });
+    }
+  } catch {
+    // journal non bloquant : la connexion reste valide même si le log échoue
+  }
   return { success: true };
 }
 
@@ -63,6 +76,18 @@ export async function loginWithBiometrics(): Promise<AuthResult> {
  * Déconnexion.
  */
 export async function logout(): Promise<void> {
+  // Marqueur de fermeture de session (non bloquant).
+  try {
+    if (db) {
+      await db.insert(auditLogs).values({
+        action: "DECONNEXION",
+        entityType: "SESSION",
+        details: "Fermeture de session.",
+      });
+    }
+  } catch {
+    // la déconnexion (suppression cookie) doit aboutir dans tous les cas
+  }
   const cookieStore = await cookies();
   cookieStore.delete(SESSION_COOKIE_NAME);
 }

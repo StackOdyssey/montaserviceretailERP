@@ -1,7 +1,7 @@
 "use server";
 
 import { asc, eq } from "drizzle-orm";
-import { db, expenseCategories, paymentMethods, priceLevels, settings, vatRates } from "@/db";
+import { auditLogs, db, expenseCategories, paymentMethods, priceLevels, settings, vatRates } from "@/db";
 import { assertAuthenticated } from "@/lib/action-guard";
 
 export type SettingsRow = typeof settings.$inferSelect;
@@ -33,6 +33,8 @@ export interface SettingsData {
   bank2Rib?: string;
   defaultVatRateId?: number | null;
   vatRegime?: string;
+  /** Interrupteur global de régime TVA : false = ventes sans TVA. */
+  vatLiable?: boolean;
   currency?: string;
   localeDefault?: string;
   localeSecondary?: string;
@@ -68,13 +70,28 @@ export async function getSettings(): Promise<SettingsRow | null> {
 export async function saveSettings(data: SettingsData): Promise<{ id: number }> {
   await assertAuthenticated();
   const d = requireDb();
-  const existing = (await d.select({ id: settings.id }).from(settings).limit(1))[0];
+  const existing = (await d.select().from(settings).limit(1))[0];
 
   if (existing) {
     await d
       .update(settings)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(settings.id, existing.id));
+    // Traçabilité du basculement de régime TVA (effet immédiat, sans rétroactivité).
+    if (typeof data.vatLiable === "boolean" && data.vatLiable !== (existing.vatLiable ?? true)) {
+      try {
+        await d.insert(auditLogs).values({
+          action: "REGIME_TVA",
+          entityType: "SETTINGS",
+          entityId: existing.id,
+          details: data.vatLiable
+            ? "Basculement en régime assujetti TVA (taux paramétré appliqué aux nouvelles ventes)."
+            : "Basculement en régime non-assujetti : nouvelles ventes à taux 0, TVA ni calculée ni affichée (historique inchangé).",
+        });
+      } catch {
+        // journal non bloquant
+      }
+    }
     return { id: existing.id };
   }
   const inserted = await d.insert(settings).values(data).returning({ id: settings.id });

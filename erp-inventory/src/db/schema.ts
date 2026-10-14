@@ -7,9 +7,7 @@ import {
   timestamp,
   numeric,
   unique,
-  check,
 } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
 
 // ==========================================
 // 1. PARAMÈTRES GÉNÉRAUX DE L'ENTREPRISE
@@ -45,6 +43,10 @@ export const settings = pgTable("settings", {
   // Fiscalité & paramètres généraux
   defaultVatRateId: integer("default_vat_rate_id").references(() => vatRates.id),
   vatRegime: text("vat_regime").notNull().default("ENCAISSEMENTS"), // ENCAISSEMENTS | DEDITS
+  // Interrupteur global de régime TVA : true = assujetti (comportement historique),
+  // false = non-assujetti (ventes à taux 0, TVA ni calculée ni affichée). Les documents
+  // existants gardent leur snapshot (tvaRate/vatDisplay) : effet immédiat, sans rétroactivité.
+  vatLiable: boolean("vat_liable").notNull().default(true),
   currency: text("currency").notNull().default("MAD"),
   localeDefault: text("locale_default").notNull().default("fr"),
   localeSecondary: text("locale_secondary").notNull().default("en"),
@@ -97,10 +99,9 @@ export const businessLineDocumentSettings = pgTable(
   },
   (table) => [
     unique("business_line_document_settings_unique").on(table.businessLineId, table.docType),
-    check(
-      "business_line_document_settings_fac_av_show_vat",
-      sql`${table.docType} NOT IN ('FAC','AV') OR ${table.showVat}`
-    ),
+    // Note : l'ancienne contrainte FAC/AV toujours SHOWN a été retirée (migration) :
+    // en régime non-assujetti, FAC/AV sont HIDDEN avec mention « TVA non applicable ».
+    // La cohérence est enforced côté serveur dans createSalesDocument selon le régime.
   ]
 );
 
@@ -427,11 +428,9 @@ export const salesDocuments = pgTable("sales_documents", {
   updatedAt: timestamp("updated_at").defaultNow(),
 },
   (table) => [
-    // Invariant §5.4 : FACTURE et AVOIR ne peuvent jamais masquer la TVA.
-    check(
-      "sales_documents_fac_av_show_vat",
-      sql`${table.docType} NOT IN ('FACTURE','AVOIR') OR ${table.vatDisplay} = 'SHOWN'`
-    ),
+    // Invariant §5.4 assoupli (régime non-assujetti) : FACTURE/AVOIR HIDDEN autorisé
+    // uniquement avec mention « TVA non applicable ». Enforcement serveur régime-aware
+    // dans createSalesDocument (la contrainte DB ne peut pas lire settings).
   ]
 );
 

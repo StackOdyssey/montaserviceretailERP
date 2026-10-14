@@ -16,6 +16,7 @@ import {
   ReceiptText,
 } from "lucide-react";
 import { SupplierItem, getSuppliers, SupplierReceiptItem } from "@/lib/actions/suppliers";
+import { getSettings } from "@/lib/actions/settings";
 import { formatMoney } from "@/lib/money";
 import { SupplierModal } from "@/components/suppliers/SupplierModal";
 import { SupplierReceiptModal } from "@/components/suppliers/SupplierReceiptModal";
@@ -27,6 +28,8 @@ export default function FournisseursPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [suppliersList, setSuppliersList] = useState<SupplierItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // Régime TVA global (réceptions sans TVA si non-assujetti).
+  const [vatLiable, setVatLiable] = useState(true);
 
   // Modals state
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
@@ -39,8 +42,12 @@ export default function FournisseursPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const data = await getSuppliers(searchQuery);
+      const [data, s] = await Promise.all([
+        getSuppliers(searchQuery),
+        getSettings().catch(() => null),
+      ]);
       setSuppliersList(data);
+      if (s) setVatLiable(s.vatLiable ?? true);
     } finally {
       setLoading(false);
     }
@@ -305,6 +312,7 @@ export default function FournisseursPage() {
         onSaved={loadData}
         suppliers={suppliersList}
         preselectedSupplierId={preselectedSupplierId}
+        vatLiable={vatLiable}
       />
 
       <SupplierPaymentModal

@@ -1,7 +1,7 @@
 "use server";
 
 import { and, desc, eq, gte, ilike, sql } from "drizzle-orm";
-import { db, expenses } from "@/db";
+import { auditLogs, db, expenses, settings } from "@/db";
 import { assertAuthenticated } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
 import type { ExpenseCategory, ExpenseItem } from "@/lib/constants/expenses";
@@ -122,7 +122,11 @@ export async function recordExpense(data: {
 
   if (!data.title.trim()) throw new Error("L'intitulé de la dépense est obligatoire");
 
-  const rate = data.tvaRate ?? 20;
+  // Régime global : non-assujetti ⇒ dépense sans TVA (taux 0, TTC = HT).
+  const liableRow = (
+    await d.select({ liable: settings.vatLiable }).from(settings).limit(1)
+  )[0];
+  const rate = (liableRow?.liable ?? true) ? (data.tvaRate ?? 20) : 0;
   let ht: number;
   let tva: number;
   let ttc: number;
@@ -155,6 +159,17 @@ export async function recordExpense(data: {
       .returning()
   )[0];
 
+  try {
+    await d.insert(auditLogs).values({
+      action: "DEPENSE_CAISSE",
+      entityType: "EXPENSE",
+      entityId: row.id,
+      details: `${row.title} (${row.category}) — ${(ttc / 100).toFixed(2)} DH TTC`,
+    });
+  } catch {
+    // journal non bloquant
+  }
+
   return mapExpense(row);
 }
 
@@ -164,6 +179,19 @@ export async function recordExpense(data: {
 export async function deleteExpense(id: number) {
   await assertAuthenticated();
   const d = requireDb();
+  const existing = (await d.select().from(expenses).where(eq(expenses.id, id)).limit(1))[0];
   await d.delete(expenses).where(eq(expenses.id, id));
+  try {
+    await d.insert(auditLogs).values({
+      action: "SUPPRESSION_DEPENSE",
+      entityType: "EXPENSE",
+      entityId: id,
+      details: existing
+        ? `Suppression « ${existing.title} » (${existing.category}) — ${((existing.amountCents ?? 0) / 100).toFixed(2)} DH`
+        : `Suppression dépense #${id}`,
+    });
+  } catch {
+    // journal non bloquant
+  }
   return { success: true };
 }

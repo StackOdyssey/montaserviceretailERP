@@ -147,14 +147,14 @@ export default function NouveauBonDeLivraisonPage() {
     setCart((prevCart) => prevCart.filter((item) => item.productId !== productId));
   };
 
-  // Calcul dynamique des totaux
+  // Calcul dynamique des totaux (taux central : 0 si régime non-assujetti)
   const totals = calculateDocumentTotals(
     cart.map((c) => ({
       unitPriceHT: c.unitPriceHTCents,
       quantity: c.quantity,
     })),
     discountPercent,
-    20 // TVA 20%
+    company.vatLiable ? company.defaultVatRate : 0
   );
 
   // Validation du BL
@@ -209,7 +209,7 @@ export default function NouveauBonDeLivraisonPage() {
               {DOC_TITLES[docType]}
             </h1>
             <p className="text-xs text-[#6B7280]">
-              Saisie rapide au comptoir • TVA {company.defaultVatRate}%
+              Saisie rapide au comptoir{company.vatLiable ? ` • TVA ${company.defaultVatRate}%` : " • sans TVA"}
             </p>
           </div>
         </div>
@@ -529,13 +529,15 @@ export default function NouveauBonDeLivraisonPage() {
                 </span>
               </div>
 
-              {/* 4. TVA 10% */}
-              <div className="flex justify-between text-[#4B5563]">
-                <span>TVA ({company.defaultVatRate}%) :</span>
-                <span className="font-mono font-bold text-[#111827]">
-                  {formatMoney(totals.tvaAmount)}
-                </span>
-              </div>
+              {/* 4. TVA (masquée si régime non-assujetti) */}
+              {totals.tvaRate > 0 && (
+                <div className="flex justify-between text-[#4B5563]">
+                  <span>TVA ({company.defaultVatRate}%) :</span>
+                  <span className="font-mono font-bold text-[#111827]">
+                    {formatMoney(totals.tvaAmount)}
+                  </span>
+                </div>
+              )}
 
               {/* 5. TOTAL TTC */}
               <div className="flex justify-between text-base font-black text-white bg-[#F7162D] p-3 rounded-xl -mx-2 mt-2 shadow-xs">

@@ -19,6 +19,8 @@ export interface CompanySettings {
   logoUrl: string | null;
   currency: string;
   defaultVatRate: number;
+  /** Interrupteur global de régime TVA : false = ventes sans TVA (ni calculée ni affichée). */
+  vatLiable: boolean;
 }
 
 export type CompanySettingsInput = { [K in keyof CompanySettings]?: CompanySettings[K] | null };
@@ -40,6 +42,7 @@ const DEFAULTS: CompanySettings = {
   logoUrl: null,
   currency: "MAD",
   defaultVatRate: 20,
+  vatLiable: true,
 };
 
 const Ctx = createContext<CompanySettings>(DEFAULTS);
@@ -69,6 +72,7 @@ export function SettingsProvider({
     logoUrl: s.logoUrl ?? DEFAULTS.logoUrl,
     currency: s.currency ?? DEFAULTS.currency,
     defaultVatRate: s.defaultVatRate ?? DEFAULTS.defaultVatRate,
+    vatLiable: s.vatLiable ?? DEFAULTS.vatLiable,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

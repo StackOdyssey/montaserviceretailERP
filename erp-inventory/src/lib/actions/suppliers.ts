@@ -275,7 +275,12 @@ export async function createSupplierReceipt(data: {
   const supplier = (await d.select().from(suppliers).where(eq(suppliers.id, data.supplierId)).limit(1))[0];
   if (!supplier) throw new Error("Fournisseur introuvable");
 
-  const tvaRate = 20;
+  // Régime global Q1 : non-assujetti ⇒ réception en TTC sans TVA (TVA d'amont
+  // non déductible = coût). Assujetti ⇒ comportement historique (20 %).
+  const liableRow = (
+    await d.select({ liable: settings.vatLiable }).from(settings).limit(1)
+  )[0];
+  const tvaRate = (liableRow?.liable ?? true) ? 20 : 0;
   let receiptId = 0;
 
   await d.transaction(async (tx) => {
@@ -307,6 +312,13 @@ export async function createSupplierReceipt(data: {
         })
         .returning({ id: supplierReceipts.id })
     )[0].id;
+
+    await tx.insert(auditLogs).values({
+      action: "RECEPTION_BR",
+      entityType: "SUPPLIER_RECEIPT",
+      entityId: receiptId,
+      details: `BR ${docNumber} — ${supplier.name} — ${(totalTtcCents / 100).toFixed(2)} DH TTC`,
+    });
 
     await tx.insert(supplierReceiptLines).values(
       data.lines.map((l) => ({
@@ -439,6 +451,17 @@ export async function recordSupplierPayment(data: {
     } else if (monthTotal > monthlyLimit) {
       warning = `Paiement espèces du mois (${(monthTotal / 100).toFixed(2)} DH) au-delà du seuil déductible de ${(monthlyLimit / 100).toFixed(2)} DH/mois pour ce fournisseur.`;
     }
+  }
+
+  try {
+    await d.insert(auditLogs).values({
+      action: "REGLEMENT_FOURNISSEUR",
+      entityType: "SUPPLIER_PAYMENT",
+      entityId: paymentId,
+      details: `Décaissement ${(data.amountCents / 100).toFixed(2)} DH (${data.paymentMethod}) — ${supplier.name}${receiptNumber ? ` sur ${receiptNumber}` : ""}`,
+    });
+  } catch {
+    // journal non bloquant
   }
 
   return { ...mapPayment(row, supplier.name, receiptNumber), warning };

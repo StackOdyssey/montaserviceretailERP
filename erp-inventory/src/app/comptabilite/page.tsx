@@ -140,6 +140,12 @@ export default function ComptabilitePage() {
           <p className="text-sm text-gray-500 mt-1">
             Déclaration périodique de TVA pour l'expert-comptable, valorisation du stock et rentabilité par pièce.
           </p>
+          {!company.vatLiable && (
+            <p className="text-xs font-bold text-amber-700 dark:text-amber-300 mt-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2">
+              Régime non-assujetti : les nouvelles ventes sont sans TVA (ni calculée ni affichée).
+              Les montants de TVA ci-dessous reflètent l&apos;historique (documents antérieurs au basculement).
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

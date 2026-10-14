@@ -99,7 +99,7 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
         category: activeCategory?.name ?? "Divers",
         categoryId: activeCategory?.id ?? null,
         amountCents: toCentimes(parsedDh),
-        tvaRate: company.defaultVatRate,
+        tvaRate: company.vatLiable ? company.defaultVatRate : 0,
         expenseDate: new Date(expenseDate).toISOString(),
         receiptPhotoUrl: photoPreview || undefined,
         notes: notes.trim() || undefined,

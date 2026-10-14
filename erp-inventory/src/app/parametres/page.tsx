@@ -48,6 +48,8 @@ export default function ParametresPage() {
   // Paramètres fiscaux
   const [fiscalSettings, setFiscalSettings] = useState({
     defaultTvaRate: 20,
+    // Interrupteur global : décoché = ventes sans TVA (ni calculée ni affichée).
+    vatLiable: true,
     currency: "MAD",
     enableNegativeStock: true,
     displayDiscountUnderBrut: true,
@@ -105,6 +107,7 @@ export default function ParametresPage() {
         setFiscalSettings((f) => ({
           ...f,
           defaultTvaRate: rate ?? f.defaultTvaRate,
+          vatLiable: s.vatLiable ?? f.vatLiable,
           currency: s.currency || f.currency,
           enableNegativeStock: s.negativeStockAllowed,
           displayDiscountUnderBrut: s.displayDiscountUnderBrut,
@@ -148,6 +151,7 @@ export default function ParametresPage() {
         email: companyInfo.email,
         footerText: fiscalSettings.invoiceFooterNote,
         defaultVatRateId: vatId,
+        vatLiable: fiscalSettings.vatLiable,
         currency: fiscalSettings.currency,
         negativeStockAllowed: fiscalSettings.enableNegativeStock,
         defaultPaymentDueDays: fiscalSettings.defaultPaymentDueDays,
@@ -409,6 +413,28 @@ export default function ParametresPage() {
               <p className="text-xs text-gray-500 mt-1">
                 Conformité aux règles comptables marocaines pour le commerce de pièces de rechange motos.
               </p>
+            </div>
+
+            {/* Interrupteur global de régime TVA */}
+            <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 flex items-start gap-3">
+              <input
+                id="vat-liable-toggle"
+                type="checkbox"
+                checked={fiscalSettings.vatLiable}
+                onChange={(e) => setFiscalSettings({ ...fiscalSettings, vatLiable: e.target.checked })}
+                className="mt-1 w-5 h-5 accent-[#F7162D]"
+              />
+              <div>
+                <label htmlFor="vat-liable-toggle" className="text-sm font-bold text-gray-900 dark:text-white">
+                  Entreprise assujettie à la TVA
+                </label>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  Coché : TVA calculée et affichée au taux par défaut. Décoché : ventes sans TVA —
+                  ni calculée ni affichée (total = net), mention « TVA non applicable » sur les
+                  factures. Effet immédiat sur les nouveaux documents, historique inchangé.
+                  Basculement tracé dans le Journal des Opérations.
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

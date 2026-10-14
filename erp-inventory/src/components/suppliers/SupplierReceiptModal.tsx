@@ -18,6 +18,8 @@ interface SupplierReceiptModalProps {
   onSaved: () => void;
   suppliers: SupplierItem[];
   preselectedSupplierId?: number;
+  /** Régime global : false = réception sans TVA (coûts TTC). Défaut true. */
+  vatLiable?: boolean;
 }
 
 interface ReceiptLineState {
@@ -34,6 +36,7 @@ export function SupplierReceiptModal({
   onSaved,
   suppliers,
   preselectedSupplierId,
+  vatLiable = true,
 }: SupplierReceiptModalProps) {
   // T2.1 — sélection recherchable, jamais d'anonyme (null = à sélectionner/créer)
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(
@@ -253,7 +256,7 @@ export function SupplierReceiptModal({
     const costCents = toCentimes(costDh);
     totalHtCents += costCents * line.quantity;
   }
-  const tvaRate = 10;
+  const tvaRate = vatLiable ? 10 : 0;
   const tvaAmountCents = Math.round((totalHtCents * tvaRate) / 100);
   const totalTtcCents = totalHtCents + tvaAmountCents;
 
@@ -616,10 +619,12 @@ export function SupplierReceiptModal({
               <span>Total Réception HT :</span>
               <span className="font-bold text-gray-900 dark:text-white">{formatMoney(totalHtCents)}</span>
             </div>
-            <div className="flex justify-between text-gray-600 dark:text-gray-300">
-              <span>TVA (10%) :</span>
-              <span className="font-bold text-gray-900 dark:text-white">{formatMoney(tvaAmountCents)}</span>
-            </div>
+            {tvaRate > 0 && (
+              <div className="flex justify-between text-gray-600 dark:text-gray-300">
+                <span>TVA (10%) :</span>
+                <span className="font-bold text-gray-900 dark:text-white">{formatMoney(tvaAmountCents)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm font-black text-blue-900 dark:text-blue-300 pt-1 border-t border-blue-200 dark:border-blue-800">
               <span>Total Facturé TTC :</span>
               <span className="text-base text-[#F7162D]">{formatMoney(totalTtcCents)}</span>

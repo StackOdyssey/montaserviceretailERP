@@ -13,6 +13,7 @@ import {
   Receipt,
   FileText,
   BarChart3,
+  ScrollText,
   Settings,
   Mail,
   LogOut,
@@ -90,6 +91,11 @@ const navItems: NavItem[] = [
     label: "Rapports & TVA",
     href: "/comptabilite",
     icon: BarChart3,
+  },
+  {
+    label: "Journal Opérations",
+    href: "/operations-log",
+    icon: ScrollText,
   },
   {
     label: "Paramètres Société",

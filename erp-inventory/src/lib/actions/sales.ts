@@ -19,6 +19,7 @@ import {
   vatRates,
 } from "@/db";
 import { calculateDocumentTotals } from "@/lib/money";
+import { effectiveVatRate, VAT_NOT_LIABLE_MENTION } from "@/lib/vat-regime";
 import { nextDocumentNumber } from "@/lib/numbering";
 import { assertAuthenticated } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
@@ -256,14 +257,16 @@ export async function createSalesDocument(data: {
   const year = new Date().getFullYear();
 
   // Taux de TVA par défaut, paramétrable (settings.defaultVatRateId → vat_rates), repli 20%.
+  // Régime global : non-assujetti ⇒ taux effectif 0 (TVA ni calculée ni affichée).
   const vatRow = (
     await d
-      .select({ rate: vatRates.ratePercent })
+      .select({ rate: vatRates.ratePercent, liable: settings.vatLiable })
       .from(settings)
       .leftJoin(vatRates, eq(settings.defaultVatRateId, vatRates.id))
       .limit(1)
   )[0];
-  const tvaRate = vatRow?.rate ?? 20;
+  const vatLiable = vatRow?.liable ?? true;
+  const tvaRate = effectiveVatRate(vatRow?.rate ?? 20, vatLiable);
 
   // Exit gate Phase 3 : une facture à un client professionnel exige son ICE.
   // Matrice POS T1.4 (fail-closed) : Client Comptoir (customerId=null) uniquement
@@ -300,6 +303,12 @@ export async function createSalesDocument(data: {
 
   let docId = 0;
 
+  // Mention légale auto-ajoutée aux FACTURE/AVOIR en régime non-assujetti.
+  const resolvedNotes =
+    !vatLiable && (docType === "FACTURE" || docType === "AVOIR")
+      ? [data.notes?.trim(), VAT_NOT_LIABLE_MENTION].filter(Boolean).join(" — ")
+      : data.notes;
+
   await d.transaction(async (tx) => {
     // Ligne métier (défaut PIECES)
     const line = (
@@ -325,9 +334,12 @@ export async function createSalesDocument(data: {
         )
         .limit(1)
     )[0];
-    const vatDisplay = vatCfg ? (vatCfg.showVat ? "SHOWN" : "HIDDEN") : "SHOWN";
+    const vatDisplay = !vatLiable ? "HIDDEN" : vatCfg ? (vatCfg.showVat ? "SHOWN" : "HIDDEN") : "SHOWN";
     const priceBasis = vatCfg?.priceBasis ?? "TTC";
-    if ((docType === "FACTURE" || docType === "AVOIR") && vatDisplay === "HIDDEN") {
+    // Régime assujetti : FAC/AV affichent toujours la TVA. Régime non-assujetti :
+    // FAC/AV masquées avec mention légale auto-ajoutée aux notes (contrainte DB
+    // FAC/AV-SHOWN retirée, enforcement régime-aware ici).
+    if ((docType === "FACTURE" || docType === "AVOIR") && vatDisplay === "HIDDEN" && vatLiable) {
       throw new Error("TVA_OBLIGATOIRE_FAC_AV: FAC et AV doivent afficher la TVA");
     }
 
@@ -422,7 +434,7 @@ export async function createSalesDocument(data: {
           totalTtcCents: totals.totalTTC,
           paidAmountCents: isFullyPaid ? totals.totalTTC : data.paidAmountCents ?? 0,
           paymentMethod: data.paymentMethod,
-          notes: data.notes ?? null,
+          notes: resolvedNotes ?? null,
           vatDisplay,
           priceBasis,
           validatedAt: new Date(),
@@ -445,6 +457,14 @@ export async function createSalesDocument(data: {
         totalTtcCents: Math.round(l.unitPriceHTCents * l.quantity * (1 + tvaRate / 100)),
       }))
     );
+
+    // Journal des opérations : toute validation BL/FACTURE/BC/DEVIS/AVOIR y figure.
+    await tx.insert(auditLogs).values({
+      action: "VALIDATION_DOCUMENT",
+      entityType: docType,
+      entityId: docId,
+      details: `${docType} ${docNumber} — ${data.customerName || "Client Comptoir Particulier"} — ${(totals.totalTTC / 100).toFixed(2)} DH TTC (${data.paymentMethod}${isFullyPaid ? ", soldé" : ", à crédit"})`,
+    });
 
     if (affectsStock) {
       for (const e of effects) {
@@ -547,7 +567,9 @@ export async function sendDocumentByEmail(data: {
           </table>
           <div style="margin-top: 20px; text-align: right;">
             <p><strong>Total Net HT :</strong> ${(doc.totalNetHtCents / 100).toFixed(2)} DH</p>
-            <p><strong>TVA (${doc.tvaRate}%) :</strong> ${(doc.tvaAmountCents / 100).toFixed(2)} DH</p>
+            ${doc.tvaRate > 0
+              ? `<p><strong>TVA (${doc.tvaRate}%) :</strong> ${(doc.tvaAmountCents / 100).toFixed(2)} DH</p>`
+              : `<p><em>TVA non applicable</em></p>`}
             <h3 style="color: #F7162D;">Total TTC : ${(doc.totalTtcCents / 100).toFixed(2)} DH</h3>
           </div>
         </div>`,
@@ -694,6 +716,13 @@ export async function convertBlToFacture(
   const totalBrutHt = srcLines.reduce((s, l) => s + l.totalHtCents, 0);
   const tvaAmount = srcLines.reduce((s, l) => s + Math.round((l.totalHtCents * l.tvaRate) / 100), 0);
 
+  // Régime au moment de la conversion : non-assujetti ⇒ facture masquée + mention.
+  const liableRow = (
+    await d.select({ liable: settings.vatLiable }).from(settings).limit(1)
+  )[0];
+  const convVatLiable = liableRow?.liable ?? true;
+  const convNotes = `Facture issue des BL : ${active.map((b) => b.docNumber).join(", ")}${convVatLiable ? "" : ` — ${VAT_NOT_LIABLE_MENTION}`}`;
+
   let docId = 0;
   await d.transaction(async (tx) => {
     const { docNumber, sequenceNo } = await nextDocumentNumber(tx, {
@@ -728,8 +757,8 @@ export async function convertBlToFacture(
           totalTtcCents: totalBrutHt + tvaAmount,
           paidAmountCents: 0,
           paymentMethod: head.paymentMethod,
-          notes: `Facture issue des BL : ${active.map((b) => b.docNumber).join(", ")}`,
-          vatDisplay: "SHOWN",
+          notes: convNotes,
+          vatDisplay: convVatLiable ? "SHOWN" : "HIDDEN",
           priceBasis: "TTC",
           validatedAt: new Date(),
         })
@@ -757,6 +786,13 @@ export async function convertBlToFacture(
     await tx.insert(documentLinks).values(
       active.map((b) => ({ sourceDocumentId: b.id, targetDocumentId: docId, linkType: "BL_TO_FAC" }))
     );
+
+    await tx.insert(auditLogs).values({
+      action: "CONVERSION_BL_FAC",
+      entityType: "FACTURE",
+      entityId: docId,
+      details: `Facture ${docNumber} issue des BL : ${active.map((b) => b.docNumber).join(", ")} — ${((totalBrutHt + tvaAmount) / 100).toFixed(2)} DH TTC`,
+    });
   });
 
   const created = await loadDocumentById(docId);
@@ -886,6 +922,13 @@ export async function createAvoir(data: {
       sourceDocumentId: docId,
       targetDocumentId: source.id,
       linkType: "AV_TO_SOURCE",
+    });
+
+    await tx.insert(auditLogs).values({
+      action: "AVOIR_EMIS",
+      entityType: "AVOIR",
+      entityId: docId,
+      details: `Avoir ${docNumber} (${avType}) sur ${source.docNumber} — ${((totalHt + tvaAmount) / 100).toFixed(2)} DH TTC`,
     });
 
     // Retour en stock au COGS d'origine (CMUP recalculé) — uniquement pour un avoir RETOUR.

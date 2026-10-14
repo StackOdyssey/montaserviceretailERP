@@ -345,6 +345,16 @@ export async function recordCustomerPayment(data: {
   });
 
   const row = (await d.select().from(customerPayments).where(eq(customerPayments.id, paymentId)).limit(1))[0];
+  try {
+    await d.insert(auditLogs).values({
+      action: "REGLEMENT_CLIENT",
+      entityType: "CUSTOMER_PAYMENT",
+      entityId: paymentId,
+      details: `Encaissement ${(data.amountCents / 100).toFixed(2)} DH (${data.paymentMethod}) — ${customer.name}${docNumber ? ` sur ${docNumber}` : ""}`,
+    });
+  } catch {
+    // journal non bloquant
+  }
   return mapPayment(row, customer.name, docNumber);
 }
 
@@ -367,6 +377,16 @@ export async function updatePaymentStatus(paymentId: number, newStatus: string):
   if (!updated) throw new Error("Règlement introuvable");
 
   const customer = (await d.select().from(customers).where(eq(customers.id, updated.customerId)).limit(1))[0];
+  try {
+    await d.insert(auditLogs).values({
+      action: "STATUT_REGLEMENT",
+      entityType: "CUSTOMER_PAYMENT",
+      entityId: paymentId,
+      details: `${updated.paymentMethod} ${(updated.amountCents / 100).toFixed(2)} DH — ${customer?.name ?? ""} : statut → ${newStatus}`,
+    });
+  } catch {
+    // journal non bloquant
+  }
   return mapPayment(updated, customer?.name ?? "");
 }
 
@@ -554,6 +574,12 @@ export async function mergeCustomers(sourceId: number, targetId: number): Promis
     await tx.update(salesDocuments).set({ customerId: targetId }).where(eq(salesDocuments.customerId, sourceId));
     await tx.update(customerPayments).set({ customerId: targetId }).where(eq(customerPayments.customerId, sourceId));
     await tx.update(customers).set({ deletedAt: new Date() }).where(eq(customers.id, sourceId));
+    await tx.insert(auditLogs).values({
+      action: "FUSION_CLIENT",
+      entityType: "CUSTOMER",
+      entityId: targetId,
+      details: `Fusion #${sourceId} « ${source.name} » → #${targetId} « ${target.name} »`,
+    });
   });
 
   return mapCustomer(target);

@@ -101,10 +101,16 @@ export function InvoiceModal({ document, onClose }: InvoiceModalProps) {
                 <span>Total Net HT</span>
                 <span className="font-mono">{formatMoney(document.totalNetHtCents)}</span>
               </div>
-              <div className="flex justify-between text-gray-600">
-                <span>TVA ({document.tvaRate}%)</span>
-                <span className="font-mono">{formatMoney(document.tvaAmountCents)}</span>
-              </div>
+              {document.tvaRate > 0 ? (
+                <div className="flex justify-between text-gray-600">
+                  <span>TVA ({document.tvaRate}%)</span>
+                  <span className="font-mono">{formatMoney(document.tvaAmountCents)}</span>
+                </div>
+              ) : (
+                (document.docType === "FACTURE" || document.docType === "AVOIR") && (
+                  <div className="text-xs italic text-gray-500">TVA non applicable</div>
+                )
+              )}
               <div className="flex justify-between text-lg font-bold text-gray-900 pt-2 border-t border-gray-200">
                 <span>Total TTC</span>
                 <span className="font-mono text-[#F7162D]">

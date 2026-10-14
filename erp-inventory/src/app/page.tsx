@@ -78,7 +78,7 @@ export default function TableauDeBordPage() {
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FEF2F2] text-[#F7162D] border border-[#FCA5A5]/40">
               <ShieldCheck size={13} />
-              SARL BM Motors • Régime Fiscal TVA {company.defaultVatRate}%
+              SARL BM Motors • {company.vatLiable ? `Régime Fiscal TVA ${company.defaultVatRate}%` : "Ventes sans TVA"}
             </span>
             <span className="text-xs text-gray-500">Casablanca</span>
           </div>
@@ -317,7 +317,9 @@ export default function TableauDeBordPage() {
                             {formatMoney(bl.totalTtcCents)}
                           </span>
                           <span className="text-[10px] text-gray-500">
-                            Dont TVA {company.defaultVatRate}%: {formatMoney(bl.tvaAmountCents)}
+                            {bl.tvaRate > 0
+                              ? `Dont TVA ${bl.tvaRate}%: ${formatMoney(bl.tvaAmountCents)}`
+                              : "Sans TVA"}
                           </span>
                         </div>
 

@@ -2,6 +2,7 @@
 
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import {
+  auditLogs,
   businessLines,
   db,
   products,
@@ -239,11 +240,32 @@ export async function validateStockCount(id: number): Promise<{ adjusted: number
     .update(stockCounts)
     .set({ status: "VALIDATED", countedAt: new Date() })
     .where(eq(stockCounts.id, id));
+  try {
+    await d.insert(auditLogs).values({
+      action: "INVENTAIRE_VALIDE",
+      entityType: "STOCK_COUNT",
+      entityId: id,
+      details: `Inventaire ${header.code} validé — ${adjusted} ligne(s) ajustée(s)`,
+    });
+  } catch {
+    // journal non bloquant
+  }
   return { adjusted };
 }
 
 export async function cancelStockCount(id: number): Promise<void> {
   await assertAuthenticated();
   const d = requireDb();
+  const header = (await d.select({ code: stockCounts.code }).from(stockCounts).where(eq(stockCounts.id, id)).limit(1))[0];
   await d.update(stockCounts).set({ status: "CANCELLED" }).where(eq(stockCounts.id, id));
+  try {
+    await d.insert(auditLogs).values({
+      action: "INVENTAIRE_ANNULE",
+      entityType: "STOCK_COUNT",
+      entityId: id,
+      details: `Inventaire ${header?.code ?? `#${id}`} annulé`,
+    });
+  } catch {
+    // journal non bloquant
+  }
 }
