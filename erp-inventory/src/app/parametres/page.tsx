@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Building2,
   Percent,
@@ -21,6 +22,7 @@ import { getSettings, saveSettings, getVatRates, saveVatRate } from "@/lib/actio
 import { OPEN_QUESTIONS } from "@/lib/open-questions";
 
 export default function ParametresPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<
     "SOCIETE" | "FISCAL" | "BANQUE" | "SECURITE" | "NUMEROTATION" | "CLOUD" | "DECISIONS"
   >("SOCIETE");
@@ -165,6 +167,9 @@ export default function ParametresPage() {
       });
       setSavedNotification(true);
       setTimeout(() => setSavedNotification(false), 3000);
+      // Revalide le layout serveur (paramètres société) pour que la caisse
+      // et les autres pages prennent le nouveau régime TVA sans F5.
+      router.refresh();
     } catch (err) {
       alert((err as Error).message);
     }
