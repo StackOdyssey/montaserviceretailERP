@@ -170,6 +170,52 @@ export async function getSalesDocuments(options?: {
 }
 
 /**
+ * T3.3 — Diagnostic : ventes orphelines qui n'auraient plus le droit d'exister
+ * depuis le garde T1.4 (FACTURE ou crédit/différé sans `customerId`).
+ * Vise zéro ligne. Les BL/BC/DEVIS comptoir en espèces n'apparaissent pas ici.
+ */
+export async function getOrphanCreditSales(): Promise<
+  Array<{
+    id: number;
+    docNumber: string;
+    docType: string;
+    paymentMethod: string | null;
+    totalTtcCents: number;
+    docDate: string;
+  }>
+> {
+  await assertAuthenticated();
+  const d = requireDb();
+  const rows = await d
+    .select({
+      id: salesDocuments.id,
+      docNumber: salesDocuments.docNumber,
+      docType: salesDocuments.docType,
+      paymentMethod: salesDocuments.paymentMethod,
+      totalTtcCents: salesDocuments.totalTtcCents,
+      docDate: salesDocuments.docDate,
+    })
+    .from(salesDocuments)
+    .where(
+      and(
+        isNull(salesDocuments.deletedAt),
+        ne(salesDocuments.status, "ANNULE"),
+        isNull(salesDocuments.customerId),
+        or(
+          eq(salesDocuments.docType, "FACTURE"),
+          ne(salesDocuments.paymentMethod, "ESPECES")
+        )!
+      )
+    )
+    .orderBy(desc(salesDocuments.id))
+    .limit(100);
+  return rows.map((r) => ({
+    ...r,
+    docDate: (r.docDate ?? new Date()).toISOString(),
+  }));
+}
+
+/**
  * Récupère un document par identifiant.
  */
 export async function getSalesDocumentById(id: number): Promise<SalesDocumentItem | null> {
@@ -220,6 +266,25 @@ export async function createSalesDocument(data: {
   const tvaRate = vatRow?.rate ?? 20;
 
   // Exit gate Phase 3 : une facture à un client professionnel exige son ICE.
+  // Matrice POS T1.4 (fail-closed) : Client Comptoir (customerId=null) uniquement
+  // pour BL/BC/DEVIS en ESPECES. FACTURE et tout crédit/différé exigent une fiche.
+  const requiresCustomerFile =
+    docType === "FACTURE" ||
+    data.paymentMethod === "A_CREDIT" ||
+    data.paymentMethod === "CHEQUE" ||
+    data.paymentMethod === "EFFET_LCN" ||
+    data.paymentMethod === "VIREMENT";
+  if (requiresCustomerFile && !data.customerId) {
+    throw new Error(
+      "CLIENT_REQUIS: créez ou sélectionnez la fiche client avant de valider (FACTURE et ventes à crédit / chèque / effet / virement exigent un client enregistré, pas de client comptoir)."
+    );
+  }
+  if (data.customerId) {
+    const existing = (
+      await d.select({ id: customers.id }).from(customers).where(eq(customers.id, data.customerId)).limit(1)
+    )[0];
+    if (!existing) throw new Error("CLIENT_INTROUVABLE: la fiche client sélectionnée n'existe plus.");
+  }
   if (docType === "FACTURE") {
     let ice = data.customerIce?.trim() || null;
     let isProfessional = false;

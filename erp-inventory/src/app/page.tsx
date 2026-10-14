@@ -78,7 +78,7 @@ export default function TableauDeBordPage() {
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FEF2F2] text-[#F7162D] border border-[#FCA5A5]/40">
               <ShieldCheck size={13} />
-              SARL BM Motors • Régime Fiscal TVA 10%
+              SARL BM Motors • Régime Fiscal TVA {company.defaultVatRate}%
             </span>
             <span className="text-xs text-gray-500">Casablanca</span>
           </div>
@@ -93,8 +93,15 @@ export default function TableauDeBordPage() {
         {/* Boutons d'accès rapide optimisés pour smartphone & comptoir */}
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            href="/ventes/nouveau"
+            href="/pos"
             className="flex items-center gap-2 bg-[#F7162D] hover:bg-[#D90E23] text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-md transition-all active:scale-98"
+          >
+            <Sparkles size={17} />
+            <span>POS</span>
+          </Link>
+          <Link
+            href="/ventes/nouveau"
+            className="flex items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-xs transition-all active:scale-98"
           >
             <PlusCircle size={17} />
             <span>Nouveau BL</span>
@@ -135,7 +142,7 @@ export default function TableauDeBordPage() {
               {metrics ? formatMoney(metrics.todaySalesTtcCents) : "..."}
             </div>
             <div className="text-xs text-gray-500 mt-1">
-              {metrics?.todaySalesCount || 0} Bon(s) de Livraison aujourd'hui
+              {metrics?.todaySalesCount || 0} Bon(s) de Livraison aujourd&apos;hui
             </div>
           </div>
           <div>
@@ -310,7 +317,7 @@ export default function TableauDeBordPage() {
                             {formatMoney(bl.totalTtcCents)}
                           </span>
                           <span className="text-[10px] text-gray-500">
-                            Dont TVA 10%: {formatMoney(bl.tvaAmountCents)}
+                            Dont TVA {company.defaultVatRate}%: {formatMoney(bl.tvaAmountCents)}
                           </span>
                         </div>
 
@@ -406,7 +413,7 @@ export default function TableauDeBordPage() {
                 })
               ) : (
                 <div className="py-6 text-center text-xs text-emerald-600 font-bold">
-                  ✓ Tous les stocks sont au-dessus des seuils d'alerte.
+                  ✓ Tous les stocks sont au-dessus des seuils d&apos;alerte.
                 </div>
               )}
             </div>

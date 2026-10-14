@@ -1,10 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Plus, Trash2, PackageCheck, AlertCircle, ShoppingBag } from "lucide-react";
-import { SupplierItem, createSupplierReceipt } from "@/lib/actions/suppliers";
+import { X, Plus, Trash2, PackageCheck, Search, CheckCircle2 } from "lucide-react";
+import {
+  SupplierItem,
+  createSupplierReceipt,
+  findSupplierDuplicates,
+  getSuppliers,
+  saveSupplier,
+} from "@/lib/actions/suppliers";
 import { getProducts, ProductItem } from "@/lib/actions/products";
-import { formatMoney, toCentimes, toDirhams } from "@/lib/money";
+import { formatMoney, toCentimes } from "@/lib/money";
 
 interface SupplierReceiptModalProps {
   isOpen: boolean;
@@ -29,15 +35,69 @@ export function SupplierReceiptModal({
   suppliers,
   preselectedSupplierId,
 }: SupplierReceiptModalProps) {
-  const [selectedSupplierId, setSelectedSupplierId] = useState<number>(
-    preselectedSupplierId || (suppliers[0]?.id ?? 1)
+  // T2.1 — sélection recherchable, jamais d'anonyme (null = à sélectionner/créer)
+  const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(
+    preselectedSupplierId ?? suppliers[0]?.id ?? null
   );
+  const [supplierSearch, setSupplierSearch] = useState("");
+  const [supplierResults, setSupplierResults] = useState<SupplierItem[]>([]);
+  const [isSearchingSuppliers, setIsSearchingSuppliers] = useState(false);
+  const [localSuppliers, setLocalSuppliers] = useState<SupplierItem[]>(suppliers);
+
+  // T2.2 — quick-create inline
+  const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [qcName, setQcName] = useState("");
+  const [qcContact, setQcContact] = useState("");
+  const [qcPhone, setQcPhone] = useState("");
+  const [qcCity, setQcCity] = useState("");
+  const [qcIce, setQcIce] = useState("");
+  const [isCreatingSupplier, setIsCreatingSupplier] = useState(false);
+  const [qcDuplicates, setQcDuplicates] = useState<SupplierItem[]>([]);
+
   const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState("");
   const [notes, setNotes] = useState("");
   const [catalog, setCatalog] = useState<ProductItem[]>([]);
   const [lines, setLines] = useState<ReceiptLineState[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync externe : la liste parent peut se recharger (loadData après création).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLocalSuppliers(suppliers);
+  }, [suppliers]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (preselectedSupplierId != null) setSelectedSupplierId(preselectedSupplierId);
+  }, [preselectedSupplierId, isOpen]);
+
+  const handleSupplierSearchChange = (v: string) => {
+    setSupplierSearch(v);
+    if (!v.trim()) {
+      setSupplierResults([]);
+      setIsSearchingSuppliers(false);
+    } else {
+      setIsSearchingSuppliers(true);
+    }
+  };
+
+  // Recherche fournisseurs debouncée (nom, contact, tél, ville)
+  useEffect(() => {
+    const term = supplierSearch.trim();
+    if (!term) return;
+    const timer = setTimeout(async () => {
+      try {
+        const rows = await getSuppliers(term);
+        setSupplierResults(rows.slice(0, 10));
+      } catch {
+        setSupplierResults([]);
+      } finally {
+        setIsSearchingSuppliers(false);
+      }
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [supplierSearch]);
 
   // Charger le catalogue pour sélection des pièces
   useEffect(() => {
@@ -48,6 +108,7 @@ export function SupplierReceiptModal({
   useEffect(() => {
     if (catalog.length > 0 && lines.length === 0) {
       const first = catalog[0];
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLines([
         {
           productId: first.id,
@@ -58,9 +119,81 @@ export function SupplierReceiptModal({
         },
       ]);
     }
-  }, [catalog]);
+  }, [catalog, lines.length, isOpen]);
 
   if (!isOpen) return null;
+
+  const selectedSupplier =
+    localSuppliers.find((s) => s.id === selectedSupplierId) ??
+    supplierResults.find((s) => s.id === selectedSupplierId) ??
+    null;
+
+  const handleSelectSupplier = (s: SupplierItem) => {
+    setSelectedSupplierId(s.id);
+    if (!localSuppliers.some((x) => x.id === s.id)) {
+      setLocalSuppliers((prev) => [s, ...prev]);
+    }
+    setSupplierResults([]);
+    setSupplierSearch("");
+    setError(null);
+  };
+
+  const handleQuickCreateSupplier = async () => {
+    const cleanName = qcName.trim().replace(/\s+/g, " ");
+    if (!cleanName) {
+      setError("Le nom du fournisseur est obligatoire pour créer la fiche.");
+      return;
+    }
+    setIsCreatingSupplier(true);
+    setError(null);
+    setQcDuplicates([]);
+    try {
+      // T2.4 — proposition anti-doublon (non bloquante) via helper dédié.
+      const dups = await findSupplierDuplicates({
+        name: cleanName,
+        phone: qcPhone.trim() || undefined,
+        ice: qcIce.trim() || undefined,
+      });
+      if (dups.length > 0) {
+        setQcDuplicates(
+          dups.slice(0, 5).map((d) => ({
+            id: d.id,
+            name: d.name,
+            contactName: null,
+            phone: d.phone,
+            email: null,
+            city: d.city,
+            ice: d.ice,
+            isActive: true,
+            externalRef: null,
+            notes: null,
+            createdAt: new Date().toISOString(),
+          }))
+        );
+        setError("Fournisseur peut-être déjà existant — sélectionnez-le plutôt que créer un doublon.");
+        return;
+      }
+      const created = await saveSupplier({
+        name: cleanName,
+        contactName: qcContact.trim() || undefined,
+        phone: qcPhone.trim() || undefined,
+        city: qcCity.trim() || undefined,
+        ice: qcIce.trim() || undefined,
+      });
+      setLocalSuppliers((prev) => [created, ...prev]);
+      setSelectedSupplierId(created.id);
+      setShowQuickCreate(false);
+      setQcName("");
+      setQcContact("");
+      setQcPhone("");
+      setQcCity("");
+      setQcIce("");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Création fournisseur impossible.");
+    } finally {
+      setIsCreatingSupplier(false);
+    }
+  };
 
   const handleAddLine = () => {
     if (catalog.length === 0) return;
@@ -130,6 +263,11 @@ export function SupplierReceiptModal({
       setError("Veuillez ajouter au moins une pièce à la réception.");
       return;
     }
+    // T2.2 — BR impossible sans fiche fournisseur
+    if (selectedSupplierId == null) {
+      setError("Sélectionnez ou créez la fiche fournisseur avant de valider la réception.");
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -155,8 +293,8 @@ export function SupplierReceiptModal({
 
       onSaved();
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de la réception du stock.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erreur lors de la réception du stock.");
     } finally {
       setIsSubmitting(false);
     }
@@ -201,17 +339,169 @@ export function SupplierReceiptModal({
               <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
                 Fournisseur <span className="text-[#F7162D]">*</span>
               </label>
-              <select
-                value={selectedSupplierId}
-                onChange={(e) => setSelectedSupplierId(Number(e.target.value))}
-                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-[#F7162D]"
+              {selectedSupplier ? (
+                <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 flex items-center gap-2 text-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <div className="flex-1">
+                    <div className="font-bold text-gray-900 dark:text-white">
+                      {selectedSupplier.name}
+                    </div>
+                    <div className="text-gray-500">
+                      {selectedSupplier.city ?? ""}{" "}
+                      {(selectedSupplier.balanceDueCents ?? 0) > 0
+                        ? `• Dette ${formatMoney(selectedSupplier.balanceDueCents ?? 0)}`
+                        : "• Soldé"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSupplierId(null)}
+                    className="text-emerald-700 underline"
+                  >
+                    Changer
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={supplierSearch}
+                      onChange={(e) => handleSupplierSearchChange(e.target.value)}
+                      placeholder="Rechercher nom, contact, tél, ville…"
+                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-[#F7162D]"
+                    />
+                  </div>
+                  {isSearchingSuppliers && (
+                    <div className="text-xs text-gray-500 mt-1">Recherche…</div>
+                  )}
+                  {supplierResults.length > 0 && (
+                    <div className="mt-2 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                      {supplierResults.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => handleSelectSupplier(s)}
+                          className="w-full p-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800 border-b border-gray-100 dark:border-gray-800 last:border-b-0"
+                        >
+                          <div className="font-bold text-xs text-gray-900 dark:text-white">
+                            {s.name}
+                          </div>
+                          <div className="text-[11px] text-gray-500">
+                            {s.city ?? ""}{" "}
+                            {(s.balanceDueCents ?? 0) > 0
+                              ? `• Dette ${formatMoney(s.balanceDueCents ?? 0)}`
+                              : ""}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {supplierSearch.trim() && !isSearchingSuppliers && supplierResults.length === 0 && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      Aucun fournisseur trouvé — créez-le ci-dessous sans quitter.
+                    </div>
+                  )}
+                  {/* Repli liste initiale */}
+                  {!supplierSearch.trim() && (
+                    <select
+                      value={selectedSupplierId ?? ""}
+                      onChange={(e) =>
+                        setSelectedSupplierId(e.target.value ? Number(e.target.value) : null)
+                      }
+                      className="mt-2 w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-[#F7162D]"
+                    >
+                      <option value="">— Choisir dans la liste —</option>
+                      {localSuppliers.slice(0, 100).map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} {s.city ? `(${s.city})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowQuickCreate((v) => !v)}
+                className="mt-2 px-3 py-2 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5"
               >
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} {s.city ? `(${s.city})` : ""}
-                  </option>
-                ))}
-              </select>
+                <Plus className="w-3.5 h-3.5" />
+                {showQuickCreate ? "Masquer la création" : "Nouveau fournisseur ici"}
+              </button>
+
+              {showQuickCreate && (
+                <div className="mt-2 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 space-y-2">
+                  <input
+                    type="text"
+                    value={qcName}
+                    onChange={(e) => setQcName(e.target.value)}
+                    placeholder="Nom fournisseur *"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-semibold"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={qcContact}
+                      onChange={(e) => setQcContact(e.target.value)}
+                      placeholder="Contact commercial"
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs"
+                    />
+                    <input
+                      type="tel"
+                      value={qcPhone}
+                      onChange={(e) => setQcPhone(e.target.value)}
+                      placeholder="Téléphone"
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={qcCity}
+                      onChange={(e) => setQcCity(e.target.value)}
+                      placeholder="Ville"
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs"
+                    />
+                    <input
+                      type="text"
+                      value={qcIce}
+                      onChange={(e) => setQcIce(e.target.value)}
+                      placeholder="ICE"
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-mono"
+                    />
+                  </div>
+                  {qcDuplicates.length > 0 && (
+                    <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] space-y-1">
+                      <div className="font-bold text-amber-800">Déjà existant ? Sélectionnez :</div>
+                      {qcDuplicates.map((d) => (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => {
+                            handleSelectSupplier(d);
+                            setShowQuickCreate(false);
+                            setQcDuplicates([]);
+                          }}
+                          className="w-full text-left px-2 py-1.5 bg-white border border-amber-300 rounded-lg font-bold text-amber-800"
+                        >
+                          {d.name} {d.city ? `(${d.city})` : ""}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleQuickCreateSupplier}
+                    disabled={isCreatingSupplier}
+                    className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg disabled:opacity-50"
+                  >
+                    {isCreatingSupplier ? "Création…" : "Créer et sélectionner"}
+                  </button>
+                </div>
+              )}
             </div>
 
             <div>
@@ -361,7 +651,8 @@ export function SupplierReceiptModal({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || selectedSupplierId == null}
+              title={selectedSupplierId == null ? "Fiche fournisseur requise" : undefined}
               className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md transition disabled:opacity-50 flex items-center gap-2"
             >
               {isSubmitting ? "Validation..." : "Valider l'entrée en stock"}

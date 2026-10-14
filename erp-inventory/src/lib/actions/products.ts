@@ -2,6 +2,13 @@
 
 import { and, asc, eq, gte, ilike, or, sql } from "drizzle-orm";
 import { businessLines, categories, db, products, settings, stockMovements } from "@/db";
+
+export interface CategoryItem {
+  id: number;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+}
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { assertAuthenticated } from "@/lib/action-guard";
 
@@ -111,6 +118,7 @@ function rawToItem(r: ProductLike, lineCode: string, categoryName?: string | nul
 export async function getProducts(options?: {
   search?: string;
   category?: string;
+  categoryId?: number;
   stockFilter?: "all" | "low" | "negative";
   businessLineCode?: string;
 }): Promise<ProductItem[]> {
@@ -122,6 +130,7 @@ export async function getProducts(options?: {
   const search = options?.search?.trim() || "";
   const stockFilter = options?.stockFilter || "all";
   const categoryName = options?.category || "";
+  const categoryId = options?.categoryId;
 
   const conds = [eq(products.businessLineId, lineId), eq(products.isActive, true)];
   if (search) {
@@ -132,7 +141,8 @@ export async function getProducts(options?: {
         ilike(products.oemCode, like),
         ilike(products.name, like),
         ilike(products.brand, like),
-        ilike(products.shelfLocation, like)
+        ilike(products.shelfLocation, like),
+        ilike(products.barcode, like)
       )!
     );
   }
@@ -140,6 +150,7 @@ export async function getProducts(options?: {
     conds.push(sql`${products.currentStock} <= ${products.minStockAlert}`, gte(products.currentStock, 0));
   if (stockFilter === "negative") conds.push(sql`${products.currentStock} < 0`);
   if (categoryName) conds.push(eq(categories.name, categoryName));
+  if (categoryId) conds.push(eq(products.categoryId, categoryId));
 
   const rows = await d
     .select({
@@ -171,6 +182,24 @@ export async function getProducts(options?: {
     .limit(500);
 
   return rows.map((r) => rawToItem(r, lineCode, r.categoryName));
+}
+
+/**
+ * Récupère toutes les catégories de pièces.
+ */
+export async function getCategories(): Promise<CategoryItem[]> {
+  await assertAuthenticated();
+  const d = requireDb();
+  const rows = await d
+    .select()
+    .from(categories)
+    .orderBy(asc(categories.sortOrder), asc(categories.name));
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    sortOrder: r.sortOrder ?? 0,
+  }));
 }
 
 /**

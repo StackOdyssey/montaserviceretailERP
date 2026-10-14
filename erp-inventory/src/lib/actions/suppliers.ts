@@ -445,6 +445,59 @@ export async function recordSupplierPayment(data: {
 }
 
 /**
+ * Détecte les doublons fournisseurs (nom, téléphone, ICE). Exclut `excludeId` (édition).
+ * Miroir de `findCustomerDuplicates` (T2.4) pour symétrie importés/saisis.
+ */
+export async function findSupplierDuplicates(
+  data: { name?: string; phone?: string; ice?: string },
+  excludeId?: number
+): Promise<Array<{ id: number; name: string; phone: string | null; ice: string | null; city: string | null }>> {
+  const d = requireDb();
+  const ors = [];
+  if (data.name?.trim()) ors.push(ilike(suppliers.name, data.name.trim()));
+  if (data.phone?.trim()) ors.push(eq(suppliers.phone, data.phone.trim()));
+  if (data.ice?.trim()) ors.push(eq(suppliers.ice, data.ice.trim()));
+  if (ors.length === 0) return [];
+  const conds = [isNull(suppliers.deletedAt), or(...ors)!];
+  if (excludeId) conds.push(ne(suppliers.id, excludeId));
+  const rows = await d
+    .select({ id: suppliers.id, name: suppliers.name, phone: suppliers.phone, ice: suppliers.ice, city: suppliers.city })
+    .from(suppliers)
+    .where(and(...conds))
+    .limit(10);
+  return rows;
+}
+
+/**
+ * Fusionne deux fournisseurs : ré-affecte réceptions + règlements à la cible puis
+ * archive (soft-delete) la source. Miroir de `mergeCustomers` (T3.2).
+ */
+export async function mergeSuppliers(sourceId: number, targetId: number): Promise<SupplierItem> {
+  await assertAuthenticated();
+  const d = requireDb();
+  if (sourceId === targetId) throw new Error("La source et la cible sont identiques");
+
+  const rows = await d.select().from(suppliers).where(inArray(suppliers.id, [sourceId, targetId]));
+  const source = rows.find((r) => r.id === sourceId);
+  const target = rows.find((r) => r.id === targetId);
+  if (!source || !target) throw new Error("Fournisseur source ou cible introuvable");
+
+  await d.transaction(async (tx) => {
+    await tx.update(supplierReceipts).set({ supplierId: targetId }).where(eq(supplierReceipts.supplierId, sourceId));
+    await tx.update(supplierPayments).set({ supplierId: targetId }).where(eq(supplierPayments.supplierId, sourceId));
+    await tx.update(suppliers).set({ deletedAt: new Date() }).where(eq(suppliers.id, sourceId));
+    await tx.insert(auditLogs).values({
+      action: "FUSION_FOURNISSEUR",
+      entityType: "SUPPLIER",
+      entityId: targetId,
+      details: `Fusion #${sourceId} « ${source.name} » → #${targetId} « ${target.name} »`,
+    });
+  });
+
+  return mapSupplier(target);
+}
+
+/**
  * Crée ou met à jour un fournisseur.
  */
 export async function saveSupplier(data: {
@@ -462,18 +515,23 @@ export async function saveSupplier(data: {
   await assertAuthenticated();
   const d = requireDb();
 
-  if (!data.name.trim()) throw new Error("Le nom du fournisseur est obligatoire");
+  // T2.3 — normalisation, même règle que clients. L'ICE est accepté tel quel
+  // (compatibilité fiches legacy) : le contrôle strict 15 chiffres se fait
+  // côté quick-create / facturation Pro, pas au save générique.
+  const cleanName = data.name.trim().replace(/\s+/g, " ");
+  if (!cleanName) throw new Error("Le nom du fournisseur est obligatoire");
+  const cleanIce = data.ice?.trim().replace(/\s+/g, "") || null;
 
   const values = {
-    name: data.name.trim(),
-    contactName: data.contactName || null,
-    phone: data.phone || null,
-    email: data.email || null,
-    city: data.city || null,
-    ice: data.ice || null,
+    name: cleanName,
+    contactName: data.contactName?.trim() || null,
+    phone: data.phone?.trim() || null,
+    email: data.email?.trim() || null,
+    city: data.city?.trim() || null,
+    ice: cleanIce,
     isActive: data.isActive ?? true,
-    externalRef: data.externalRef || null,
-    notes: data.notes || null,
+    externalRef: data.externalRef?.trim() || null,
+    notes: data.notes?.trim() || null,
   };
 
   const saved = data.id
@@ -481,6 +539,19 @@ export async function saveSupplier(data: {
     : (await d.insert(suppliers).values(values).returning())[0];
 
   if (!saved) throw new Error("Fournisseur introuvable");
+  // T3.1 — traçabilité des créations (dont BR à la volée).
+  if (!data.id) {
+    try {
+      await d.insert(auditLogs).values({
+        action: "CREATION_FOURNISSEUR",
+        entityType: "SUPPLIER",
+        entityId: saved.id,
+        details: `Création fiche « ${saved.name} »${saved.phone ? ` (${saved.phone})` : ""}`,
+      });
+    } catch {
+      // audit non bloquant
+    }
+  }
   return mapSupplier(saved);
 }
 

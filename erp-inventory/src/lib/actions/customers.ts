@@ -1,7 +1,7 @@
 "use server";
 
 import { and, asc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
-import { customerPayments, customers, db, salesDocuments } from "@/db";
+import { auditLogs, customerPayments, customers, db, salesDocuments } from "@/db";
 import { assertAuthenticated } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
 import { initialStatusFor, statusesForMethod } from "@/lib/payments";
@@ -465,17 +465,25 @@ export async function saveCustomer(data: {
   await assertAuthenticated();
   const d = requireDb();
 
-  if (!data.name.trim()) throw new Error("Le nom du client ou de la société est obligatoire");
+  // T2.3 — normalisation (anti `Mohamed` x3) : trim + espaces simples.
+  const cleanName = data.name.trim().replace(/\s+/g, " ");
+  if (!cleanName) throw new Error("Le nom du client ou de la société est obligatoire");
 
   const isProfessional = data.isProfessional ?? false;
-  const iceValue = data.ice?.trim() || null;
+  const iceValue = data.ice?.trim().replace(/\s+/g, "") || null;
   if (isProfessional && !iceValue) {
     throw new Error("ICE obligatoire pour un client professionnel (B2B).");
+  }
+  // ICE marocain = 15 chiffres, exigé strictement pour un Pro (FACTURE).
+  // Hors Pro, on accepte la valeur telle quelle (compatibilité fiches legacy
+  // importées, ex. ICE à 14 chiffres) au lieu de bloquer toute modification.
+  if (isProfessional && iceValue && !/^\d{15}$/.test(iceValue)) {
+    throw new Error("ICE invalide : 15 chiffres requis (registre marocain).");
   }
 
   if (!data.force) {
     const dups = await findCustomerDuplicates(
-      { name: data.name.trim(), phone: data.phone?.trim(), ice: iceValue ?? undefined },
+      { name: cleanName, phone: data.phone?.trim(), ice: iceValue ?? undefined },
       data.id
     );
     if (dups.length > 0) {
@@ -485,22 +493,24 @@ export async function saveCustomer(data: {
     }
   }
 
+  const cleanPhone = data.phone?.trim() || null;
+  const cleanCity = data.city?.trim() || "Casablanca";
   const values = {
-    name: data.name.trim(),
-    phone: data.phone || null,
-    email: data.email || null,
-    city: data.city || "Casablanca",
-    address: data.address || null,
+    name: cleanName,
+    phone: cleanPhone,
+    email: data.email?.trim() || null,
+    city: cleanCity,
+    address: data.address?.trim() || null,
     ice: iceValue,
     identityNumber: data.identityNumber?.trim() || null,
     isWholesale: data.isWholesale ?? false,
     isProfessional,
     defaultPriceLevelId: data.defaultPriceLevelId ?? null,
     creditLimitCents: data.creditLimitCents ?? null,
-    paymentTerms: data.paymentTerms || null,
-    representative: data.representative || null,
-    externalRef: data.externalRef || null,
-    notes: data.notes || null,
+    paymentTerms: data.paymentTerms?.trim() || null,
+    representative: data.representative?.trim() || null,
+    externalRef: data.externalRef?.trim() || null,
+    notes: data.notes?.trim() || null,
   };
 
   const saved = data.id
@@ -510,6 +520,19 @@ export async function saveCustomer(data: {
     : (await d.insert(customers).values(values).returning())[0];
 
   if (!saved) throw new Error("Client introuvable");
+  // T3.1 — traçabilité des créations (dont POS à la volée).
+  if (!data.id) {
+    try {
+      await d.insert(auditLogs).values({
+        action: "CREATION_CLIENT",
+        entityType: "CUSTOMER",
+        entityId: saved.id,
+        details: `Création fiche « ${saved.name} »${saved.phone ? ` (${saved.phone})` : ""}${isProfessional ? " [PRO]" : ""}`,
+      });
+    } catch {
+      // audit non bloquant
+    }
+  }
   return mapCustomer(saved);
 }
 
