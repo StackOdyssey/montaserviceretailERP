@@ -18,8 +18,12 @@ import {
   CreditCard,
   Banknote,
   FileCheck,
+  LayoutGrid,
+  ChevronDown,
 } from "lucide-react";
 import { getProducts, ProductItem } from "@/lib/actions/products";
+import { getCustomers } from "@/lib/actions/customers";
+import { ProductGrid } from "@/components/pos/ProductGrid";
 import { createSalesDocument, SalesLineInput, SalesDocumentItem } from "@/lib/actions/sales";
 import { formatMoney, calculateDocumentTotals } from "@/lib/money";
 import { useSettings, useParameters } from "@/components/layout/SettingsProvider";
@@ -66,6 +70,12 @@ export default function NouveauBonDeLivraisonPage() {
   const [searchResults, setSearchResults] = useState<ProductItem[]>([]);
   const [isSearching, startSearch] = useTransition();
 
+  // Suggestions client (recherche tolérante : ben/bennani → EL BANNANI)
+  type CustomerMatch = Awaited<ReturnType<typeof getCustomers>>[number];
+  const [customerMatches, setCustomerMatches] = useState<CustomerMatch[]>([]);
+  const [hasCustomerSearched, setHasCustomerSearched] = useState(false);
+  const customerJustSelected = React.useRef(false);
+
   // Remise personnalisée en %
   const [discountPercent, setDiscountPercent] = useState<number>(0);
 
@@ -99,8 +109,62 @@ export default function NouveauBonDeLivraisonPage() {
     return () => clearTimeout(timer);
   }, [searchTerm, businessLineCode]);
 
+  // Suggestions client au fil de la frappe (ne se déclenche pas après sélection)
+  useEffect(() => {
+    if (customerJustSelected.current) {
+      customerJustSelected.current = false;
+      return;
+    }
+    const term = customerName.trim();
+    if (term.length < 2 || term === "Client Comptoir Particulier") {
+      setCustomerMatches([]);
+      setHasCustomerSearched(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const results = await getCustomers(term);
+        setCustomerMatches(results.slice(0, 6));
+        setHasCustomerSearched(true);
+      } catch {
+        setCustomerMatches([]);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [customerName]);
+
+  const handleSelectCustomerMatch = (c: CustomerMatch) => {
+    customerJustSelected.current = true;
+    setCustomerName(c.name);
+    setCustomerPhone(c.phone || "");
+    setCustomerCity(c.city || "Casablanca");
+    setCustomerIce(c.ice || "");
+    setCustomerMatches([]);
+    setHasCustomerSearched(false);
+  };
+
+  // Catalogue visuel avec photos (toucher une carte ajoute la pièce)
+  const [catalogItems, setCatalogItems] = useState<ProductItem[]>([]);
+  const [catalogOpen, setCatalogOpen] = useState(true);
+  const [catalogShown, setCatalogShown] = useState(24);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const results = await getProducts({ businessLineCode });
+        if (!cancelled) setCatalogItems(results);
+      } catch {
+        // catalogue indisponible : la recherche textuelle reste utilisable
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [businessLineCode]);
+
   // Ajouter un article au panier
-  const handleAddToCart = (product: ProductItem) => {
+  const addToCart = (product: ProductItem) => {
     setCart((prevCart) => {
       const existing = prevCart.find((item) => item.productId === product.id);
       if (existing) {
@@ -123,6 +187,10 @@ export default function NouveauBonDeLivraisonPage() {
         },
       ];
     });
+  };
+
+  const handleAddToCart = (product: ProductItem) => {
+    addToCart(product);
     setSearchTerm("");
     setSearchResults([]);
   };
@@ -192,19 +260,20 @@ export default function NouveauBonDeLivraisonPage() {
   };
 
   return (
-    <div className="space-y-5 pb-8">
+    <div className="-mx-4 md:mx-0 space-y-3 md:space-y-5 pb-8">
       {/* ======================================================== */}
       {/* 1. EN-TÊTE DE LA CAISSE COMPTOIR                        */}
       {/* ======================================================== */}
-      <div className="flex items-center justify-between bg-white p-4 md:p-5 rounded-2xl border border-[#E5E7EB] shadow-xs">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 bg-white p-4 md:p-5 rounded-none md:rounded-2xl border border-[#E5E7EB] shadow-xs">
+        <div className="flex items-center gap-2.5 min-w-0">
           <button
             onClick={() => router.push("/ventes")}
-            className="p-2 text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6] rounded-xl transition-colors"
+            aria-label="Retour aux ventes"
+            className="p-2 text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6] rounded-xl transition-colors shrink-0"
           >
             <ArrowLeft size={18} />
           </button>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-base md:text-xl font-bold text-[#111827] tracking-tight">
               {DOC_TITLES[docType]}
             </h1>
@@ -214,12 +283,12 @@ export default function NouveauBonDeLivraisonPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 text-xs font-bold">
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 text-xs font-bold">
           {DOC_TYPES.map((t) => (
             <button
               key={t.id}
               onClick={() => setDocType(t.id)}
-              className={`px-3 py-2 rounded-xl whitespace-nowrap transition-all ${
+              className={`px-3 py-2 rounded-xl transition-all ${
                 docType === t.id ? "bg-[#111827] text-white" : "bg-[#F8F9FA] text-[#4B5563] hover:bg-[#E5E7EB]"
               }`}
             >
@@ -243,7 +312,7 @@ export default function NouveauBonDeLivraisonPage() {
         {/* COLONNE GAUCHE (7/12) : RECHERCHE PIÈCES & CLIENT */}
         <div className="lg:col-span-7 space-y-4">
           {/* Bloc 1 : Client */}
-          <div className="bg-white p-4 rounded-2xl border border-[#E5E7EB] shadow-xs space-y-3">
+          <div className="bg-white p-4 rounded-none md:rounded-2xl border border-[#E5E7EB] shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
                 <User size={15} className="text-[#F7162D]" />
@@ -259,13 +328,42 @@ export default function NouveauBonDeLivraisonPage() {
               </button>
             </div>
 
-            <input
-              type="text"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Nom du client ou garage..."
-              className="w-full px-3.5 py-2 text-sm bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl font-semibold text-[#111827] outline-none focus:border-[#F7162D]"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                onBlur={() => setTimeout(() => setCustomerMatches([]), 150)}
+                placeholder="Nom du client ou garage..."
+                autoComplete="off"
+                className="w-full px-3.5 py-2 text-sm bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl font-semibold text-[#111827] outline-none focus:border-[#F7162D]"
+              />
+              {customerMatches.length > 0 && (
+                <div className="absolute z-20 left-0 right-0 mt-1 border border-[#E5E7EB] rounded-xl overflow-hidden bg-white shadow-lg max-h-56 overflow-y-auto">
+                  {customerMatches.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleSelectCustomerMatch(c)}
+                      className="w-full p-2.5 text-left hover:bg-[#FEF2F2]/60 border-b border-[#F3F4F6] last:border-b-0"
+                    >
+                      <div className="text-xs font-bold text-[#111827]">{c.name}</div>
+                      <div className="text-[11px] text-[#6B7280] mt-0.5">
+                        {c.phone && <span>{c.phone}</span>}
+                        {c.city && <span> • {c.city}</span>}
+                        {c.ice && <span> • ICE {c.ice}</span>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {hasCustomerSearched && customerMatches.length === 0 && customerName.trim().length >= 2 && (
+                <div className="text-[11px] text-[#6B7280] px-1 pt-1">
+                  Nouveau client — complétez Tél / Ville ci-dessous.
+                </div>
+              )}
+            </div>
 
             {isClientDetailsOpen && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-[#E5E7EB]">
@@ -295,7 +393,7 @@ export default function NouveauBonDeLivraisonPage() {
           </div>
 
           {/* Bloc 2 : Recherche rapide des pièces */}
-          <div className="bg-white p-4 rounded-2xl border border-[#E5E7EB] shadow-xs space-y-3">
+          <div className="bg-white p-4 rounded-none md:rounded-2xl border border-[#E5E7EB] shadow-xs space-y-3">
             <label className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
               <Boxes size={15} className="text-[#F7162D]" />
               <span>Ajouter une Pièce au Comptoir</span>
@@ -359,8 +457,56 @@ export default function NouveauBonDeLivraisonPage() {
             )}
           </div>
 
+          {/* Bloc 2b : Catalogue visuel avec photos (comme la version PC) */}
+          <div className="bg-white p-4 rounded-none md:rounded-2xl border border-[#E5E7EB] shadow-xs space-y-3">
+            <button
+              type="button"
+              onClick={() => setCatalogOpen(!catalogOpen)}
+              className="w-full flex items-center justify-between"
+            >
+              <label className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
+                <LayoutGrid size={15} className="text-[#F7162D]" />
+                <span>
+                  {searchTerm.trim()
+                    ? `Catalogue — résultats visuels (${searchResults.length})`
+                    : `Catalogue visuel (${catalogItems.length} pièces)`}
+                </span>
+              </label>
+              <ChevronDown
+                size={16}
+                className={`text-[#6B7280] transition-transform ${catalogOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {catalogOpen && (
+              <>
+                <ProductGrid
+                  products={
+                    searchTerm.trim()
+                      ? searchResults.slice(0, 12)
+                      : catalogItems.slice(0, catalogShown)
+                  }
+                  onAddToCart={addToCart}
+                  disableOutOfStock={false}
+                />
+                {!searchTerm.trim() && catalogShown < catalogItems.length && (
+                  <button
+                    type="button"
+                    onClick={() => setCatalogShown((n) => n + 48)}
+                    className="w-full py-2.5 text-xs font-bold text-[#F7162D] bg-[#FEF2F2] hover:bg-[#FEE2E2] rounded-xl transition-colors"
+                  >
+                    Afficher plus ({catalogItems.length - catalogShown} restantes)
+                  </button>
+                )}
+                <p className="text-[11px] text-[#6B7280]">
+                  Touchez une carte pour ajouter la pièce. La recherche ci-dessus filtre aussi ce catalogue.
+                </p>
+              </>
+            )}
+          </div>
+
           {/* Bloc 3 : Articles ajoutés au panier */}
-          <div className="bg-white p-4 rounded-2xl border border-[#E5E7EB] shadow-xs space-y-3">
+          <div className="bg-white p-4 rounded-none md:rounded-2xl border border-[#E5E7EB] shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-[#111827]">
                 Lignes du Bon de Livraison ({cart.length})
@@ -446,7 +592,7 @@ export default function NouveauBonDeLivraisonPage() {
 
         {/* COLONNE DROITE (5/12) : REMISE %, TOTAUX COMPTOIR & VALIDATION */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="bg-white p-5 rounded-2xl border border-[#E5E7EB] shadow-xs space-y-4 sticky top-20">
+          <div className="bg-white p-5 rounded-none md:rounded-2xl border border-[#E5E7EB] shadow-xs space-y-4 sticky top-20">
             <h2 className="text-sm font-bold text-[#111827] border-b border-[#E5E7EB] pb-3">
               Récapitulatif & Remise Commerciale
             </h2>
@@ -508,7 +654,7 @@ export default function NouveauBonDeLivraisonPage() {
 
               {/* 2. REMISE MENTIONNÉE EXPLICITEMENT SOUS LE TOTAL BRUT HT */}
               {totals.discountPercent > 0 ? (
-                <div className="flex justify-between text-[#059669] font-bold py-1 border-y border-[#E5E7EB] bg-[#ECFDF5]/80 -mx-4 px-4">
+                <div className="flex justify-between text-[#059669] font-bold py-1 border-y border-[#E5E7EB] bg-[#ECFDF5]/80 rounded-lg px-2">
                   <span>Remise accordée ({totals.discountPercent}%) :</span>
                   <span className="font-mono">
                     -{formatMoney(totals.discountAmount)}
@@ -540,7 +686,7 @@ export default function NouveauBonDeLivraisonPage() {
               )}
 
               {/* 5. TOTAL TTC */}
-              <div className="flex justify-between text-base font-black text-white bg-[#F7162D] p-3 rounded-xl -mx-2 mt-2 shadow-xs">
+              <div className="flex justify-between items-center text-base font-black text-white bg-[#F7162D] p-3 rounded-xl mt-2 shadow-xs">
                 <span>TOTAL TTC :</span>
                 <span className="font-mono tracking-tight">
                   {formatMoney(totals.totalTTC)}

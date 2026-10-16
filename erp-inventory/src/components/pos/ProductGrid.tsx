@@ -6,18 +6,21 @@ import { ProductItem } from "@/lib/actions/products";
 interface ProductGridProps {
   products: ProductItem[];
   onAddToCart: (product: ProductItem) => void;
+  /** Si false, les articles en rupture restent ajoutables (stock négatif toléré). Défaut : true. */
+  disableOutOfStock?: boolean;
 }
 
-export function ProductGrid({ products, onAddToCart }: ProductGridProps) {
+export function ProductGrid({ products, onAddToCart, disableOutOfStock = true }: ProductGridProps) {
+  const isOut = (p: ProductItem) => disableOutOfStock && p.currentStock <= 0;
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
       {products.map((product) => (
         <button
           key={product.id}
           onClick={() => onAddToCart(product)}
-          disabled={product.currentStock <= 0}
+          disabled={isOut(product)}
           className={`bg-white rounded-xl border-2 p-3 text-left transition-all hover:shadow-md active:scale-95 ${
-            product.currentStock <= 0
+            isOut(product)
               ? "border-gray-200 opacity-50 cursor-not-allowed"
               : "border-gray-200 hover:border-[#F7162D] cursor-pointer"
           }`}

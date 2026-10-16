@@ -15,6 +15,7 @@ import { CustomerSelect } from "@/components/pos/CustomerSelect";
 import { PaymentModal } from "@/components/pos/PaymentModal";
 import { InvoiceModal } from "@/components/pos/InvoiceModal";
 import { POS_DOC_TYPES, type PosDocType } from "@/components/pos/docTypes";
+import { ProductQuickAddModal } from "@/components/pos/ProductQuickAddModal";
 
 interface CartLine extends SalesLineInput {
   currentStock: number;
@@ -98,14 +99,22 @@ export default function POSPage() {
     return () => clearTimeout(timer);
   }, [loadProducts]);
 
+  // Popup de saisie rapide (quantité) à l'ajout d'un produit
+  const [quickAddProduct, setQuickAddProduct] = useState<ProductItem | null>(null);
+
   // Add product to cart
   const handleAddToCart = (product: ProductItem) => {
+    // Le popup de quantité s'ouvre : plus d'aller-retour vers le panier.
+    setQuickAddProduct(product);
+  };
+
+  const handleQuickAddConfirm = (product: ProductItem, quantity: number) => {
     setCart((prevCart) => {
       const existing = prevCart.find((item) => item.productId === product.id);
       if (existing) {
         return prevCart.map((item) =>
           item.productId === product.id
-            ? { ...item, quantity: item.quantity + 1 }
+            ? { ...item, quantity: item.quantity + quantity }
             : item
         );
       }
@@ -117,11 +126,12 @@ export default function POSPage() {
           sku: product.sku,
           oemCode: product.oemCode,
           unitPriceHTCents: product.salePriceRetailCents,
-          quantity: 1,
+          quantity,
           currentStock: product.currentStock,
         },
       ];
     });
+    setQuickAddProduct(null);
   };
 
   // Update quantity
@@ -446,6 +456,14 @@ export default function POSPage() {
           document={createdDocument}
           onClose={() => setCreatedDocument(null)}
           onCancelled={() => loadProducts()}
+        />
+      )}
+
+      {quickAddProduct && (
+        <ProductQuickAddModal
+          product={quickAddProduct}
+          onClose={() => setQuickAddProduct(null)}
+          onConfirm={handleQuickAddConfirm}
         />
       )}
     </div>
