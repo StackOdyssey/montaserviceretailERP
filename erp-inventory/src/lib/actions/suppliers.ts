@@ -17,6 +17,7 @@ import { assertPeriodOpen } from "@/lib/accounting-period";
 import type { AgingBuckets, PartyAgingRow } from "./customers";
 import { nextDocumentNumber } from "@/lib/numbering";
 import { applyMovement, type CmupState } from "@/lib/stock";
+import { matchTokens } from "@/lib/search";
 
 export interface SupplierItem {
   id: number;
@@ -156,18 +157,10 @@ export async function getSuppliers(searchQuery?: string): Promise<SupplierItem[]
   await assertAuthenticated();
   const d = requireDb();
 
-  const search = searchQuery?.trim().toLowerCase() || "";
   const conds = [isNull(suppliers.deletedAt)];
-  if (search) {
-    conds.push(
-      or(
-        ilike(suppliers.name, `%${search}%`),
-        ilike(suppliers.contactName, `%${search}%`),
-        ilike(suppliers.phone, `%${search}%`),
-        ilike(suppliers.city, `%${search}%`)
-      )!
-    );
-  }
+  // Recherche tolérante caisse : voir getCustomers (mots en ET + squelette consonantique).
+  const match = matchTokens(searchQuery, [suppliers.name], [suppliers.contactName, suppliers.phone, suppliers.city]);
+  if (match) conds.push(match);
 
   const rows = await d
     .select()

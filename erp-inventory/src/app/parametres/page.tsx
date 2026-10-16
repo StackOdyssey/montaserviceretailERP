@@ -11,7 +11,6 @@ import {
   Save,
   CheckCircle2,
   Lock,
-  Fingerprint,
   RefreshCw,
   Smartphone,
   Server,
@@ -68,14 +67,6 @@ export default function ParametresPage() {
     bank2Name: "Bank of Africa (BMCE)",
     bank2Agency: "Agence Bd Al Qods Ain Chock",
     bank2Rib: "011 780 0009876543210987 89",
-  });
-
-  // Sécurité et Code PIN
-  const [pinSettings, setPinSettings] = useState({
-    currentPin: "2026",
-    newPin: "",
-    confirmPin: "",
-    biometricEnabled: true,
   });
 
   const [vatRates, setVatRates] = useState<Array<{ id: number; ratePercent: number; label: string }>>([]);
@@ -221,7 +212,7 @@ export default function ParametresPage() {
           { id: "SOCIETE", label: "Identité SARL", icon: Building2 },
           { id: "FISCAL", label: "TVA & Facturation", icon: Percent },
           { id: "BANQUE", label: "Banques & RIB", icon: CreditCard },
-          { id: "SECURITE", label: "Code PIN & Biométrie", icon: Lock },
+          { id: "SECURITE", label: "Code PIN & Accès", icon: Lock },
           { id: "NUMEROTATION", label: "Numérotation BL", icon: Hash },
           { id: "CLOUD", label: "Infrastructure Cloud", icon: Server },
           { id: "DECISIONS", label: "Décisions & Questions", icon: HelpCircle },
@@ -612,65 +603,34 @@ export default function ParametresPage() {
             <div className="border-b border-gray-100 dark:border-gray-800 pb-4">
               <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <Lock className="w-5 h-5 text-[#F7162D]" />
-                Sécurité Monoutilisateur & Authentification Rapide
+                Sécurité Monoutilisateur & Code PIN
               </h2>
               <p className="text-xs text-gray-500 mt-1">
-                Protection par Code PIN tactile 4 chiffres et Biométrie WebAuthn (Touch ID, Face ID, Empreinte).
+                Protection par code PIN tactile à 4 chiffres. Le second facteur est assuré par Cloudflare Access devant l'application.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Statut Biométrie */}
-              <div className="p-5 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Fingerprint className="w-6 h-6 text-emerald-600" />
-                    <span className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
-                      Capteur Biométrique Actif
-                    </span>
-                  </div>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-800 text-[10px] font-black uppercase">
-                    Configuré
-                  </span>
-                </div>
-                <p className="text-xs text-emerald-800 dark:text-emerald-300/80 leading-relaxed">
-                  Votre appareil (iPhone 17 Pro Max ou PC Comptoir) est autorisé pour le déverrouillage instantané à l'empreinte digitale sans ressaisie du mot de passe.
+              {/* Code PIN géré par l'environnement */}
+              <div className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 space-y-3">
+                <span className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider block">
+                  Code PIN comptoir
+                </span>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Le code PIN est défini par la variable d'environnement <span className="font-mono font-bold">ADMIN_PIN</span> (Secret Manager en production).
+                  Aucun PIN n'est affiché ni modifiable depuis cette page : toute rotation se fait côté hébergement, sans valeur codée en dur.
                 </p>
               </div>
 
-              {/* Modification PIN */}
-              <div className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 space-y-3">
-                <span className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider block">
-                  Code PIN Comptoir Actuel : <span className="font-mono text-[#F7162D]">2026</span>
+              {/* Second facteur */}
+              <div className="p-5 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 space-y-3">
+                <span className="text-sm font-bold text-emerald-900 dark:text-emerald-200 block">
+                  Second facteur : Cloudflare Access
                 </span>
-                <p className="text-xs text-gray-500">
-                  Pour modifier votre code PIN à 4 chiffres :
+                <p className="text-xs text-emerald-800 dark:text-emerald-300/80 leading-relaxed">
+                  L'accès applicatif est filtré en amont par Cloudflare Access (Zero Trust). Il n'y a pas de déverrouillage biométrique applicatif :
+                  la biométrie éventuelle de l'appareil reste du ressort du système, pas d'une session émise par l'ERP.
                 </p>
-
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Nouveau PIN</label>
-                    <input
-                      type="password"
-                      maxLength={4}
-                      placeholder="****"
-                      value={pinSettings.newPin}
-                      onChange={(e) => setPinSettings({ ...pinSettings, newPin: e.target.value })}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-center font-mono font-bold tracking-widest text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Confirmer PIN</label>
-                    <input
-                      type="password"
-                      maxLength={4}
-                      placeholder="****"
-                      value={pinSettings.confirmPin}
-                      onChange={(e) => setPinSettings({ ...pinSettings, confirmPin: e.target.value })}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-center font-mono font-bold tracking-widest text-sm"
-                    />
-                  </div>
-                </div>
               </div>
             </div>
           </div>

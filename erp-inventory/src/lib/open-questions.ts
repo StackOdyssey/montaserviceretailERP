@@ -85,7 +85,8 @@ export const OPEN_QUESTIONS: OpenQuestion[] = [
     answer: "Annuler la vente des véhicules (Side 2) dans le projet.",
     defautActuel:
       "La vente de véhicules est retirée : la page /stock/vehicules a été supprimée et le lien retiré. Seule la ligne métier PIECES (Side 1) est opérationnelle pour les ventes.",
-    cablage: "src/app/stock/page.tsx (lien supprimé), src/app/stock/vehicules (page supprimée)",
+    cablage:
+      "src/app/stock/page.tsx (lien supprimé), table stock_units + colonne products.is_serialized supprimées (migration 0018)",
   },
   {
     code: "Templates-Q13-Q16",

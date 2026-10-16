@@ -4,76 +4,19 @@ import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
-  Fingerprint,
-  ScanFace,
-  Lock,
   Delete,
   CheckCircle2,
   AlertCircle,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
-import { loginWithPin, loginWithBiometrics } from "@/lib/actions/auth";
+import { loginWithPin } from "@/lib/actions/auth";
 
 export default function LoginPage() {
   const router = useRouter();
   const [pin, setPin] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
   const [shake, setShake] = useState(false);
-
-  // Vérification de la disponibilité du capteur biométrique (Empreinte / Touch ID / Face ID)
-  useEffect(() => {
-    if (
-      typeof window !== "undefined" &&
-      window.PublicKeyCredential &&
-      typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === "function"
-    ) {
-      window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(
-        (available) => {
-          setIsBiometricAvailable(available);
-        }
-      );
-    }
-  }, []);
-
-  // Déverrouillage biométrique (Empreinte / Touch ID / Face ID)
-  const handleBiometricAuth = async () => {
-    setError(null);
-    setIsSubmitting(true);
-
-    try {
-      // Déclenchement de l'authentification biométrique matérielle native du système
-      if (typeof window !== "undefined" && navigator.credentials) {
-        const challenge = new Uint8Array(32);
-        window.crypto.getRandomValues(challenge);
-
-        // Appel WebAuthn déclenchant la boîte de dialogue Empreinte / Face ID du système
-        await navigator.credentials.get({
-          publicKey: {
-            challenge,
-            timeout: 60000,
-            userVerification: "required",
-            rpId: window.location.hostname,
-          },
-        }).catch(() => {
-          // Si l'utilisateur annule ou première visite sans clé stockée, on valide pour le gérant
-        });
-
-        const res = await loginWithBiometrics();
-        if (res.success) {
-          router.push("/");
-          router.refresh();
-          return;
-        }
-      }
-    } catch (err: any) {
-      setError("Échec de l'authentification biométrique. Utilisez votre code PIN.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   // Ajout d'un chiffre au PIN tactile
   const handleKeyPress = (num: string) => {
@@ -169,39 +112,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* 1. Déverrouillage Biométrique Rapide (Empreinte / Touch ID / Face ID) */}
-        <div className="w-full space-y-2">
-          <button
-            type="button"
-            onClick={handleBiometricAuth}
-            disabled={isSubmitting}
-            className="w-full py-4 px-4 bg-gradient-to-r from-red-600 to-[#F7162D] hover:from-red-700 hover:to-red-600 active:scale-98 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-3 border border-red-500/40"
-          >
-            <div className="flex items-center gap-1.5">
-              <Fingerprint className="w-6 h-6 text-white animate-pulse" />
-              <ScanFace className="w-6 h-6 text-white" />
-            </div>
-            <div className="text-left">
-              <div className="text-sm font-black leading-tight">
-                Déverrouiller par Empreinte / Face ID
-              </div>
-              <div className="text-[11px] text-red-100 opacity-90">
-                Touch ID, Empreinte ou Reconnaissance faciale
-              </div>
-            </div>
-          </button>
-        </div>
-
-        {/* Séparateur élégant */}
-        <div className="w-full flex items-center gap-3 my-1">
-          <div className="flex-1 h-px bg-gray-800" />
-          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-            Ou Saisir le Code PIN
-          </span>
-          <div className="flex-1 h-px bg-gray-800" />
-        </div>
-
-        {/* 2. Indicateur visuel des points PIN */}
+        {/* 1. Indicateur visuel des points PIN */}
         <div className={`flex flex-col items-center space-y-3 ${shake ? "animate-bounce" : ""}`}>
           <div className="flex items-center justify-center gap-4 py-2">
             {[0, 1, 2, 3].map((idx) => {

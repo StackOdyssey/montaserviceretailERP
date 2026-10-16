@@ -30,10 +30,10 @@ const counts = await sql.query(
 );
 console.log("\ncounts:", counts[0]);
 
-// Doit échouer : FAC/AV ne peuvent pas masquer la TVA (CHECK constraint).
-try {
-  await sql.query("UPDATE business_line_document_settings SET show_vat = false WHERE doc_type = 'FAC'");
-  console.log("\nCHECK FAC/AV: FAILED — update was accepted (constraint not enforced)");
-} catch (e) {
-  console.log("\nCHECK FAC/AV: OK — update rejected:", String(e.message).split("\n")[0]);
-}
+// Depuis la migration 0017 (régime TVA global assujetti/non-assujetti), il n'y a plus
+// de contrainte CHECK interdisant FAC/AV en HIDDEN : en régime non-assujetti, FAC/AV
+// sont HIDDEN avec mention « TVA non applicable », enforced côté serveur dans
+// createSalesDocument selon settings.vat_liable. Ce script contrôle donc le régime
+// courant au lieu d'exiger un rejet DB.
+const regime = await sql.query("SELECT vat_liable FROM settings LIMIT 1");
+console.log("\nregime TVA (settings.vat_liable):", regime[0]?.vat_liable);

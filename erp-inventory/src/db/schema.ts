@@ -69,11 +69,11 @@ export const settings = pgTable("settings", {
 });
 
 // ==========================================
-// 1b. LIGNE MÉTIER (PIECES — pièces moto uniquement ; la ligne quads/vehicules a été retirée)
+// 1b. LIGNE MÉTIER (PIECES — pièces moto uniquement ; Side 2 véhicules annulé, voir Side2-Q16-Q19)
 // ==========================================
 export const businessLines = pgTable("business_lines", {
   id: serial("id").primaryKey(),
-  code: text("code").notNull().unique(), // PIECES (ligne unique)
+  code: text("code").notNull().unique(), // PIECES (ligne unique, Side 2 annulé)
   displayName: text("display_name").notNull(),
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
@@ -218,8 +218,7 @@ export const products = pgTable("products", {
   nature: text("nature"), // Nature (NORMAL, ...)
   businessLineId: integer("business_line_id")
     .notNull()
-    .references(() => businessLines.id), // PIECES | VEHICULES
-  isSerialized: boolean("is_serialized").notNull().default(false), // true = unités sérialisées (châssis/VIN)
+    .references(() => businessLines.id), // PIECES (ligne unique)
   categoryId: integer("category_id").references(() => categories.id),
   supplierId: integer("supplier_id").references(() => suppliers.id),
   warehouseId: integer("warehouse_id").references(() => warehouses.id),
@@ -293,27 +292,10 @@ export const stockMovements = pgTable("stock_movements", {
 });
 
 // ==========================================
-// 5b. UNITÉS SÉRIALISÉES (VÉHICULES — CHÂSSIS/VIN) & INVENTAIRE
+// 5b. INVENTAIRE
 // ==========================================
-export const stockUnits = pgTable("stock_units", {
-  id: serial("id").primaryKey(),
-  productId: integer("product_id")
-    .notNull()
-    .references(() => products.id),
-  businessLineId: integer("business_line_id")
-    .notNull()
-    .references(() => businessLines.id),
-  serialNo: text("serial_no").notNull().unique(), // châssis / VIN
-  engineNo: text("engine_no"),
-  colour: text("colour"),
-  modelYear: integer("model_year"),
-  status: text("status").notNull().default("IN_STOCK"), // IN_STOCK, RESERVED, SOLD, RETURNED
-  unitCostCents: integer("unit_cost_cents").notNull().default(0), // identification spécifique
-  receiptLineId: integer("receipt_line_id"),
-  saleLineId: integer("sale_line_id"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
+// Note G9 : la table `stock_units` (unités sérialisées Side 2, décision Side2-Q16-Q19)
+// a été supprimée par la migration 0018. Tout code la référençant est du code mort.
 
 export const stockCounts = pgTable("stock_counts", {
   id: serial("id").primaryKey(),

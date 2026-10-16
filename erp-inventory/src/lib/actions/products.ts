@@ -32,7 +32,6 @@ export interface ProductItem {
   isActive: boolean;
   businessLineId?: number;
   businessLineCode?: string;
-  isSerialized?: boolean;
   cmupCents?: number;
 }
 
@@ -83,7 +82,6 @@ type ProductLike = {
   photoUrl: string | null;
   isActive: boolean;
   businessLineId: number;
-  isSerialized: boolean;
 };
 
 function rawToItem(r: ProductLike, lineCode: string, categoryName?: string | null): ProductItem {
@@ -107,7 +105,6 @@ function rawToItem(r: ProductLike, lineCode: string, categoryName?: string | nul
     isActive: r.isActive,
     businessLineId: r.businessLineId,
     businessLineCode: lineCode,
-    isSerialized: r.isSerialized,
     cmupCents: r.cmupCents,
   };
 }
@@ -173,7 +170,6 @@ export async function getProducts(options?: {
       photoUrl: products.photoUrl,
       isActive: products.isActive,
       businessLineId: products.businessLineId,
-      isSerialized: products.isSerialized,
     })
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))
@@ -222,7 +218,6 @@ export async function saveProduct(data: {
   barcode?: string;
   photoUrl?: string;
   businessLineCode?: string;
-  isSerialized?: boolean;
 }): Promise<ProductItem> {
   await assertAuthenticated();
   const d = requireDb();
@@ -238,7 +233,6 @@ export async function saveProduct(data: {
     name: data.name.trim(),
     brand: data.brand ?? null,
     businessLineId: lineId,
-    isSerialized: data.isSerialized ?? false,
     categoryId,
     tvaRate: data.tvaRate ?? 20,
     costPriceHtCents: data.purchasePriceCents,
@@ -290,7 +284,6 @@ export async function saveProduct(data: {
     isActive: true,
     businessLineId: lineId,
     businessLineCode: lineCode,
-    isSerialized: data.isSerialized ?? false,
     cmupCents: values.cmupCents,
   };
 }

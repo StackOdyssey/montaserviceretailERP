@@ -5,6 +5,7 @@ import { auditLogs, customerPayments, customers, db, salesDocuments } from "@/db
 import { assertAuthenticated } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
 import { initialStatusFor, statusesForMethod } from "@/lib/payments";
+import { matchTokens } from "@/lib/search";
 import { getSalesDocuments, type SalesDocumentItem } from "./sales";
 
 export interface CustomerItem {
@@ -134,18 +135,11 @@ export async function getCustomers(searchQuery?: string) {
   await assertAuthenticated();
   const d = requireDb();
 
-  const search = searchQuery?.trim().toLowerCase() || "";
   const conds = [isNull(customers.deletedAt)];
-  if (search) {
-    conds.push(
-      or(
-        ilike(customers.name, `%${search}%`),
-        ilike(customers.phone, `%${search}%`),
-        ilike(customers.city, `%${search}%`),
-        ilike(customers.ice, `%${search}%`)
-      )!
-    );
-  }
+  // Recherche tolérante caisse : sous-chaînes multi-mots (ET) + squelette consonantique
+  // (« ben », « bennani », « bennani el » retrouvent « EL BANNANI »).
+  const match = matchTokens(searchQuery, [customers.name], [customers.phone, customers.city, customers.ice]);
+  if (match) conds.push(match);
 
   const rows = await d
     .select()

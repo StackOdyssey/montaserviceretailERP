@@ -1,16 +1,46 @@
 import React, { useState } from "react";
-import { X, Printer, Check } from "lucide-react";
-import { SalesDocumentItem } from "@/lib/actions/sales";
+import { X, Printer, Check, Ban } from "lucide-react";
+import { SalesDocumentItem, cancelDocument } from "@/lib/actions/sales";
 import { formatMoney } from "@/lib/money";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
 
 interface InvoiceModalProps {
   document: SalesDocumentItem;
   onClose: () => void;
+  /** Appelé après annulation (ex. pour rafraîchir le stock affiché). */
+  onCancelled?: (document: SalesDocumentItem) => void;
 }
 
-export function InvoiceModal({ document, onClose }: InvoiceModalProps) {
+export function InvoiceModal({ document, onClose, onCancelled }: InvoiceModalProps) {
   const [showPrintView, setShowPrintView] = useState(false);
+  const [currentDocument, setCurrentDocument] = useState(document);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  // Annulation réservée aux BL/BC au comptoir (la FACTURE s'annule depuis /ventes).
+  const canCancel =
+    (currentDocument.docType === "BL" || currentDocument.docType === "BC") &&
+    currentDocument.status !== "ANNULE";
+
+  const handleCancel = async () => {
+    if (
+      !confirm(
+        `Annuler le ${currentDocument.docNumber} ? Les quantités seront réintégrées au stock. L'opération est irréversible.`
+      )
+    )
+      return;
+    try {
+      setIsCancelling(true);
+      setCancelError(null);
+      const updated = await cancelDocument(currentDocument.id, "Annulation au comptoir (POS)");
+      setCurrentDocument(updated);
+      onCancelled?.(updated);
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : "Échec de l'annulation");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
   return (
     <>
@@ -138,21 +168,44 @@ export function InvoiceModal({ document, onClose }: InvoiceModalProps) {
           </div>
 
           {/* Footer */}
-          <div className="p-4 border-t border-gray-200 flex gap-2">
-            <button
-              onClick={() => setShowPrintView(true)}
-              className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
-            >
-              <Printer size={16} />
-              <span>Imprimer</span>
-            </button>
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2.5 bg-[#F7162D] hover:bg-[#D90E23] text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
-            >
-              <Check size={16} />
-              <span>Terminé</span>
-            </button>
+          <div className="p-4 border-t border-gray-200 space-y-2">
+            {cancelError && (
+              <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-semibold">
+                {cancelError}
+              </div>
+            )}
+            {currentDocument.status === "ANNULE" ? (
+              <div className="p-2.5 rounded-lg bg-gray-100 border border-gray-200 text-gray-600 text-xs font-bold text-center">
+                Document annulé — stock réintégré
+              </div>
+            ) : (
+              canCancel && (
+                <button
+                  onClick={handleCancel}
+                  disabled={isCancelling}
+                  className="w-full px-4 py-2.5 bg-white hover:bg-red-50 text-[#F7162D] font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 border border-[#F7162D]/40 disabled:opacity-50"
+                >
+                  <Ban size={16} />
+                  <span>{isCancelling ? "Annulation..." : "Annuler BL/BC (réintégrer le stock)"}</span>
+                </button>
+              )
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowPrintView(true)}
+                className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <Printer size={16} />
+                <span>Imprimer</span>
+              </button>
+              <button
+                onClick={onClose}
+                className="flex-1 px-4 py-2.5 bg-[#F7162D] hover:bg-[#D90E23] text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <Check size={16} />
+                <span>Terminé</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

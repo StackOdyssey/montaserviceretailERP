@@ -62,17 +62,6 @@ export async function loginWithPin(pin: string): Promise<AuthResult> {
 }
 
 /**
- * Connexion biométrique — DÉSACTIVÉE (fail-closed).
- * Aucune session n'est émise sans vérification WebAuthn/FIDO2 côté serveur.
- */
-export async function loginWithBiometrics(): Promise<AuthResult> {
-  return {
-    success: false,
-    message: "Déverrouillage biométrique indisponible.",
-  };
-}
-
-/**
  * Déconnexion.
  */
 export async function logout(): Promise<void> {

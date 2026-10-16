@@ -49,6 +49,10 @@ export default function POSPage() {
   // Discount state
   const [discountPercent, setDiscountPercent] = useState<number>(0);
 
+  // Mobile : onglet Catalogue / Panier (côte à côte dès md).
+  const [mobileTab, setMobileTab] = useState<"catalog" | "cart">("catalog");
+  const cartCount = cart.reduce((s, l) => s + l.quantity, 0);
+
   // Payment and checkout state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -270,8 +274,12 @@ export default function POSPage() {
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Product Grid (Left) */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Product Grid (Left) — plein écran sur mobile sauf onglet panier */}
+        <div
+          className={`flex-1 flex-col overflow-hidden ${
+            mobileTab === "cart" ? "hidden md:flex" : "flex"
+          }`}
+        >
           {/* Search and Category Bar */}
           <div className="bg-white border-b border-gray-200 p-4 space-y-3">
             <div className="relative">
@@ -335,8 +343,13 @@ export default function POSPage() {
           </div>
         </div>
 
-        {/* Cart Sidebar (Right) */}
-        <CartSidebar
+        {/* Cart Sidebar (Right) — tiroir plein écran sur mobile sauf onglet catalogue */}
+        <div
+          className={`w-full md:w-96 shrink-0 ${
+            mobileTab === "catalog" ? "hidden md:block" : "block"
+          }`}
+        >
+          <CartSidebar
           cart={cart}
           docType={docType}
           onDocTypeChange={setDocType}
@@ -349,7 +362,33 @@ export default function POSPage() {
           onCheckout={handleCheckout}
           onCustomerSelect={() => setIsCustomerModalOpen(true)}
           customerName={customerName}
-        />
+          />
+        </div>
+      </div>
+
+      {/* Barre d'onglets mobile (Catalogue / Panier) — masquée dès md */}
+      <div className="md:hidden bg-white border-t border-gray-200 grid grid-cols-2">
+        <button
+          onClick={() => setMobileTab("catalog")}
+          className={`py-3 text-sm font-bold ${
+            mobileTab === "catalog" ? "text-[#F7162D]" : "text-gray-500"
+          }`}
+        >
+          Catalogue
+        </button>
+        <button
+          onClick={() => setMobileTab("cart")}
+          className={`py-3 text-sm font-bold relative ${
+            mobileTab === "cart" ? "text-[#F7162D]" : "text-gray-500"
+          }`}
+        >
+          Panier
+          {cartCount > 0 && (
+            <span className="ml-1.5 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-[#F7162D] text-white text-[11px]">
+              {cartCount}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Modals */}
@@ -406,6 +445,7 @@ export default function POSPage() {
         <InvoiceModal
           document={createdDocument}
           onClose={() => setCreatedDocument(null)}
+          onCancelled={() => loadProducts()}
         />
       )}
     </div>

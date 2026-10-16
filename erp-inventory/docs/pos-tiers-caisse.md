@@ -23,6 +23,11 @@
 3. Si doublon proposé → sélectionnez-le.
 4. Sans fiche, `Valider l'entrée en stock` reste désactivé. Jamais de BR anonyme.
 
+## Erreur de saisie (annuler un BL/BC)
+1. Juste après validation, la fenêtre du document affiche `Annuler BL/BC (réintégrer le stock)`.
+2. Cliquez → confirmez → les quantités retournent en stock, le document passe `Annulé`.
+3. Irréversible. Une FACTURE ne s'annule pas ici : voir `/ventes`.
+
 ## Règles à retenir
 - Comptoir = espèces + BL/BC uniquement.
 - Crédit/chèque/virement/FACTURE = fiche obligatoire.
