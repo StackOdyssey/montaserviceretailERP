@@ -439,6 +439,7 @@ export async function findCustomerDuplicates(
   data: { name?: string; phone?: string; ice?: string },
   excludeId?: number
 ): Promise<Array<{ id: number; name: string; phone: string | null; ice: string | null }>> {
+  await assertAuthenticated();
   const d = requireDb();
   const ors = [];
   if (data.name?.trim()) ors.push(ilike(customers.name, data.name.trim()));

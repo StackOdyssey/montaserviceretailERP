@@ -1,7 +1,7 @@
 // Service Worker BM Motors ERP — cache STATIQUE uniquement.
 // Ne met JAMAIS en cache les pages applicatives (HTML) ni les données authentifiées.
 
-const CACHE_NAME = "bm-motors-static-v2";
+const CACHE_NAME = "bm-motors-static-v3";
 const STATIC_ASSETS = ["/manifest.json", "/bashan-logo.png", "/favicon.ico"];
 
 self.addEventListener("install", (event) => {
@@ -9,15 +9,16 @@ self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
+// Changer CACHE_NAME ne supprime rien : CacheStorage persiste tant qu'un script ne le
+// supprime pas. On purge donc explicitement tous les anciens caches (dont l'ancien cache
+// v1 qui contenait des pages HTML authentifiées) AVANT de prendre le contrôle des clients.
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.map((key) => (key !== CACHE_NAME ? caches.delete(key) : undefined))
-      )
-    )
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {

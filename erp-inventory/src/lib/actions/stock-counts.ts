@@ -13,6 +13,7 @@ import {
 } from "@/db";
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { assertAuthenticated } from "@/lib/action-guard";
+import { lockProducts } from "@/lib/stock-lock";
 
 export interface StockCountSummary {
   id: number;
@@ -99,6 +100,7 @@ export async function createStockCount(businessLineCode: string): Promise<{ id: 
 
 /** Liste les inventaires (optionnellement filtrés par ligne). */
 export async function getStockCounts(businessLineCode?: string): Promise<StockCountSummary[]> {
+  await assertAuthenticated();
   const d = requireDb();
   const conds = businessLineCode ? [eq(businessLines.code, businessLineCode)] : [];
   const rows = await d
@@ -125,6 +127,7 @@ export async function getStockCounts(businessLineCode?: string): Promise<StockCo
 export async function getStockCount(
   id: number
 ): Promise<{ header: StockCountSummary; lines: StockCountLineDTO[] } | null> {
+  await assertAuthenticated();
   const d = requireDb();
   const headerRows = await d
     .select({
@@ -181,71 +184,89 @@ export async function setStockCountLine(lineId: number, countedQty: number): Pro
 export async function validateStockCount(id: number): Promise<{ adjusted: number }> {
   await assertAuthenticated();
   const d = requireDb();
-  const headerRows = await d
-    .select({ id: stockCounts.id, code: stockCounts.code, status: stockCounts.status })
-    .from(stockCounts)
-    .where(eq(stockCounts.id, id))
-    .limit(1);
-  const header = headerRows[0];
-  if (!header) throw new Error("INVENTAIRE_INTROUVABLE");
-  if (header.status !== "DRAFT") throw new Error("INVENTAIRE_DEJA_TRAITE");
 
-  const negRow = await d.select({ neg: settings.negativeStockAllowed }).from(settings).limit(1);
-  const negativeAllowed = negRow[0]?.neg ?? false;
+  // Une seule transaction : en-tête verrouillé (pas de double validation), produits
+  // verrouillés puis relus (stock courant, pas la valeur du comptage initial).
+  const { code, adjusted } = await d.transaction(async (tx) => {
+    const header = (
+      await tx
+        .select({ id: stockCounts.id, code: stockCounts.code, status: stockCounts.status })
+        .from(stockCounts)
+        .where(eq(stockCounts.id, id))
+        .for("update")
+    )[0];
+    if (!header) throw new Error("INVENTAIRE_INTROUVABLE");
+    if (header.status !== "DRAFT") throw new Error("INVENTAIRE_DEJA_TRAITE");
 
-  const lines = await d
-    .select({
-      lineId: stockCountLines.id,
-      productId: stockCountLines.productId,
-      countedQty: stockCountLines.countedQty,
-      productStock: products.currentStock,
-      productCmup: products.cmupCents,
-      businessLineId: products.businessLineId,
-    })
-    .from(stockCountLines)
-    .innerJoin(products, eq(stockCountLines.productId, products.id))
-    .where(eq(stockCountLines.stockCountId, id));
+    const negRow = await tx.select({ neg: settings.negativeStockAllowed }).from(settings).limit(1);
+    const negativeAllowed = negRow[0]?.neg ?? false;
 
-  let adjusted = 0;
-  for (const ln of lines) {
-    const delta = ln.countedQty - ln.productStock;
-    if (delta === 0) continue;
+    const countLines = await tx
+      .select({
+        lineId: stockCountLines.id,
+        productId: stockCountLines.productId,
+        countedQty: stockCountLines.countedQty,
+      })
+      .from(stockCountLines)
+      .where(eq(stockCountLines.stockCountId, id));
+    await lockProducts(tx, countLines.map((l) => l.productId));
 
-    const state: CmupState = { quantity: ln.productStock, cmupCents: ln.productCmup };
-    const { state: next } = applyMovement(state, delta, ln.productCmup);
-    if (next.quantity < 0 && !negativeAllowed) throw new Error("STOCK_NEGATIF_INTERDIT");
+    const lines = await tx
+      .select({
+        lineId: stockCountLines.id,
+        productId: stockCountLines.productId,
+        countedQty: stockCountLines.countedQty,
+        productStock: products.currentStock,
+        productCmup: products.cmupCents,
+        businessLineId: products.businessLineId,
+      })
+      .from(stockCountLines)
+      .innerJoin(products, eq(stockCountLines.productId, products.id))
+      .where(eq(stockCountLines.stockCountId, id));
 
-    await d.insert(stockMovements).values({
-      productId: ln.productId,
-      businessLineId: ln.businessLineId,
-      movementType: "AJUSTEMENT_INVENTAIRE",
-      quantity: delta,
-      unitCostCents: ln.productCmup,
-      sourceDocumentType: "INVENTAIRE",
-      sourceDocumentId: id,
-      reason: `Inventaire ${header.code}`,
-    });
-    await d
-      .update(products)
-      .set({ currentStock: next.quantity, cmupCents: next.cmupCents, updatedAt: new Date() })
-      .where(eq(products.id, ln.productId));
-    await d
-      .update(stockCountLines)
-      .set({ varianceQty: delta, unitCostCents: ln.productCmup })
-      .where(eq(stockCountLines.id, ln.lineId));
-    adjusted++;
-  }
+    let adjusted = 0;
+    for (const ln of lines) {
+      const delta = ln.countedQty - ln.productStock;
+      if (delta === 0) continue;
 
-  await d
-    .update(stockCounts)
-    .set({ status: "VALIDATED", countedAt: new Date() })
-    .where(eq(stockCounts.id, id));
+      const state: CmupState = { quantity: ln.productStock, cmupCents: ln.productCmup };
+      const { state: next } = applyMovement(state, delta, ln.productCmup);
+      if (next.quantity < 0 && !negativeAllowed) throw new Error("STOCK_NEGATIF_INTERDIT");
+
+      await tx.insert(stockMovements).values({
+        productId: ln.productId,
+        businessLineId: ln.businessLineId,
+        movementType: "AJUSTEMENT_INVENTAIRE",
+        quantity: delta,
+        unitCostCents: ln.productCmup,
+        sourceDocumentType: "INVENTAIRE",
+        sourceDocumentId: id,
+        reason: `Inventaire ${header.code}`,
+      });
+      await tx
+        .update(products)
+        .set({ currentStock: next.quantity, cmupCents: next.cmupCents, updatedAt: new Date() })
+        .where(eq(products.id, ln.productId));
+      await tx
+        .update(stockCountLines)
+        .set({ varianceQty: delta, unitCostCents: ln.productCmup })
+        .where(eq(stockCountLines.id, ln.lineId));
+      adjusted++;
+    }
+
+    await tx
+      .update(stockCounts)
+      .set({ status: "VALIDATED", countedAt: new Date() })
+      .where(eq(stockCounts.id, id));
+    return { code: header.code, adjusted };
+  });
+
   try {
     await d.insert(auditLogs).values({
       action: "INVENTAIRE_VALIDE",
       entityType: "STOCK_COUNT",
       entityId: id,
-      details: `Inventaire ${header.code} validé — ${adjusted} ligne(s) ajustée(s)`,
+      details: `Inventaire ${code} validé — ${adjusted} ligne(s) ajustée(s)`,
     });
   } catch {
     // journal non bloquant

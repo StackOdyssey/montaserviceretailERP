@@ -134,6 +134,13 @@
       "when": 1792157062574,
       "tag": "0018_drop-stock-units",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792273901850,
+      "tag": "0019_session-version",
+      "breakpoints": true
     }
   ]
 }

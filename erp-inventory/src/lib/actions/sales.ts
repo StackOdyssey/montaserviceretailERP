@@ -23,6 +23,7 @@ import { effectiveVatRate, VAT_NOT_LIABLE_MENTION } from "@/lib/vat-regime";
 import { nextDocumentNumber } from "@/lib/numbering";
 import { assertAuthenticated } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
+import { lockProducts } from "@/lib/stock-lock";
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { Resend } from "resend";
 
@@ -310,6 +311,7 @@ export async function createSalesDocument(data: {
       : data.notes;
 
   await d.transaction(async (tx) => {
+    await lockProducts(tx, data.lines.map((l) => l.productId));
     // Ligne métier (défaut PIECES)
     const line = (
       await tx
@@ -858,6 +860,7 @@ export async function createAvoir(data: {
   const year = new Date().getFullYear();
   let docId = 0;
   await d.transaction(async (tx) => {
+    if (restock) await lockProducts(tx, avLines.map((x) => x.orig.productId));
     const { docNumber, sequenceNo } = await nextDocumentNumber(tx, {
       docType: "AV",
       year,
@@ -977,7 +980,13 @@ export async function cancelDocument(documentId: number, reason?: string): Promi
   await assertPeriodOpen(doc.docDate ?? new Date());
 
   await d.transaction(async (tx) => {
+    // Verrou du document + re-contrôle : deux annulations concurrentes ne contrepassent pas deux fois.
+    const locked = (
+      await tx.select({ status: salesDocuments.status }).from(salesDocuments).where(eq(salesDocuments.id, documentId)).for("update")
+    )[0];
+    if (!locked || locked.status === "ANNULE") throw new Error("Document déjà annulé");
     const movs = await tx.select().from(stockMovements).where(eq(stockMovements.sourceDocumentId, documentId));
+    await lockProducts(tx, movs.map((m) => m.productId));
     for (const m of movs) {
       const p = (await tx.select().from(products).where(eq(products.id, m.productId)).limit(1))[0];
       if (!p) continue;
@@ -1033,6 +1042,7 @@ export async function writeOffStock(data: {
   await assertPeriodOpen();
 
   await d.transaction(async (tx) => {
+    await lockProducts(tx, [data.productId]);
     const p = (await tx.select().from(products).where(eq(products.id, data.productId)).limit(1))[0];
     if (!p) throw new Error("PIECE_INTROUVABLE");
     if (data.quantity > p.currentStock) throw new Error("STOCK_INSUFFISANT_POUR_REBUT");

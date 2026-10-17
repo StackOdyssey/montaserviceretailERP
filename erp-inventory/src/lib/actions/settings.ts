@@ -1,7 +1,7 @@
 "use server";
 
 import { asc, eq } from "drizzle-orm";
-import { auditLogs, db, expenseCategories, paymentMethods, priceLevels, settings, vatRates } from "@/db";
+import { auditLogs, db, settings, vatRates } from "@/db";
 import { assertAuthenticated } from "@/lib/action-guard";
 
 export type SettingsRow = typeof settings.$inferSelect;
@@ -128,70 +128,4 @@ export async function saveVatRate(data: { id?: number; ratePercent: number; labe
       .returning()
   )[0];
   return inserted;
-}
-
-export type PublicSettings = SettingsRow & { defaultVatRate: number };
-
-/**
- * Lecture publique (affichage) des paramètres société — sans session, sûre au build.
- * Retourne `null` si la base n'est pas joignable.
- */
-export async function getPublicSettings(): Promise<PublicSettings | null> {
-  try {
-    if (!db) return null;
-    const s = (await db.select().from(settings).limit(1))[0];
-    if (!s) return null;
-    let defaultVatRate = 20;
-    if (s.defaultVatRateId) {
-      const v = (
-        await db.select({ r: vatRates.ratePercent }).from(vatRates).where(eq(vatRates.id, s.defaultVatRateId)).limit(1)
-      )[0];
-      if (v) defaultVatRate = v.r;
-    }
-    return { ...s, defaultVatRate };
-  } catch {
-    return null;
-  }
-}
-
-export interface Parameters {
-  vatRates: Array<{ id: number; label: string; ratePercent: number; isDefault: boolean }>;
-  expenseCategories: Array<{ id: number; name: string; vatDeductibleDefault: boolean; receiptRequired: boolean }>;
-  paymentMethods: Array<{ code: string; label: string }>;
-  priceLevels: Array<{ id: number; code: string; label: string }>;
-}
-
-const EMPTY_PARAMS: Parameters = { vatRates: [], expenseCategories: [], paymentMethods: [], priceLevels: [] };
-
-/** Listes de paramètres (TVA, catégories de dépense, moyens de paiement, niveaux de prix) — sûres au build. */
-export async function getParameters(): Promise<Parameters> {
-  try {
-    if (!db) return EMPTY_PARAMS;
-    const [vats, cats, methods, levels] = await Promise.all([
-      db
-        .select({ id: vatRates.id, label: vatRates.label, ratePercent: vatRates.ratePercent, isDefault: vatRates.isDefault })
-        .from(vatRates)
-        .where(eq(vatRates.isActive, true))
-        .orderBy(asc(vatRates.ratePercent)),
-      db
-        .select({
-          id: expenseCategories.id,
-          name: expenseCategories.name,
-          vatDeductibleDefault: expenseCategories.vatDeductibleDefault,
-          receiptRequired: expenseCategories.receiptRequired,
-        })
-        .from(expenseCategories)
-        .where(eq(expenseCategories.isActive, true))
-        .orderBy(asc(expenseCategories.sortOrder)),
-      db
-        .select({ code: paymentMethods.code, label: paymentMethods.label })
-        .from(paymentMethods)
-        .where(eq(paymentMethods.isActive, true))
-        .orderBy(asc(paymentMethods.sortOrder)),
-      db.select({ id: priceLevels.id, code: priceLevels.code, label: priceLevels.label }).from(priceLevels).orderBy(asc(priceLevels.id)),
-    ]);
-    return { vatRates: vats, expenseCategories: cats, paymentMethods: methods, priceLevels: levels };
-  } catch {
-    return EMPTY_PARAMS;
-  }
 }

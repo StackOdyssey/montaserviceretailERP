@@ -3,6 +3,7 @@
 // en plus du filtrage proxy/middleware).
 import { cookies } from "next/headers";
 import { SESSION_COOKIE_NAME, parseSession, verifyToken } from "@/lib/auth";
+import { getSessionVersion } from "@/lib/session-version";
 import { logWarn } from "@/lib/observability";
 
 // Rôles autorisés aux mutations. En attendant le RBAC complet (Phase 10), seul le
@@ -16,7 +17,7 @@ export class NotAuthenticatedError extends Error {
   }
 }
 
-/** Lève NotAuthenticatedError si la requête n'a pas de session valide ET owner. */
+/** Lève NotAuthenticatedError si la requête n'a pas de session valide, non révoquée ET owner. */
 export async function assertAuthenticated(): Promise<void> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
@@ -27,6 +28,10 @@ export async function assertAuthenticated(): Promise<void> {
   const session = parseSession(token);
   if (!session || !OWNER_ROLES.has(session.role)) {
     logWarn("auth.denied", { reason: "insufficient_role", role: session?.role ?? null });
+    throw new NotAuthenticatedError();
+  }
+  if (session.v !== (await getSessionVersion())) {
+    logWarn("auth.denied", { reason: "revoked_session" });
     throw new NotAuthenticatedError();
   }
 }

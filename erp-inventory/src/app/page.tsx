@@ -256,7 +256,7 @@ export default function TableauDeBordPage() {
                   Derniers Bons de Livraison (BL)
                 </h2>
                 <p className="text-xs text-gray-500">
-                  Ventes en direct au comptoir avec détail de la remise personnalisée et TVA 10%
+                  Ventes en direct au comptoir avec détail de la remise personnalisée
                 </p>
               </div>
               <Link

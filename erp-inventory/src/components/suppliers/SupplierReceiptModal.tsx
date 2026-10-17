@@ -11,6 +11,8 @@ import {
 } from "@/lib/actions/suppliers";
 import { getProducts, ProductItem } from "@/lib/actions/products";
 import { formatMoney, toCentimes } from "@/lib/money";
+import { useSettings } from "@/components/layout/SettingsProvider";
+import { effectiveVatRate } from "@/lib/vat-regime";
 
 interface SupplierReceiptModalProps {
   isOpen: boolean;
@@ -38,6 +40,7 @@ export function SupplierReceiptModal({
   preselectedSupplierId,
   vatLiable = true,
 }: SupplierReceiptModalProps) {
+  const { defaultVatRate } = useSettings();
   // T2.1 — sélection recherchable, jamais d'anonyme (null = à sélectionner/créer)
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(
     preselectedSupplierId ?? suppliers[0]?.id ?? null
@@ -256,7 +259,7 @@ export function SupplierReceiptModal({
     const costCents = toCentimes(costDh);
     totalHtCents += costCents * line.quantity;
   }
-  const tvaRate = vatLiable ? 10 : 0;
+  const tvaRate = effectiveVatRate(defaultVatRate, vatLiable);
   const tvaAmountCents = Math.round((totalHtCents * tvaRate) / 100);
   const totalTtcCents = totalHtCents + tvaAmountCents;
 
@@ -621,7 +624,7 @@ export function SupplierReceiptModal({
             </div>
             {tvaRate > 0 && (
               <div className="flex justify-between text-gray-600 dark:text-gray-300">
-                <span>TVA (10%) :</span>
+                <span>TVA ({tvaRate}%) :</span>
                 <span className="font-bold text-gray-900 dark:text-white">{formatMoney(tvaAmountCents)}</span>
               </div>
             )}

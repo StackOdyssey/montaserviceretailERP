@@ -11,13 +11,16 @@ import {
   supplierReceiptLines,
   supplierReceipts,
   suppliers,
+  vatRates,
 } from "@/db";
 import { assertAuthenticated } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
 import type { AgingBuckets, PartyAgingRow } from "./customers";
 import { nextDocumentNumber } from "@/lib/numbering";
+import { lockProducts } from "@/lib/stock-lock";
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { matchTokens } from "@/lib/search";
+import { effectiveVatRate } from "@/lib/vat-regime";
 
 export interface SupplierItem {
   id: number;
@@ -269,14 +272,19 @@ export async function createSupplierReceipt(data: {
   if (!supplier) throw new Error("Fournisseur introuvable");
 
   // Régime global Q1 : non-assujetti ⇒ réception en TTC sans TVA (TVA d'amont
-  // non déductible = coût). Assujetti ⇒ comportement historique (20 %).
-  const liableRow = (
-    await d.select({ liable: settings.vatLiable }).from(settings).limit(1)
+  // non déductible = coût). Assujetti ⇒ taux par défaut paramétré (settings → vat_rates), repli 20 %.
+  const vatRow = (
+    await d
+      .select({ rate: vatRates.ratePercent, liable: settings.vatLiable })
+      .from(settings)
+      .leftJoin(vatRates, eq(settings.defaultVatRateId, vatRates.id))
+      .limit(1)
   )[0];
-  const tvaRate = (liableRow?.liable ?? true) ? 20 : 0;
+  const tvaRate = effectiveVatRate(vatRow?.rate ?? 20, vatRow?.liable ?? true);
   let receiptId = 0;
 
   await d.transaction(async (tx) => {
+    await lockProducts(tx, data.lines.map((l) => l.productId));
     const totalHtCents = data.lines.reduce((s, l) => s + l.unitCostCents * l.quantity, 0);
     const tvaAmountCents = Math.round((totalHtCents * tvaRate) / 100);
     const totalTtcCents = totalHtCents + tvaAmountCents;
@@ -468,6 +476,7 @@ export async function findSupplierDuplicates(
   data: { name?: string; phone?: string; ice?: string },
   excludeId?: number
 ): Promise<Array<{ id: number; name: string; phone: string | null; ice: string | null; city: string | null }>> {
+  await assertAuthenticated();
   const d = requireDb();
   const ors = [];
   if (data.name?.trim()) ors.push(ilike(suppliers.name, data.name.trim()));
@@ -706,6 +715,7 @@ export async function createSupplierPriceCreditNote(data: {
 
   let totalCreditHt = 0;
   await d.transaction(async (tx) => {
+    await lockProducts(tx, data.lines.map((r) => byId.get(r.lineId)?.productId));
     for (const r of data.lines) {
       const line = byId.get(r.lineId);
       if (!line || !line.productId) continue;

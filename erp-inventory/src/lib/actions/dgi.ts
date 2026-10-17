@@ -20,6 +20,7 @@ function requireDb() {
  * reste purement local et ne dépend pas de ce drapeau.
  */
 export async function isDgiIntegrationEnabled(): Promise<boolean> {
+  await assertAuthenticated();
   return process.env.DGI_ENABLED === "true";
 }
 

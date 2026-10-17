@@ -14,5 +14,6 @@ export async function getPhotoUploadUrl(data: {
 
 /** Indique si le stockage média (R2) est configuré. */
 export async function isPhotoStorageReady(): Promise<boolean> {
+  await assertAuthenticated();
   return isStorageConfigured();
 }

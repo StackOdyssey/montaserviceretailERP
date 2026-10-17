@@ -11,6 +11,7 @@ export interface CategoryItem {
 }
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { assertAuthenticated } from "@/lib/action-guard";
+import { lockProducts } from "@/lib/stock-lock";
 
 export interface ProductItem {
   id: number;
@@ -119,6 +120,7 @@ export async function getProducts(options?: {
   stockFilter?: "all" | "low" | "negative";
   businessLineCode?: string;
 }): Promise<ProductItem[]> {
+  await assertAuthenticated();
   const d = requireDb();
   const lineCode = options?.businessLineCode || "PIECES";
   const lineId = await lineIdByCode(lineCode);
@@ -301,37 +303,41 @@ export async function recordStockMovement(data: {
 }): Promise<ProductItem> {
   await assertAuthenticated();
   const d = requireDb();
-  const found = await d.select().from(products).where(eq(products.id, data.productId)).limit(1);
-  const p = found[0];
-  if (!p) throw new Error("PIECE_INTROUVABLE");
+  // Lecture verrouillée + écriture dans la même transaction (pas de mise à jour perdue).
+  const { p, next } = await d.transaction(async (tx) => {
+    await lockProducts(tx, [data.productId]);
+    const p = (await tx.select().from(products).where(eq(products.id, data.productId)).limit(1))[0];
+    if (!p) throw new Error("PIECE_INTROUVABLE");
 
-  const state: CmupState = { quantity: p.currentStock, cmupCents: p.cmupCents };
-  const inboundCost = data.quantity > 0 ? data.unitCostCents ?? p.cmupCents : 0;
-  const { state: next } = applyMovement(state, data.quantity, inboundCost);
+    const state: CmupState = { quantity: p.currentStock, cmupCents: p.cmupCents };
+    const inboundCost = data.quantity > 0 ? data.unitCostCents ?? p.cmupCents : 0;
+    const { state: next } = applyMovement(state, data.quantity, inboundCost);
 
-  if (next.quantity < 0) {
-    const s = await d.select({ neg: settings.negativeStockAllowed }).from(settings).limit(1);
-    if (!s[0]?.neg) throw new Error("STOCK_NEGATIF_INTERDIT");
-  }
+    if (next.quantity < 0) {
+      const s = await tx.select({ neg: settings.negativeStockAllowed }).from(settings).limit(1);
+      if (!s[0]?.neg) throw new Error("STOCK_NEGATIF_INTERDIT");
+    }
 
-  await d.insert(stockMovements).values({
-    productId: p.id,
-    businessLineId: p.businessLineId,
-    movementType: data.movementType,
-    quantity: data.quantity,
-    unitCostCents: data.quantity > 0 ? inboundCost : p.cmupCents,
-    reason: data.reason,
+    await tx.insert(stockMovements).values({
+      productId: p.id,
+      businessLineId: p.businessLineId,
+      movementType: data.movementType,
+      quantity: data.quantity,
+      unitCostCents: data.quantity > 0 ? inboundCost : p.cmupCents,
+      reason: data.reason,
+    });
+
+    const updates: Partial<typeof products.$inferInsert> = {
+      currentStock: next.quantity,
+      cmupCents: next.cmupCents,
+      updatedAt: new Date(),
+    };
+    if (data.quantity > 0 && data.unitCostCents != null) {
+      updates.lastPurchasePriceCents = data.unitCostCents;
+    }
+    await tx.update(products).set(updates).where(eq(products.id, p.id));
+    return { p, next };
   });
-
-  const updates: Partial<typeof products.$inferInsert> = {
-    currentStock: next.quantity,
-    cmupCents: next.cmupCents,
-    updatedAt: new Date(),
-  };
-  if (data.quantity > 0 && data.unitCostCents != null) {
-    updates.lastPurchasePriceCents = data.unitCostCents;
-  }
-  await d.update(products).set(updates).where(eq(products.id, p.id));
 
   const line = await d
     .select({ code: businessLines.code })

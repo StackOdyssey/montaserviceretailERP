@@ -26,7 +26,9 @@ import {
   Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { VAT_NOT_LIABLE_MENTION } from "@/lib/vat-regime";
 import { logout } from "@/lib/actions/auth";
+import { clearAppCaches } from "@/components/pwa/clear-app-caches";
 import {
   BusinessLineProvider,
   BusinessLineSelect,
@@ -123,6 +125,12 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
       setIsCollapsed(saved === "true");
     }
   }, []);
+
+  // Libellés TVA dérivés des paramètres (régime global + taux par défaut), jamais codés en dur.
+  const vatLiable = settings?.vatLiable ?? true;
+  const vatRate = settings?.defaultVatRate ?? 20;
+  const vatLabel = vatLiable ? `TVA ${vatRate}%` : VAT_NOT_LIABLE_MENTION;
+  const vatShort = vatLiable ? `${vatRate}%` : "HT";
 
   const toggleSidebar = () => {
     const nextState = !isCollapsed;
@@ -244,14 +252,15 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
           {!isCollapsed ? (
             <div className="flex flex-col gap-0.5">
               <span className="font-semibold text-[#111827]">BM Motors SARL</span>
-              <span>TVA 10% • MAD</span>
+              <span>{vatLabel} • {settings?.currency ?? "MAD"}</span>
             </div>
           ) : (
-            <div className="text-center font-bold text-[#F7162D]">10%</div>
+            <div className="text-center font-bold text-[#F7162D]">{vatShort}</div>
           )}
           <button
             onClick={async () => {
               await logout();
+              await clearAppCaches();
               window.location.href = "/login";
             }}
             className="mt-2 w-full flex items-center justify-center gap-1.5 py-1.5 px-2 text-xs font-semibold text-gray-500 hover:text-[#F7162D] hover:bg-red-50 rounded-lg transition"
@@ -365,10 +374,11 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
 
             <div className="p-4 border-t border-[#E5E7EB] bg-[#F8F9FA] text-xs text-[#6B7280]">
               <p className="font-semibold text-[#111827]">BM Motors ERP v2.0</p>
-              <p>Régime TVA 10% • Dirhams (MAD)</p>
+              <p>{vatLabel} • {settings?.currency ?? "MAD"}</p>
               <button
                 onClick={async () => {
                   await logout();
+                  await clearAppCaches();
                   window.location.href = "/login";
                 }}
                 className="mt-3 w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-bold text-white bg-[#F7162D] hover:bg-[#d81023] rounded-xl shadow-xs transition"

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { SESSION_COOKIE_NAME, verifyToken } from "@/lib/auth";
+import { SESSION_COOKIE_NAME } from "@/lib/auth";
+import { isLiveSession } from "@/lib/session";
 
 // App interne : aucune indexation/archivage, quel que soit le domaine (Cloud Run ou futur domaine).
 const NO_INDEX = "noindex, nofollow, noarchive, nosnippet, noimageindex";
@@ -28,7 +29,7 @@ export async function proxy(request: NextRequest) {
 
   // 2. Vérification du cookie de session
   const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  const isAuthenticated = sessionCookie ? await verifyToken(sessionCookie) : false;
+  const isAuthenticated = await isLiveSession(sessionCookie);
 
   // 3. Redirection vers la page de connexion si non authentifié
   if (!isAuthenticated) {

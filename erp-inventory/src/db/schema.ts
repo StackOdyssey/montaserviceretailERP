@@ -65,6 +65,8 @@ export const settings = pgTable("settings", {
   facPrefix: text("fac_prefix").notNull().default("FAC-"),
   avPrefix: text("av_prefix").notNull().default("AV-"),
   brPrefix: text("br_prefix").notNull().default("BR-"),
+  // Version des sessions : l'incrémenter révoque tous les cookies de session émis.
+  sessionVersion: integer("session_version").notNull().default(1),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

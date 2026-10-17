@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { getSettings, saveSettings, getVatRates, saveVatRate } from "@/lib/actions/settings";
 import { OPEN_QUESTIONS } from "@/lib/open-questions";
+import { revokeAllSessions } from "@/lib/actions/auth";
+import { clearAppCaches } from "@/components/pwa/clear-app-caches";
 
 export default function ParametresPage() {
   const router = useRouter();
@@ -632,6 +634,29 @@ export default function ParametresPage() {
                   la biométrie éventuelle de l'appareil reste du ressort du système, pas d'une session émise par l'ERP.
                 </p>
               </div>
+            </div>
+
+            {/* Révocation globale des sessions */}
+            <div className="p-5 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <span className="text-sm font-bold text-gray-900 dark:text-white block">Déconnecter tous les appareils</span>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Invalide immédiatement toutes les sessions ouvertes (téléphone perdu, poste partagé), y compris celle-ci.
+                  Après 5 codes PIN erronés en 15 minutes, la connexion est suspendue automatiquement.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!window.confirm("Déconnecter tous les appareils, y compris celui-ci ?")) return;
+                  await revokeAllSessions();
+                  await clearAppCaches();
+                  window.location.href = "/login";
+                }}
+                className="shrink-0 px-4 py-2 text-xs font-bold text-white bg-[#F7162D] hover:bg-[#d81023] rounded-xl shadow-xs transition"
+              >
+                Déconnecter tous les appareils
+              </button>
             </div>
           </div>
         )}

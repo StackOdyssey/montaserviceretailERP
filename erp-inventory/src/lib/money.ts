@@ -8,7 +8,7 @@ export interface DocumentTotals {
   discountPercent: number;   // Pourcentage (ex: 5 pour 5%)
   discountAmount: number;    // Montant de la remise en centimes (ex: 5000 = 50,00 DH)
   totalNetHT: number;        // En centimes (Total Brut HT - Remise)
-  tvaRate: number;           // Pourcentage (ex: 10 pour 10% SARL)
+  tvaRate: number;           // Pourcentage (taux paramétré, ex: 20 ; 0 si non-assujetti)
   tvaAmount: number;         // En centimes (Total Net HT * TVA)
   totalTTC: number;          // En centimes (Total Net HT + TVA)
 }
@@ -73,7 +73,7 @@ export function calculateNetHT(totalBrutHTCents: number, discountAmountCents: nu
 
 /**
  * Calcule le montant de la TVA en centimes sur la base du Total Net HT
- * Taux par défaut : 10% (Régime SARL pièces moto)
+ * Taux paramétré (settings → vat_rates) ; repli 20 % (taux normal CGI). 0 = non-assujetti.
  */
 export function calculateTVAAmount(totalNetHTCents: number, tvaRatePercent: number = 20): number {
   if (tvaRatePercent <= 0) return 0;
@@ -86,7 +86,7 @@ export function calculateTVAAmount(totalNetHTCents: number, tvaRatePercent: numb
  * 1. Total Brut HT
  * 2. Remise (X%) mentionnée sous le Total Brut HT
  * 3. Total Net HT
- * 4. TVA (10%)
+ * 4. TVA (taux paramétré)
  * 5. Total TTC (Net à payer)
  */
 export function calculateDocumentTotals(

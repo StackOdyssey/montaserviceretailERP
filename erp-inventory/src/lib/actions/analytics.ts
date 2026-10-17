@@ -6,6 +6,7 @@ import { getCustomers } from "./customers";
 import { getSuppliers, SupplierItem } from "./suppliers";
 import { getExpenses } from "./expenses";
 import { formatMoney } from "@/lib/money";
+import { assertAuthenticated } from "@/lib/action-guard";
 import { and, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
 import {
   db,
@@ -134,6 +135,7 @@ export interface TvaAccountingExport {
  * Calcule tous les indicateurs clés du tableau de bord en direct
  */
 export async function getDashboardMetrics(): Promise<DashboardMetrics> {
+  await assertAuthenticated();
   const [sales, prods, custs, supps, expRes] = await Promise.all([
     getSalesDocuments(),
     getProducts(),
@@ -247,6 +249,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
  * Calcule la valorisation intégrale du stock
  */
 export async function getStockValuation(): Promise<StockValuation> {
+  await assertAuthenticated();
   const prods = await getProducts();
 
   let totalItemsCount = 0;
@@ -302,6 +305,7 @@ export async function getStockValuation(): Promise<StockValuation> {
  * Calcule le rapport d'analyse des marges brutes
  */
 export async function getProfitMarginsReport(period: "THIS_MONTH" | "LAST_MONTH" | "ALL" = "THIS_MONTH"): Promise<ProfitMarginsReport> {
+  await assertAuthenticated();
   const expPeriod = period === "THIS_MONTH" ? "THIS_MONTH" : "ALL";
   const [sales, prods, expRes] = await Promise.all([
     getSalesDocuments(),
@@ -402,6 +406,7 @@ export async function getTvaAccountingExport(options?: {
   month?: number; // 0-11
   year?: number;
 }): Promise<TvaAccountingExport> {
+  await assertAuthenticated();
   const sales = await getSalesDocuments();
 
   const now = new Date();

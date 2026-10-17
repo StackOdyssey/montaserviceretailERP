@@ -3,8 +3,10 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/layout/AppShell";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
-import { getBusinessLines } from "@/lib/actions/business-lines";
-import { getPublicSettings, getParameters } from "@/lib/actions/settings";
+import { cookies } from "next/headers";
+import { getBusinessLines, getPublicSettings, getParameters } from "@/lib/queries/layout";
+import { SESSION_COOKIE_NAME } from "@/lib/auth";
+import { isLiveSession } from "@/lib/session";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -54,9 +56,11 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const lines = await getBusinessLines();
-  const settings = await getPublicSettings();
-  const parameters = await getParameters();
+  // Rendu aussi sur /login : aucune donnée société/paramètres sans session valide.
+  const authenticated = await isLiveSession((await cookies()).get(SESSION_COOKIE_NAME)?.value);
+  const [lines, settings, parameters] = authenticated
+    ? await Promise.all([getBusinessLines(), getPublicSettings(), getParameters()])
+    : [[], null, null];
   return (
     <html lang="fr" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="min-h-full flex flex-col bg-[#F8F9FA] text-[#111827]" suppressHydrationWarning>
