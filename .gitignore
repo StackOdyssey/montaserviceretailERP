@@ -12,9 +12,15 @@
 /PROJECT_TRACKER.md
 /PHASE_0_SCOPE_LOCK.md
 /gap_issue_tracker.md
+/report_analyse_file_by_claude.md
+/SECURITY_AND_VULNERABILITY_REMEDIATION_PLAN.md
+
+# Catalogue photo sources (imported to R2)
+/CatalogueImages/
 
 # Local AI tool state
 .kilo/
+.cursor/
 .agents/
 skills-lock.json
 .neon
