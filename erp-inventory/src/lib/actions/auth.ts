@@ -14,19 +14,25 @@ export interface AuthResult {
   message?: string;
 }
 
-// Anti force brute : au-delà de MAX_PIN_FAILURES échecs sur la fenêtre, la connexion est
-// suspendue (verrou global : un seul compte gérant ; Cloudflare Access filtre en amont).
+// Anti force brute : verrou PAR IP au-delà de MAX_PIN_FAILURES échecs sur la fenêtre,
+// + plafond global (spray distribué) au-delà de MAX_GLOBAL_FAILURES. Un seul compte
+// gérant : un verrou global pur permettrait à n'importe qui de bannir le gérant.
 const MAX_PIN_FAILURES = 5;
+const MAX_GLOBAL_FAILURES = 40;
 const PIN_LOCK_WINDOW_MS = 15 * 60 * 1000;
 
-async function recentPinFailures(): Promise<number> {
-  if (!db) return 0;
+async function recentPinFailures(ip: string): Promise<{ perIp: number; global: number }> {
+  if (!db) return { perIp: 0, global: 0 };
   const since = new Date(Date.now() - PIN_LOCK_WINDOW_MS);
   const rows = await db
-    .select({ n: count() })
+    .select({ n: count(), ip: auditLogs.ipAddress })
     .from(auditLogs)
-    .where(and(eq(auditLogs.action, "PIN_ECHEC"), gte(auditLogs.createdAt, since)));
-  return rows[0]?.n ?? 0;
+    .where(and(eq(auditLogs.action, "PIN_ECHEC"), gte(auditLogs.createdAt, since)))
+    .groupBy(auditLogs.ipAddress);
+  return {
+    perIp: rows.find((r) => r.ip === ip)?.n ?? 0,
+    global: rows.reduce((s, r) => s + r.n, 0),
+  };
 }
 
 async function clientIp(): Promise<string> {
@@ -48,8 +54,10 @@ export async function loginWithPin(pin: string): Promise<AuthResult> {
     return { success: false, message: "Base de données indisponible. Réessayez plus tard." };
   }
 
-  if ((await recentPinFailures()) >= MAX_PIN_FAILURES) {
-    logWarn("auth.pin_locked");
+  const ip = await clientIp();
+  const failures = await recentPinFailures(ip);
+  if (failures.perIp >= MAX_PIN_FAILURES || failures.global >= MAX_GLOBAL_FAILURES) {
+    logWarn("auth.pin_locked", { ip });
     return {
       success: false,
       message: "Trop de tentatives incorrectes. Connexion suspendue 15 minutes.",
@@ -57,11 +65,12 @@ export async function loginWithPin(pin: string): Promise<AuthResult> {
   }
 
   if (!verifyAdminPin(String(pin ?? ""))) {
-    logWarn("auth.pin_failed");
+    logWarn("auth.pin_failed", { ip });
     await db.insert(auditLogs).values({
       action: "PIN_ECHEC",
       entityType: "SESSION",
-      details: `Code PIN incorrect (IP ${await clientIp()}).`,
+      ipAddress: ip,
+      details: `Code PIN incorrect (IP ${ip}).`,
     });
     return {
       success: false,
@@ -86,6 +95,7 @@ export async function loginWithPin(pin: string): Promise<AuthResult> {
     await db.insert(auditLogs).values({
       action: "CONNEXION",
       entityType: "SESSION",
+      ipAddress: ip,
       details: "Ouverture de session (PIN gérant).",
     });
   } catch {

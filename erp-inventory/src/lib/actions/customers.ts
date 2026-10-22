@@ -7,6 +7,7 @@ import { assertPeriodOpen } from "@/lib/accounting-period";
 import { initialStatusFor, statusesForMethod } from "@/lib/payments";
 import { matchTokens } from "@/lib/search";
 import { getSalesDocuments, type SalesDocumentItem } from "./sales";
+import { validateInput, recordCustomerPaymentSchema } from "@/lib/action-validation";
 
 export interface CustomerItem {
   id: number;
@@ -265,10 +266,9 @@ export async function recordCustomerPayment(data: {
   notes?: string;
 }): Promise<CustomerPaymentItem> {
   await assertAuthenticated();
+  data = validateInput(recordCustomerPaymentSchema, data);
   const d = requireDb();
   await assertPeriodOpen();
-
-  if (data.amountCents <= 0) throw new Error("Le montant du règlement doit être supérieur à 0");
 
   const customer = (await d.select().from(customers).where(eq(customers.id, data.customerId)).limit(1))[0];
   if (!customer) throw new Error("Client introuvable");

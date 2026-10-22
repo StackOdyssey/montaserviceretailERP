@@ -106,6 +106,7 @@ export async function setPeriodLock(
   locked: boolean,
   notes?: string
 ): Promise<AccountingPeriodItem> {
+  await assertAuthenticated();
   return setPeriodStatus(year, month, locked ? "LOCKED" : "OPEN", notes);
 }
 

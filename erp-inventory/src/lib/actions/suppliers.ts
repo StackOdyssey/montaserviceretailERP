@@ -21,6 +21,7 @@ import { lockProducts } from "@/lib/stock-lock";
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { matchTokens } from "@/lib/search";
 import { effectiveVatRate } from "@/lib/vat-regime";
+import { validateInput, createSupplierReceiptSchema, recordSupplierPaymentSchema } from "@/lib/action-validation";
 
 export interface SupplierItem {
   id: number;
@@ -263,6 +264,7 @@ export async function createSupplierReceipt(data: {
   notes?: string;
 }): Promise<SupplierReceiptItem> {
   await assertAuthenticated();
+  data = validateInput(createSupplierReceiptSchema, data);
   const d = requireDb();
   await assertPeriodOpen();
 
@@ -379,10 +381,9 @@ export async function recordSupplierPayment(data: {
   notes?: string;
 }): Promise<SupplierPaymentItem & { warning?: string }> {
   await assertAuthenticated();
+  data = validateInput(recordSupplierPaymentSchema, data);
   const d = requireDb();
   await assertPeriodOpen();
-
-  if (data.amountCents <= 0) throw new Error("Le montant du règlement doit être supérieur à 0");
 
   const supplier = (await d.select().from(suppliers).where(eq(suppliers.id, data.supplierId)).limit(1))[0];
   if (!supplier) throw new Error("Fournisseur introuvable");

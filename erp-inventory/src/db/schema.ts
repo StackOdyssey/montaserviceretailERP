@@ -557,6 +557,7 @@ export const auditLogs = pgTable("audit_logs", {
   action: text("action").notNull(), // CREATION_BL, VALIDATION_BL, ENCAISSEMENT, REGLEMENT_FOURNISSEUR, DEPENSE_CAISSE, etc.
   entityType: text("entity_type").notNull(),
   entityId: integer("entity_id"),
+  ipAddress: text("ip_address"),
   details: text("details"),
   createdAt: timestamp("created_at").defaultNow(),
 });

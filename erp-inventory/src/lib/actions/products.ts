@@ -1,7 +1,7 @@
 "use server";
 
 import { and, asc, eq, gte, ilike, or, sql } from "drizzle-orm";
-import { businessLines, categories, db, products, settings, stockMovements } from "@/db";
+import { auditLogs, businessLines, categories, db, products, settings, stockMovements } from "@/db";
 
 export interface CategoryItem {
   id: number;
@@ -12,6 +12,7 @@ export interface CategoryItem {
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { assertAuthenticated } from "@/lib/action-guard";
 import { lockProducts } from "@/lib/stock-lock";
+import { validateInput, saveProductSchema, recordStockMovementSchema } from "@/lib/action-validation";
 
 export interface ProductItem {
   id: number;
@@ -222,6 +223,7 @@ export async function saveProduct(data: {
   businessLineCode?: string;
 }): Promise<ProductItem> {
   await assertAuthenticated();
+  data = validateInput(saveProductSchema, data);
   const d = requireDb();
   const lineCode = data.businessLineCode || "PIECES";
   const lineId = await lineIdByCode(lineCode);
@@ -266,6 +268,13 @@ export async function saveProduct(data: {
     savedId = r[0].id;
   }
 
+  await d.insert(auditLogs).values({
+    action: data.id ? "PRODUIT_MODIFIE" : "PRODUIT_CREE",
+    entityType: "PRODUCT",
+    entityId: savedId,
+    details: `${values.sku} — ${values.name} — vente ${(values.salePriceHtCents / 100).toFixed(2)} DH, stock ${values.currentStock}`,
+  });
+
   return {
     id: savedId,
     sku: values.sku,
@@ -302,6 +311,7 @@ export async function recordStockMovement(data: {
   unitCostCents?: number;
 }): Promise<ProductItem> {
   await assertAuthenticated();
+  data = validateInput(recordStockMovementSchema, data);
   const d = requireDb();
   // Lecture verrouillée + écriture dans la même transaction (pas de mise à jour perdue).
   const { p, next } = await d.transaction(async (tx) => {
@@ -336,6 +346,14 @@ export async function recordStockMovement(data: {
       updates.lastPurchasePriceCents = data.unitCostCents;
     }
     await tx.update(products).set(updates).where(eq(products.id, p.id));
+
+    await tx.insert(auditLogs).values({
+      action: "MOUVEMENT_STOCK_MANUEL",
+      entityType: "PRODUCT",
+      entityId: p.id,
+      details: `${p.sku} — ${data.movementType} ${data.quantity > 0 ? "+" : ""}${data.quantity} — ${data.reason} — stock ${next.quantity}`,
+    });
+
     return { p, next };
   });
 

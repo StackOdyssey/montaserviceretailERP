@@ -25,6 +25,7 @@ import { assertAuthenticated } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
 import { lockProducts } from "@/lib/stock-lock";
 import { applyMovement, type CmupState } from "@/lib/stock";
+import { validateInput, createSalesDocumentSchema } from "@/lib/action-validation";
 import { Resend } from "resend";
 
 export interface SalesLineInput {
@@ -247,11 +248,9 @@ export async function createSalesDocument(data: {
   overrideReason?: string;
 }): Promise<SalesDocumentItem> {
   await assertAuthenticated();
+  data = validateInput(createSalesDocumentSchema, data);
   const d = requireDb();
 
-  if (!data.lines || data.lines.length === 0) {
-    throw new Error("Le document doit contenir au moins un article");
-  }
   await assertPeriodOpen();
 
   const docType = data.docType ?? "BL";
@@ -370,8 +369,10 @@ export async function createSalesDocument(data: {
 
       // Question ouverte « Prix-negocie » : le prix est résolu côté serveur depuis
       // la base. Un prix hors catalogue est refusé (fail-closed) sauf motif tracé.
+      // Produit SANS prix catalogue : tout prix saisi est « hors catalogue » et exige
+      // aussi un motif (sinon un prix arbitraire passerait inaperçu).
       const catalogPrices = [p.salePriceHtCents].filter((v) => v > 0);
-      const isOffCatalog = catalogPrices.length > 0 && !catalogPrices.includes(l.unitPriceHTCents);
+      const isOffCatalog = catalogPrices.length === 0 || !catalogPrices.includes(l.unitPriceHTCents);
       if (isOffCatalog) {
         if (!data.overrideReason?.trim()) {
           throw new Error(
