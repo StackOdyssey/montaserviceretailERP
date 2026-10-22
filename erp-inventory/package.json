@@ -11,7 +11,8 @@
     "db:migrate": "node --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs migrate",
     "db:push": "node --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs push",
     "db:import-stock": "node --env-file=.env.local scripts/import-stock.mjs",
-    "db:verify-stock": "node --env-file=.env.local scripts/verify-stock.mjs"
+    "db:verify-stock": "node --env-file=.env.local scripts/verify-stock.mjs",
+    "stagehand": "node --env-file=.env.local --experimental-strip-types scripts/stagehand-agent.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
@@ -28,6 +29,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@browserbasehq/stagehand": "^4.2.1",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
@@ -38,5 +40,10 @@
     "eslint-config-next": "16.3.8",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "@browserbasehq/stagehand": {
+      "zod": "$zod"
+    }
   }
 }
