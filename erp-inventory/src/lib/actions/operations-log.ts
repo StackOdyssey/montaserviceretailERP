@@ -20,7 +20,8 @@ export interface OperationsLogEntry {
 }
 
 /** Libellés français des actions tracées (repli : code brut). */
-export const OPERATIONS_LOG_LABELS: Record<string, string> = {
+// Non exporté : un fichier "use server" ne peut exporter que des fonctions async.
+const OPERATIONS_LOG_LABELS: Record<string, string> = {
   CONNEXION: "Connexion",
   DECONNEXION: "Déconnexion",
   VALIDATION_DOCUMENT: "Vente validée (BL / Facture / BC)",

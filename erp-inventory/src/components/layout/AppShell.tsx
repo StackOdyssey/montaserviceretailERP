@@ -109,12 +109,6 @@ const navItems: NavItem[] = [
 
 export function AppShell({ children, lines, settings, parameters }: { children: React.ReactNode; lines: BusinessLine[]; settings?: CompanySettingsInput | null; parameters?: Parameters | null }) {
   const pathname = usePathname();
-
-  // Sur la page de connexion, afficher l'écran plein écran sans la barre de navigation
-  if (pathname === "/login") {
-    return <>{children}</>;
-  }
-
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -125,6 +119,13 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
       setIsCollapsed(saved === "true");
     }
   }, []);
+
+  // Sur la page de connexion, afficher l'écran plein écran sans la barre de navigation.
+  // Le return est APRÈS les hooks : AppShell reste monté lors des navigations
+  // (/login -> /), un return anticipé changerait le nombre de hooks appelés.
+  if (pathname === "/login") {
+    return <>{children}</>;
+  }
 
   // Libellés TVA dérivés des paramètres (régime global + taux par défaut), jamais codés en dur.
   const vatLiable = settings?.vatLiable ?? true;

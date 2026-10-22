@@ -59,6 +59,7 @@ export default function NouveauBonDeLivraisonPage() {
   const [docType, setDocType] = useState<"BL" | "FACTURE" | "BC" | "DEVIS">("BL");
 
   // Informations client
+  const [customerId, setCustomerId] = useState<number | null>(null);
   const [customerName, setCustomerName] = useState("Client Comptoir Particulier");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerCity, setCustomerCity] = useState("Casablanca");
@@ -135,6 +136,7 @@ export default function NouveauBonDeLivraisonPage() {
 
   const handleSelectCustomerMatch = (c: CustomerMatch) => {
     customerJustSelected.current = true;
+    setCustomerId(c.id);
     setCustomerName(c.name);
     setCustomerPhone(c.phone || "");
     setCustomerCity(c.city || "Casablanca");
@@ -238,6 +240,7 @@ export default function NouveauBonDeLivraisonPage() {
 
       const doc = await createSalesDocument({
         docType,
+        customerId,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim() || undefined,
         customerCity: customerCity.trim() || undefined,
@@ -332,7 +335,10 @@ export default function NouveauBonDeLivraisonPage() {
               <input
                 type="text"
                 value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
+                onChange={(e) => {
+                  setCustomerName(e.target.value);
+                  setCustomerId(null);
+                }}
                 onBlur={() => setTimeout(() => setCustomerMatches([]), 150)}
                 placeholder="Nom du client ou garage..."
                 autoComplete="off"
