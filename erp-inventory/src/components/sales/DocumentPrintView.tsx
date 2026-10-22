@@ -172,8 +172,8 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
                   <Image
                     src={company?.logoUrl || "/bashan-logo.png"}
                     alt="Logo"
-                    width={176}
-                    height={56}
+                    fill
+                    sizes="176px"
                     className="object-contain object-left"
                   />
                 </div>
@@ -284,8 +284,8 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
                 <Image
                   src={company?.logoUrl || "/bashan-logo.png"}
                   alt="Logo"
-                  width={112}
-                  height={40}
+                  fill
+                  sizes="112px"
                   className="object-contain object-left"
                 />
               </div>

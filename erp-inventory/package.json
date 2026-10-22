@@ -12,7 +12,7 @@
     "db:push": "node --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs push",
     "db:import-stock": "node --env-file=.env.local scripts/import-stock.mjs",
     "db:verify-stock": "node --env-file=.env.local scripts/verify-stock.mjs",
-    "stagehand": "node --env-file=.env.local --experimental-strip-types scripts/stagehand-agent.ts"
+    "stagehand": "node --env-file=.env.local --experimental-strip-types scripts/stagehand-agent.mts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

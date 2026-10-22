@@ -161,7 +161,7 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
                 src="/bashan-logo.png"
                 alt="Logo Bashan"
                 width={36}
-                height={36}
+                height={12}
                 className="object-contain"
                 priority
               />
@@ -289,8 +289,8 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
             <Image
               src="/bashan-logo.png"
               alt="Logo"
-              width={28}
-              height={28}
+              width={30}
+              height={10}
               className="object-contain"
             />
             <span className="font-bold text-sm tracking-tight text-[#111827]">BM MOTORS</span>
@@ -322,8 +322,8 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
                 <Image
                   src="/bashan-logo.png"
                   alt="Logo Bashan"
-                  width={32}
-                  height={32}
+                  width={30}
+                  height={10}
                   className="object-contain"
                 />
                 <div className="flex flex-col">

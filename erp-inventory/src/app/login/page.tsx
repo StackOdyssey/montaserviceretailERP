@@ -97,8 +97,8 @@ export default function LoginPage() {
             <Image
               src="/bashan-logo.png"
               alt="Logo Bashan"
-              width={70}
-              height={70}
+              width={72}
+              height={24}
               className="object-contain"
               priority
             />
