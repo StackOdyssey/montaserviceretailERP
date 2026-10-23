@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useTransition } from "react";
+import React, { useState, useEffect, useRef, useTransition } from "react";
 import Link from "next/link";
 import {
   Boxes,
@@ -9,6 +9,8 @@ import {
   FileSpreadsheet,
   AlertTriangle,
   ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
   Edit2,
   Filter,
   Package,
@@ -29,13 +31,18 @@ import { CsvModal } from "@/components/stock/CsvModal";
 import { useBusinessLine } from "@/components/layout/BusinessLineProvider";
 import { useSettings } from "@/components/layout/SettingsProvider";
 
+const PAGE_SIZE = 50;
+
 export default function StockCataloguePage() {
   const [productsList, setProductsList] = useState<ProductItem[]>([]);
-  const [catalogTotal, setCatalogTotal] = useState<number | null>(null);
+  // Compteurs serveur par onglet (le stockFilter actif n'y est pas appliqué).
+  const [counts, setCounts] = useState({ all: 0, low: 0, negative: 0 });
+  const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "negative">("all");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [, startTransition] = useTransition();
+  const filtersKeyRef = useRef("");
 
   // Modals state
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -49,53 +56,73 @@ export default function StockCataloguePage() {
   const { activeCode, activeLine } = useBusinessLine();
   const company = useSettings();
 
-  // Charger les pièces avec recherche instantanée
-  const fetchProducts = () => {
+  // Charger une page du catalogue (pagination serveur) + compteurs par onglet.
+  const fetchProducts = (targetPage: number) => {
     startTransition(async () => {
-      const filters = {
-        search: searchTerm,
-        stockFilter,
-        category: categoryFilter,
-        businessLineCode: activeCode,
-      };
-      const data = await getProducts(filters);
+      const base = { search: searchTerm, category: categoryFilter, businessLineCode: activeCode };
+      const [data, all, low, negative] = await Promise.all([
+        getProducts({
+          ...base,
+          stockFilter,
+          limit: PAGE_SIZE,
+          offset: (targetPage - 1) * PAGE_SIZE,
+        }),
+        getProductsCount(base),
+        getProductsCount({ ...base, stockFilter: "low" }),
+        getProductsCount({ ...base, stockFilter: "negative" }),
+      ]);
+      const filtered =
+        stockFilter === "all" ? all : stockFilter === "low" ? low : negative;
+      const lastPage = Math.max(1, Math.ceil(filtered / PAGE_SIZE));
+      // Après suppression/filtrage, ne pas rester bloqué sur une page vide.
+      if (targetPage > lastPage) {
+        setPage(lastPage); // re-déclenche l'effet de chargement
+        return;
+      }
       setProductsList(data);
-      // Le catalogue est plafonné à 500 lignes : si on atteint le plafond on
-      // récupère le total réel pour afficher un avertissement de troncature.
-      setCatalogTotal(data.length >= 500 ? await getProductsCount(filters) : null);
+      setCounts({ all, low, negative });
     });
   };
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchProducts();
+      const key = JSON.stringify([searchTerm, stockFilter, categoryFilter, activeCode]);
+      if (filtersKeyRef.current !== key) {
+        filtersKeyRef.current = key;
+        // Filtres modifiés : repartir en page 1 (re-déclenche l'effet via `page`).
+        if (page !== 1) {
+          setPage(1);
+          return;
+        }
+      }
+      fetchProducts(page);
     }, 150); // Débounce rapide (<200 ms)
 
     return () => clearTimeout(timer);
-  }, [searchTerm, stockFilter, categoryFilter, activeCode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, stockFilter, categoryFilter, activeCode, page]);
+
+  const filteredTotal =
+    stockFilter === "all" ? counts.all : stockFilter === "low" ? counts.low : counts.negative;
+  const totalPages = Math.max(1, Math.ceil(filteredTotal / PAGE_SIZE));
 
   // Sauvegarder un produit
   const handleSaveProduct = async (productData: Parameters<typeof saveProduct>[0]) => {
     await saveProduct(productData);
-    fetchProducts();
+    fetchProducts(page);
   };
 
   // Ajuster un stock
   const handleAdjustStock = async (data: Parameters<typeof recordStockMovement>[0]) => {
     await recordStockMovement(data);
-    fetchProducts();
+    fetchProducts(page);
   };
 
   // Importer CSV
   const handleImportCsv = async (items: Parameters<typeof importProductsBatch>[0]) => {
     await importProductsBatch(items);
-    fetchProducts();
+    fetchProducts(page);
   };
-
-  // Calcul des compteurs
-  const totalCount = productsList.length;
-  const lowStockCount = productsList.filter((p) => p.currentStock <= p.minStockAlert && p.currentStock >= 0).length;
-  const negativeStockCount = productsList.filter((p) => p.currentStock < 0).length;
 
   return (
     <div className="space-y-6">
@@ -209,7 +236,7 @@ export default function StockCataloguePage() {
                 : "bg-[#F8F9FA] text-[#4B5563] hover:bg-[#E5E7EB]"
             }`}
           >
-            Tous les articles ({catalogTotal ?? totalCount})
+            Tous les articles ({counts.all})
           </button>
 
           <button
@@ -221,7 +248,7 @@ export default function StockCataloguePage() {
             }`}
           >
             <AlertTriangle size={13} />
-            <span>Stock faible ({lowStockCount})</span>
+            <span>Stock faible ({counts.low})</span>
           </button>
 
           <button
@@ -233,20 +260,10 @@ export default function StockCataloguePage() {
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-[#F7162D] animate-ping" />
-            <span>Stock négatif toléré ({negativeStockCount})</span>
+            <span>Stock négatif toléré ({counts.negative})</span>
           </button>
         </div>
       </div>
-
-      {catalogTotal !== null && catalogTotal > productsList.length && (
-        <div className="flex items-center gap-2.5 bg-[#FFFBEB] border border-[#FDE68A] text-[#92400E] rounded-xl px-4 py-3 text-xs font-semibold">
-          <AlertTriangle size={15} className="shrink-0" />
-          <span>
-            Affichage limité aux {productsList.length} premiers articles sur {catalogTotal} —
-            affinez la recherche ou les filtres pour voir le reste du catalogue.
-          </span>
-        </div>
-      )}
 
       {/* ======================================================== */}
       {/* 3. TABLEAU DES ARTICLES (DESKTOP & MOBILE)               */}
@@ -413,6 +430,32 @@ export default function StockCataloguePage() {
             </table>
           </div>
         )}
+
+        {filteredTotal > 0 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[#E5E7EB] text-xs">
+            <span className="text-[#6B7280] font-medium">
+              Page {page} sur {totalPages} — {filteredTotal} article{filteredTotal > 1 ? "s" : ""}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg font-bold bg-[#F8F9FA] border border-[#E5E7EB] text-[#374151] hover:bg-[#E5E7EB] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                <ChevronLeft size={14} />
+                Précédent
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg font-bold bg-[#F8F9FA] border border-[#E5E7EB] text-[#374151] hover:bg-[#E5E7EB] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                Suivant
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ======================================================== */}
@@ -435,7 +478,7 @@ export default function StockCataloguePage() {
       <CsvModal
         isOpen={isCsvModalOpen}
         onClose={() => setIsCsvModalOpen(false)}
-        products={productsList}
+        businessLineCode={activeCode}
         onImport={handleImportCsv}
       />
     </div>

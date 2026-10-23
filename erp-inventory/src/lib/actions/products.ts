@@ -117,6 +117,9 @@ type ProductFilters = {
   categoryId?: number;
   stockFilter?: "all" | "low" | "negative";
   businessLineCode?: string;
+  /** Pagination : taille de page (défaut PRODUCTS_PAGE_SIZE) et décalage. */
+  limit?: number;
+  offset?: number;
 };
 
 async function productConds(options?: ProductFilters) {
@@ -155,8 +158,9 @@ const PRODUCTS_PAGE_SIZE = 500;
 
 /**
  * Récupère les pièces du catalogue filtrées par ligne métier (défaut PIECES).
- * Limité à PRODUCTS_PAGE_SIZE : comparer avec getProductsCount pour détecter
- * une troncature silencieuse.
+ * Sans `limit` explicite, plafonné à PRODUCTS_PAGE_SIZE : comparer avec
+ * getProductsCount pour détecter une troncature silencieuse. Avec
+ * `limit` + `offset`, sert de pagination serveur (ordre stable sku, id).
  */
 export async function getProducts(options?: ProductFilters): Promise<ProductItem[]> {
   await assertAuthenticated();
@@ -164,6 +168,8 @@ export async function getProducts(options?: ProductFilters): Promise<ProductItem
   const ctx = await productConds(options);
   if (!ctx) return [];
   const { conds, lineCode } = ctx;
+  const limit = Math.min(Math.max(1, options?.limit ?? PRODUCTS_PAGE_SIZE), 1000);
+  const offset = Math.max(0, options?.offset ?? 0);
 
   const rows = await d
     .select({
@@ -190,8 +196,9 @@ export async function getProducts(options?: ProductFilters): Promise<ProductItem
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))
     .where(and(...conds))
-    .orderBy(asc(products.sku))
-    .limit(PRODUCTS_PAGE_SIZE);
+    .orderBy(asc(products.sku), asc(products.id))
+    .limit(limit)
+    .offset(offset);
 
   return rows.map((r) => rawToItem(r, lineCode, r.categoryName));
 }

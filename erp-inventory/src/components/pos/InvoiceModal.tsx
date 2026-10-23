@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X, Printer, Check, Ban } from "lucide-react";
-import { SalesDocumentItem, cancelDocument } from "@/lib/actions/sales";
+import { SalesDocumentItem } from "@/lib/actions/sales";
+import { cancelDocument } from "@/lib/actions/sales-documents";
 import { formatMoney } from "@/lib/money";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
 

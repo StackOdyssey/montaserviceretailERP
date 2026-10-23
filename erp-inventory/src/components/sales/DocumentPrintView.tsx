@@ -3,12 +3,12 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { Printer, Share2, Mail, X, Check, AlertCircle } from "lucide-react";
+import { SalesDocumentItem } from "@/lib/actions/sales";
 import {
-  SalesDocumentItem,
   sendDocumentByEmail,
   getDocumentPrintContext,
   type DocumentPrintContext,
-} from "@/lib/actions/sales";
+} from "@/lib/actions/sales-documents";
 import { formatMoney } from "@/lib/money";
 
 interface DocumentPrintViewProps {

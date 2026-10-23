@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { X, Upload, Download, FileSpreadsheet, Check, AlertCircle } from "lucide-react";
-import { ProductItem, importProductsBatch } from "@/lib/actions/products";
+import { getProducts, importProductsBatch } from "@/lib/actions/products";
 import { toDirhams } from "@/lib/money";
 
 type CsvImportItems = Parameters<typeof importProductsBatch>[0];
@@ -10,11 +10,12 @@ type CsvImportItems = Parameters<typeof importProductsBatch>[0];
 interface CsvModalProps {
   isOpen: boolean;
   onClose: () => void;
-  products: ProductItem[];
+  /** Ligne métier active : l'export récupère le catalogue complet côté serveur. */
+  businessLineCode: string;
   onImport: (items: CsvImportItems) => Promise<void>;
 }
 
-export function CsvModal({ isOpen, onClose, products, onImport }: CsvModalProps) {
+export function CsvModal({ isOpen, onClose, businessLineCode, onImport }: CsvModalProps) {
   const [, setCsvText] = useState("");
   const [parsedPreview, setParsedPreview] = useState<CsvImportItems>([]);
   const [isImporting, setIsImporting] = useState(false);
@@ -23,8 +24,18 @@ export function CsvModal({ isOpen, onClose, products, onImport }: CsvModalProps)
 
   if (!isOpen) return null;
 
-  // Télécharger le catalogue actuel en CSV compatible Excel
-  const handleExport = () => {
+  // Télécharger le catalogue complet en CSV compatible Excel
+  const handleExport = async () => {
+    setErrorMessage(null);
+    setStatusMessage("Export en cours…");
+    let catalog;
+    try {
+      catalog = await getProducts({ businessLineCode });
+    } catch (err) {
+      setStatusMessage(null);
+      setErrorMessage(err instanceof Error ? err.message : "Erreur lors de l'export.");
+      return;
+    }
     const headers = [
       "SKU",
       "Code_OEM",
@@ -38,7 +49,7 @@ export function CsvModal({ isOpen, onClose, products, onImport }: CsvModalProps)
       "Emplacement",
     ];
 
-    const rows = products.map((p) => [
+    const rows = catalog.map((p) => [
       `"${p.sku}"`,
       `"${p.oemCode || ""}"`,
       `"${p.name.replace(/"/g, '""')}"`,
@@ -60,6 +71,7 @@ export function CsvModal({ isOpen, onClose, products, onImport }: CsvModalProps)
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setStatusMessage(`${catalog.length} articles exportés.`);
   };
 
   // Traiter un fichier CSV déposé ou collé
@@ -163,7 +175,7 @@ export function CsvModal({ isOpen, onClose, products, onImport }: CsvModalProps)
           <div className="p-4 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB] flex items-center justify-between gap-4">
             <div>
               <span className="text-xs font-bold text-[#111827] block">
-                Exporter le Catalogue Actuel ({products.length} articles)
+                Exporter le Catalogue Complet
               </span>
               <p className="text-xs text-[#6B7280]">
                 Génère un fichier CSV (.csv) directement ouvrable dans Microsoft Excel

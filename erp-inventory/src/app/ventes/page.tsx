@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useTransition } from "react";
+import React, { useState, useEffect, useRef, useTransition } from "react";
 import Link from "next/link";
 import {
   ShoppingCart,
@@ -12,14 +12,19 @@ import {
   Ban,
   FileDown,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   getSalesDocuments,
+  getSalesDocumentsCount,
+  type SalesDocumentItem,
+} from "@/lib/actions/sales";
+import {
   convertBlToFacture,
   createAvoir,
   cancelDocument,
-  SalesDocumentItem,
-} from "@/lib/actions/sales";
+} from "@/lib/actions/sales-documents";
 import { getDocumentUbl } from "@/lib/actions/dgi";
 import { formatMoney } from "@/lib/money";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
@@ -42,33 +47,62 @@ const DOC_TYPE_BADGE: Record<string, string> = {
   DEVIS: "bg-[#F3F4F6] text-[#6B7280]",
 };
 
+const PAGE_SIZE = 25;
+
 export default function VentesListPage() {
   const company = useSettings();
   const toast = useToast();
   const [documents, setDocuments] = useState<SalesDocumentItem[]>([]);
+  const [totalDocs, setTotalDocs] = useState(0);
+  const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [selectedDoc, setSelectedDoc] = useState<SalesDocumentItem | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [isLoading, startTransition] = useTransition();
+  const filtersKeyRef = useRef("");
 
-  const loadDocuments = () => {
+  const loadDocuments = (targetPage: number) => {
     startTransition(async () => {
-      const data = await getSalesDocuments({
+      const base = {
         search: searchTerm,
         status: statusFilter,
         docType: typeFilter === "ALL" ? undefined : (typeFilter as SalesDocumentItem["docType"]),
-      });
+      };
+      const [data, total] = await Promise.all([
+        getSalesDocuments({ ...base, limit: PAGE_SIZE, offset: (targetPage - 1) * PAGE_SIZE }),
+        getSalesDocumentsCount(base),
+      ]);
+      const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      // Après annulation/filtrage, ne pas rester bloqué sur une page vide.
+      if (targetPage > lastPage) {
+        setPage(lastPage); // re-déclenche l'effet de chargement
+        return;
+      }
       setDocuments(data);
+      setTotalDocs(total);
     });
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => loadDocuments(), 150);
+    const timer = setTimeout(() => {
+      const key = JSON.stringify([searchTerm, statusFilter, typeFilter]);
+      if (filtersKeyRef.current !== key) {
+        filtersKeyRef.current = key;
+        // Filtres modifiés : repartir en page 1 (re-déclenche l'effet via `page`).
+        if (page !== 1) {
+          setPage(1);
+          return;
+        }
+      }
+      loadDocuments(page);
+    }, 150);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, statusFilter, typeFilter]);
+  }, [searchTerm, statusFilter, typeFilter, page]);
+
+  const totalPages = Math.max(1, Math.ceil(totalDocs / PAGE_SIZE));
 
   const runAction = (doc: SalesDocumentItem, fn: () => Promise<unknown>) => {
     setBusyId(doc.id);
@@ -79,7 +113,7 @@ export default function VentesListPage() {
         toast.error((err as Error).message);
       } finally {
         setBusyId(null);
-        loadDocuments();
+        loadDocuments(page);
       }
     });
   };
@@ -323,6 +357,32 @@ export default function VentesListPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {totalDocs > 0 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[#E5E7EB] text-xs">
+            <span className="text-[#6B7280] font-medium">
+              Page {page} sur {totalPages} — {totalDocs} document{totalDocs > 1 ? "s" : ""}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg font-bold bg-[#F8F9FA] border border-[#E5E7EB] text-[#374151] hover:bg-[#E5E7EB] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                <ChevronLeft size={14} />
+                Précédent
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg font-bold bg-[#F8F9FA] border border-[#E5E7EB] text-[#374151] hover:bg-[#E5E7EB] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                Suivant
+                <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
         )}
       </div>
