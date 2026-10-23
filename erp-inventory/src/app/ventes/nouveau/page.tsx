@@ -17,6 +17,8 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { getProducts, ProductItem } from "@/lib/actions/products";
+import { saveCustomer } from "@/lib/actions/customers";
+import { unwrap } from "@/lib/action-result";
 import { useCustomerSearch, type CustomerMatch } from "@/lib/hooks/useCustomerSearch";
 import { ProductGrid } from "@/components/pos/ProductGrid";
 import { createSalesDocument, SalesLineInput, SalesDocumentItem } from "@/lib/actions/sales";
@@ -60,6 +62,7 @@ export default function NouveauBonDeLivraisonPage() {
   const [customerCity, setCustomerCity] = useState("Casablanca");
   const [customerIce, setCustomerIce] = useState("");
   const [isClientDetailsOpen, setIsClientDetailsOpen] = useState(false);
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
 
   // Recherche d'articles
   const [searchTerm, setSearchTerm] = useState("");
@@ -120,6 +123,31 @@ export default function NouveauBonDeLivraisonPage() {
     setCustomerPhone(c.phone || "");
     setCustomerCity(c.city || "Casablanca");
     setCustomerIce(c.ice || "");
+  };
+
+  // Crée la fiche client depuis la saisie libre (évite les doublons type
+  // « EL BENNANI » / « EL BANNANI » : le client existant doit être choisi dans
+  // la liste ; le bouton Créer n'existe que pour un vrai nouveau).
+  const handleCreateCustomer = async () => {
+    const name = customerName.trim();
+    if (name.length < 2 || isCreatingCustomer) return;
+    try {
+      setIsCreatingCustomer(true);
+      setErrorMessage(null);
+      const created = unwrap(await saveCustomer({
+        name,
+        phone: customerPhone.trim() || undefined,
+        city: customerCity.trim() || undefined,
+        ice: customerIce.trim() || undefined,
+        isProfessional: Boolean(customerIce.trim()),
+      }));
+      handleSelectCustomerMatch(created as CustomerMatch);
+      setIsClientDetailsOpen(true);
+    } catch (err) {
+      setErrorMessage((err as Error).message || "Erreur lors de la création du client");
+    } finally {
+      setIsCreatingCustomer(false);
+    }
   };
 
   // Catalogue visuel avec photos (toucher une carte ajoute la pièce)
@@ -327,7 +355,8 @@ export default function NouveauBonDeLivraisonPage() {
                 autoComplete="off"
                 className="w-full px-3.5 py-2 text-sm bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl font-semibold text-[#111827] outline-none focus:border-[#F7162D]"
               />
-              {customerMatches.length > 0 && (
+              {(customerMatches.length > 0 ||
+                (hasCustomerSearched && customerName.trim().length >= 2 && !customerId)) && (
                 <div className="absolute z-20 left-0 right-0 mt-1 border border-[#E5E7EB] rounded-xl overflow-hidden bg-white shadow-lg max-h-56 overflow-y-auto">
                   {customerMatches.map((c) => (
                     <button
@@ -345,11 +374,26 @@ export default function NouveauBonDeLivraisonPage() {
                       </div>
                     </button>
                   ))}
+                  {customerName.trim().length >= 2 &&
+                    !customerId &&
+                    !customerMatches.some(
+                      (c) => c.name.trim().toLowerCase() === customerName.trim().toLowerCase()
+                    ) && (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={handleCreateCustomer}
+                        disabled={isCreatingCustomer}
+                        className="w-full p-2.5 text-left bg-[#ECFDF5] hover:bg-[#D1FAE5] border-t border-[#E5E7EB] text-xs font-bold text-[#059669] disabled:opacity-50"
+                      >
+                        {isCreatingCustomer ? "Création…" : `+ Créer « ${customerName.trim()} » comme nouveau client`}
+                      </button>
+                    )}
                 </div>
               )}
-              {hasCustomerSearched && customerMatches.length === 0 && customerName.trim().length >= 2 && (
-                <div className="text-[11px] text-[#6B7280] px-1 pt-1">
-                  Nouveau client — complétez Tél / Ville ci-dessous.
+              {customerId && (
+                <div className="text-[11px] text-[#059669] px-1 pt-1 font-semibold">
+                  Fiche client existante sélectionnée (id {customerId}).
                 </div>
               )}
             </div>
