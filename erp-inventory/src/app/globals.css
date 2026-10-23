@@ -1,6 +1,13 @@
 @import "tailwindcss";
 
+/* Thème clair uniquement : l'app n'est pas conçue pour le mode sombre.
+   Les classes `dark:` vestigiales (basées sur prefers-color-scheme par défaut)
+   produisaient des champs illisibles sur mobile — on les rend inertes en
+   les rattachant à une classe .dark jamais posée. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
+  color-scheme: light;
   --background: #F8F9FA; /* Smoke White */
   --foreground: #111827; /* Deep Charcoal */
   
