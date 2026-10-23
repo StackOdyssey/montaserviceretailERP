@@ -17,7 +17,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { getProducts, ProductItem } from "@/lib/actions/products";
-import { saveCustomer } from "@/lib/actions/customers";
+import { getCustomers, saveCustomer } from "@/lib/actions/customers";
 import { unwrap } from "@/lib/action-result";
 import { useCustomerSearch, type CustomerMatch } from "@/lib/hooks/useCustomerSearch";
 import { ProductGrid } from "@/components/pos/ProductGrid";
@@ -63,6 +63,10 @@ export default function NouveauBonDeLivraisonPage() {
   const [customerIce, setCustomerIce] = useState("");
   const [isClientDetailsOpen, setIsClientDetailsOpen] = useState(false);
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+  // Liste complète des clients (flèche du combobox, chargée à la 1re ouverture)
+  const [isClientListOpen, setIsClientListOpen] = useState(false);
+  const [allCustomers, setAllCustomers] = useState<CustomerMatch[]>([]);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
 
   // Recherche d'articles
   const [searchTerm, setSearchTerm] = useState("");
@@ -149,6 +153,27 @@ export default function NouveauBonDeLivraisonPage() {
       setIsCreatingCustomer(false);
     }
   };
+
+  // Combobox : la flèche liste TOUS les clients ; la saisie filtre (matchTokens).
+  const toggleClientList = async () => {
+    if (!isClientListOpen && allCustomers.length === 0) {
+      try {
+        setIsLoadingCustomers(true);
+        setAllCustomers(await getCustomers());
+      } catch {
+        // liste indisponible : la recherche textuelle reste utilisable
+      } finally {
+        setIsLoadingCustomers(false);
+      }
+    }
+    setIsClientListOpen((v) => !v);
+  };
+
+  const isTypingCustomer =
+    !customerId &&
+    customerName.trim() !== "Client Comptoir Particulier" &&
+    customerName.trim().length >= 2;
+  const displayedCustomers = isTypingCustomer ? customerMatches : isClientListOpen ? allCustomers : [];
 
   // Catalogue visuel avec photos (toucher une carte ajoute la pièce)
   const [catalogItems, setCatalogItems] = useState<ProductItem[]>([]);
@@ -350,15 +375,40 @@ export default function NouveauBonDeLivraisonPage() {
                   setCustomerName(e.target.value);
                   setCustomerId(null);
                 }}
-                onBlur={() => setTimeout(() => clearCustomerMatches(), 150)}
+                onBlur={() =>
+                  setTimeout(() => {
+                    clearCustomerMatches();
+                    setIsClientListOpen(false);
+                  }, 150)
+                }
                 placeholder="Nom du client ou garage..."
                 autoComplete="off"
-                className="w-full px-3.5 py-2 text-sm bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl font-semibold text-[#111827] outline-none focus:border-[#F7162D]"
+                className="w-full pl-3.5 pr-9 py-2 text-sm bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl font-semibold text-[#111827] outline-none focus:border-[#F7162D]"
               />
-              {(customerMatches.length > 0 ||
-                (hasCustomerSearched && customerName.trim().length >= 2 && !customerId)) && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={toggleClientList}
+                aria-label="Afficher tous les clients"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 text-[#6B7280] hover:text-[#111827] rounded-md"
+              >
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform ${isClientListOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+              {(displayedCustomers.length > 0 || isTypingCustomer) && (
                 <div className="absolute z-20 left-0 right-0 mt-1 border border-[#E5E7EB] rounded-xl overflow-hidden bg-white shadow-lg max-h-56 overflow-y-auto">
-                  {customerMatches.map((c) => (
+                  {isLoadingCustomers && (
+                    <div className="p-2.5 text-[11px] text-[#6B7280]">Chargement des clients…</div>
+                  )}
+                  {!isTypingCustomer &&
+                    !isLoadingCustomers &&
+                    isClientListOpen &&
+                    allCustomers.length === 0 && (
+                      <div className="p-2.5 text-[11px] text-[#6B7280]">Aucun client enregistré.</div>
+                    )}
+                  {displayedCustomers.map((c) => (
                     <button
                       key={c.id}
                       type="button"
