@@ -23,9 +23,11 @@ import { lockProducts } from "@/lib/stock-lock";
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { validateInput, createSalesDocumentSchema } from "@/lib/action-validation";
 import {
+  businessMessage,
   loadDocumentById,
   mapDoc,
   requireDb,
+  type SalesDocResult,
   type SalesLineInput,
   type SalesDocumentItem,
 } from "@/lib/sales/shared";
@@ -33,6 +35,7 @@ import {
 export type {
   SalesLineInput,
   SalesDocumentItem,
+  SalesDocResult,
   CompanyPrintInfo,
   DocumentPrintContext,
 } from "@/lib/sales/shared";
@@ -183,8 +186,9 @@ export async function createSalesDocument(data: {
   overrideReason?: string;
   /** Clé de déduplication caisse : un retry/double-clic renvoie le doc existant. */
   idempotencyKey?: string;
-}): Promise<SalesDocumentItem> {
+}): Promise<SalesDocResult> {
   await assertAuthenticated();
+  try {
   data = validateInput(createSalesDocumentSchema, data);
   const d = requireDb();
 
@@ -202,7 +206,7 @@ export async function createSalesDocument(data: {
   };
   if (data.idempotencyKey) {
     const existing = await findByIdemKey(data.idempotencyKey);
-    if (existing) return existing;
+    if (existing) return { ok: true, document: existing };
   }
 
   await assertPeriodOpen();
@@ -483,12 +487,19 @@ export async function createSalesDocument(data: {
     // entre la pré-vérif et l'insert — on renvoie le document qu'elle a créé.
     if (data.idempotencyKey) {
       const existing = await findByIdemKey(data.idempotencyKey);
-      if (existing) return existing;
+      if (existing) return { ok: true, document: existing };
     }
     throw err;
   }
 
   const created = await loadDocumentById(docId);
   if (!created) throw new Error("ECHEC_CREATION_DOCUMENT");
-  return created;
+  return { ok: true, document: created };
+  } catch (err) {
+    // En production, les erreurs jetées sont masquées ("React error #441") :
+    // les règles de gestion sont renvoyées, les erreurs internes restent masquées.
+    const msg = businessMessage(err);
+    if (msg) return { ok: false, error: msg };
+    throw err;
+  }
 }

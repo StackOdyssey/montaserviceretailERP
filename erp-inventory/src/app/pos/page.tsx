@@ -208,7 +208,7 @@ export default function POSPage() {
         ? `Chèque N°${paymentData.chequeDetails.chequeNumber} - Banque: ${paymentData.chequeDetails.bankName} - Date émission: ${paymentData.chequeDetails.issueDate} - Encaissement: ${paymentData.chequeDetails.encaissementDate}`
         : undefined;
 
-      const doc = await createSalesDocument({
+      const res = await createSalesDocument({
         docType,
         customerId,
         customerName: customerName.trim(),
@@ -223,8 +223,12 @@ export default function POSPage() {
         businessLineCode,
         idempotencyKey: idempotencyKeyRef.current ?? undefined,
       });
+      if (!res.ok) {
+        setErrorMessage(res.error);
+        return;
+      }
 
-      setCreatedDocument(doc);
+      setCreatedDocument(res.document);
       setIsPaymentModalOpen(false);
       setCart([]);
       setDiscountPercent(0);

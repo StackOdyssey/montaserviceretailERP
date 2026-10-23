@@ -215,7 +215,7 @@ export default function NouveauBonDeLivraisonPage() {
       setIsSubmitting(true);
       setErrorMessage(null);
 
-      const doc = await createSalesDocument({
+      const res = await createSalesDocument({
         docType,
         customerId,
         customerName: customerName.trim(),
@@ -230,8 +230,12 @@ export default function NouveauBonDeLivraisonPage() {
         businessLineCode,
         idempotencyKey: idempotencyKeyRef.current ?? undefined,
       });
+      if (!res.ok) {
+        setErrorMessage(res.error);
+        return;
+      }
 
-      setCreatedDocument(doc);
+      setCreatedDocument(res.document);
       setCart([]);
       idempotencyKeyRef.current = crypto.randomUUID();
     } catch (err) {
