@@ -14,6 +14,7 @@ import {
 } from "@/lib/actions/stock-counts";
 import { useBusinessLine } from "@/components/layout/BusinessLineProvider";
 import { formatMoney } from "@/lib/money";
+import { unwrap } from "@/lib/action-result";
 
 export default function InventoryPage() {
   const { activeCode, activeLine } = useBusinessLine();
@@ -42,7 +43,7 @@ export default function InventoryPage() {
   const handleCreate = () => {
     setMessage(null);
     startTransition(async () => {
-      const { id } = await createStockCount(activeCode);
+      const { id } = unwrap(await createStockCount(activeCode));
       refresh(id);
     });
   };
@@ -71,7 +72,7 @@ export default function InventoryPage() {
 
   const persistLine = (lineId: number, counted: number) => {
     startTransition(async () => {
-      await setStockCountLine(lineId, counted);
+      unwrap(await setStockCountLine(lineId, counted));
     });
   };
 
@@ -79,9 +80,9 @@ export default function InventoryPage() {
     if (!selected) return;
     startTransition(async () => {
       for (const l of selected.lines) {
-        await setStockCountLine(l.lineId, l.countedQty);
+        unwrap(await setStockCountLine(l.lineId, l.countedQty));
       }
-      const { adjusted } = await validateStockCount(selected.header.id);
+      const { adjusted } = unwrap(await validateStockCount(selected.header.id));
       setMessage(`Inventaire validé — ${adjusted} ajustement(s) posté(s).`);
       refresh(selected.header.id);
     });
@@ -90,7 +91,7 @@ export default function InventoryPage() {
   const handleCancel = () => {
     if (!selected) return;
     startTransition(async () => {
-      await cancelStockCount(selected.header.id);
+      unwrap(await cancelStockCount(selected.header.id));
       setMessage("Inventaire annulé.");
       refresh(selected.header.id);
     });

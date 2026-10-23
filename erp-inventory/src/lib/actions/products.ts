@@ -13,6 +13,7 @@ import { applyMovement, type CmupState } from "@/lib/stock";
 import { assertAuthenticated, currentActor } from "@/lib/action-guard";
 import { lockProducts } from "@/lib/stock-lock";
 import { validateInput, saveProductSchema, recordStockMovementSchema } from "@/lib/action-validation";
+import { actionResult, type ActionResult } from "@/lib/action-result";
 
 export interface ProductItem {
   id: number;
@@ -260,6 +261,53 @@ export async function saveProduct(data: {
   barcode?: string;
   photoUrl?: string;
   businessLineCode?: string;
+}): Promise<ActionResult<ProductItem>> {
+  return actionResult(() => saveProductImpl(data));
+}
+
+export async function recordStockMovement(data: {
+  productId: number;
+  movementType: "ACHAT_RECEPTION" | "VENTE_BL" | "AVOIR_RETOUR" | "AJUSTEMENT_INVENTAIRE";
+  quantity: number; // positif = entrée, négatif = sortie
+  reason: string;
+  unitCostCents?: number;
+}): Promise<ActionResult<ProductItem>> {
+  return actionResult(() => recordStockMovementImpl(data));
+}
+
+export async function importProductsBatch(
+  items: Array<{
+    sku: string;
+    oemCode?: string;
+    name: string;
+    brand?: string;
+    purchasePriceDH: number;
+    salePriceRetailDH: number;
+    stock: number;
+    minStock?: number;
+    shelfLocation?: string;
+  }>
+): Promise<ActionResult<{ count: number }>> {
+  return actionResult(() => importProductsBatchImpl(items));
+}
+
+async function saveProductImpl(data: {
+  id?: number;
+  sku: string;
+  oemCode?: string;
+  name: string;
+  brand?: string;
+  categoryName?: string;
+  purchasePriceCents: number;
+  salePriceRetailCents: number;
+  salePriceWholesaleCents?: number;
+  tvaRate?: number;
+  minStockAlert: number;
+  currentStock: number;
+  shelfLocation?: string;
+  barcode?: string;
+  photoUrl?: string;
+  businessLineCode?: string;
 }): Promise<ProductItem> {
   await assertAuthenticated();
   data = validateInput(saveProductSchema, data);
@@ -343,7 +391,7 @@ export async function saveProduct(data: {
  * Enregistre un mouvement de stock (append-only) et met à jour stock + CMUP.
  * Bloque le stock négatif sauf si `settings.negative_stock_allowed`.
  */
-export async function recordStockMovement(data: {
+async function recordStockMovementImpl(data: {
   productId: number;
   movementType: "ACHAT_RECEPTION" | "VENTE_BL" | "AVOIR_RETOUR" | "AJUSTEMENT_INVENTAIRE";
   quantity: number; // positif = entrée, négatif = sortie
@@ -410,7 +458,7 @@ export async function recordStockMovement(data: {
 /**
  * Import de masse CSV : upsert par sku + mouvement de stock initial.
  */
-export async function importProductsBatch(
+async function importProductsBatchImpl(
   items: Array<{
     sku: string;
     oemCode?: string;

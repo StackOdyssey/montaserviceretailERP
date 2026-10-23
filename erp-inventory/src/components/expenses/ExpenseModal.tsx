@@ -7,6 +7,7 @@ import { useParameters, useSettings } from "@/components/layout/SettingsProvider
 import { toCentimes } from "@/lib/money";
 import { compressImageToWebP } from "@/lib/image-compressor";
 import { getPhotoUploadUrl } from "@/lib/actions/media";
+import { unwrap } from "@/lib/action-result";
 
 interface ExpenseModalProps {
   isOpen: boolean;
@@ -94,7 +95,7 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
       setIsSubmitting(true);
       setError(null);
 
-      await recordExpense({
+      unwrap(await recordExpense({
         title,
         category: activeCategory?.name ?? "Divers",
         categoryId: activeCategory?.id ?? null,
@@ -103,7 +104,7 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
         expenseDate: new Date(expenseDate).toISOString(),
         receiptPhotoUrl: photoPreview || undefined,
         notes: notes.trim() || undefined,
-      });
+      }));
 
       onSaved();
       onClose();

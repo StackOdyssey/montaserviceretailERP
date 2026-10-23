@@ -14,6 +14,7 @@ import {
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { assertAuthenticated, assertOwner } from "@/lib/action-guard";
 import { lockProducts } from "@/lib/stock-lock";
+import { actionResult, type ActionResult } from "@/lib/action-result";
 
 export interface StockCountSummary {
   id: number;
@@ -53,7 +54,23 @@ async function lineIdByCode(code: string): Promise<number | null> {
 }
 
 /** Crée un inventaire brouillon et fige le stock théorique de chaque article de la ligne. */
-export async function createStockCount(businessLineCode: string): Promise<{ id: number; code: string }> {
+export async function createStockCount(businessLineCode: string): Promise<ActionResult<{ id: number; code: string }>> {
+  return actionResult(() => createStockCountImpl(businessLineCode));
+}
+
+export async function setStockCountLine(lineId: number, countedQty: number): Promise<ActionResult<void>> {
+  return actionResult(() => setStockCountLineImpl(lineId, countedQty));
+}
+
+export async function validateStockCount(id: number): Promise<ActionResult<{ adjusted: number }>> {
+  return actionResult(() => validateStockCountImpl(id));
+}
+
+export async function cancelStockCount(id: number): Promise<ActionResult<void>> {
+  return actionResult(() => cancelStockCountImpl(id));
+}
+
+async function createStockCountImpl(businessLineCode: string): Promise<{ id: number; code: string }> {
   await assertAuthenticated();
   const d = requireDb();
   const lineId = await lineIdByCode(businessLineCode);
@@ -168,7 +185,7 @@ export async function getStockCount(
 }
 
 /** Saisit la quantité comptée d'une ligne (variance recalculée vs stock théorique). */
-export async function setStockCountLine(lineId: number, countedQty: number): Promise<void> {
+async function setStockCountLineImpl(lineId: number, countedQty: number): Promise<void> {
   await assertAuthenticated();
   const d = requireDb();
   await d
@@ -181,7 +198,7 @@ export async function setStockCountLine(lineId: number, countedQty: number): Pro
  * Valide l'inventaire : poste un ajustement (counter-signé) par écart,
  * via le moteur CMUP, puis passe l'inventaire à VALIDATED.
  */
-export async function validateStockCount(id: number): Promise<{ adjusted: number }> {
+async function validateStockCountImpl(id: number): Promise<{ adjusted: number }> {
   const session = await assertOwner();
   const d = requireDb();
 
@@ -275,7 +292,7 @@ export async function validateStockCount(id: number): Promise<{ adjusted: number
   return { adjusted };
 }
 
-export async function cancelStockCount(id: number): Promise<void> {
+async function cancelStockCountImpl(id: number): Promise<void> {
   const session = await assertOwner();
   const d = requireDb();
   const header = (await d.select({ code: stockCounts.code }).from(stockCounts).where(eq(stockCounts.id, id)).limit(1))[0];

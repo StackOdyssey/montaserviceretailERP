@@ -77,13 +77,8 @@ export interface DocumentPrintContext {
   docLabel: string;
 }
 
-/** Erreur métier : son message est SAFE à renvoyer au client (règles de gestion). */
-export class BusinessError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "BusinessError";
-  }
-}
+// La logique de résultat d'action vit dans @/lib/action-result (partagée).
+export { BusinessError, businessMessage } from "@/lib/action-result";
 
 /**
  * En production, Next masque les erreurs levées par les Server Actions
@@ -93,17 +88,6 @@ export class BusinessError extends Error {
 export type SalesDocResult =
   | { ok: true; document: SalesDocumentItem }
   | { ok: false; error: string };
-
-/** Préfixes de messages métier sûrs à afficher (validateInput, requireDb, période). */
-const SAFE_ERROR_PREFIX =
-  /^(ENTREE_INVALIDE|BASE_INDISPONIBLE|CLIENT_|ICE_|STOCK_|PRIX_|TVA_|LIGNE_|PIECE_|ECHEC_|Période|DOCUMENT_|AVOIR_|NON_AUTORISE)/;
-
-/** Convertit une erreur en message affichable si elle est métier, sinon null. */
-export function businessMessage(err: unknown): string | null {
-  if (err instanceof BusinessError) return err.message;
-  if (err instanceof Error && SAFE_ERROR_PREFIX.test(err.message)) return err.message;
-  return null;
-}
 
 export const DOC_LABELS: Record<string, string> = {
   BL: "BON DE LIVRAISON",

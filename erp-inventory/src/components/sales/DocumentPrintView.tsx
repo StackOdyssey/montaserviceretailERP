@@ -10,6 +10,7 @@ import {
   type DocumentPrintContext,
 } from "@/lib/actions/sales-documents";
 import { formatMoney } from "@/lib/money";
+import { unwrap } from "@/lib/action-result";
 
 interface DocumentPrintViewProps {
   document: SalesDocumentItem;
@@ -30,8 +31,8 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
   useEffect(() => {
     let active = true;
     getDocumentPrintContext(doc.id)
-      .then((c) => {
-        if (active) setCtx(c);
+      .then((r) => {
+        if (active && r.ok) setCtx(r.value);
       })
       .catch(() => {});
     return () => {
@@ -75,7 +76,7 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
     try {
       setIsSendingEmail(true);
       setEmailStatus(null);
-      const res = await sendDocumentByEmail({ documentId: doc.id, recipientEmail: recipientEmail.trim() });
+      const res = unwrap(await sendDocumentByEmail({ documentId: doc.id, recipientEmail: recipientEmail.trim() }));
       setEmailStatus(res);
     } catch (err) {
       setEmailStatus({ success: false, message: (err as Error).message || "Erreur lors de l'envoi de l'email" });

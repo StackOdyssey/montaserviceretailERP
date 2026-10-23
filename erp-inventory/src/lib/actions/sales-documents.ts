@@ -26,6 +26,7 @@ import {
   type DocumentPrintContext,
   type CompanyPrintInfo,
 } from "@/lib/sales/shared";
+import { actionResult, type ActionResult } from "@/lib/action-result";
 import { Resend } from "resend";
 
 export type { SalesDocumentItem, DocumentPrintContext, CompanyPrintInfo } from "@/lib/sales/shared";
@@ -34,6 +35,13 @@ export type { SalesDocumentItem, DocumentPrintContext, CompanyPrintInfo } from "
  * Envoie le document par email (Resend). Simulation si RESEND_API_KEY absente.
  */
 export async function sendDocumentByEmail(data: {
+  documentId: number;
+  recipientEmail: string;
+}): Promise<ActionResult<{ success: boolean; message: string }>> {
+  return actionResult(() => sendDocumentByEmailImpl(data));
+}
+
+async function sendDocumentByEmailImpl(data: {
   documentId: number;
   recipientEmail: string;
 }): Promise<{ success: boolean; message: string }> {
@@ -91,7 +99,13 @@ export async function sendDocumentByEmail(data: {
  * Contexte d'impression : document, visibilité TVA par ligne métier (§6A) et identité société.
  * La visibilité TVA provient de `business_line_document_settings` (FAC/AV toujours affichés).
  */
-export async function getDocumentPrintContext(documentId: number): Promise<DocumentPrintContext | null> {
+export async function getDocumentPrintContext(
+  documentId: number
+): Promise<ActionResult<DocumentPrintContext | null>> {
+  return actionResult(() => getDocumentPrintContextImpl(documentId));
+}
+
+async function getDocumentPrintContextImpl(documentId: number): Promise<DocumentPrintContext | null> {
   await assertAuthenticated();
   const d = requireDb();
 
@@ -163,6 +177,13 @@ export async function getDocumentPrintContext(documentId: number): Promise<Docum
  * supplémentaire (le BL l'a déjà déduit) ; liaison BL→FAC via document_links.
  */
 export async function convertBlToFacture(
+  blIds: number[],
+  opts?: { customerId?: number | null }
+): Promise<ActionResult<SalesDocumentItem>> {
+  return actionResult(() => convertBlToFactureImpl(blIds, opts));
+}
+
+async function convertBlToFactureImpl(
   blIds: number[],
   opts?: { customerId?: number | null }
 ): Promise<SalesDocumentItem> {
@@ -281,6 +302,15 @@ export async function convertBlToFacture(
  * en stock au COGS d'origine. TVA au taux d'origine.
  */
 export async function createAvoir(data: {
+  sourceDocumentId: number;
+  returns: Array<{ lineId: number; quantity: number }>;
+  notes?: string;
+  avType?: "RETOUR" | "COMMERCIAL" | "CORRECTION";
+}): Promise<ActionResult<SalesDocumentItem>> {
+  return actionResult(() => createAvoirImpl(data));
+}
+
+async function createAvoirImpl(data: {
   sourceDocumentId: number;
   returns: Array<{ lineId: number; quantity: number }>;
   notes?: string;
@@ -444,7 +474,14 @@ export async function createAvoir(data: {
  * Annule un document validé (immutabilité : on n'édite pas, on annule).
  * Contrepasse les mouvements de stock du document et journalise l'action.
  */
-export async function cancelDocument(documentId: number, reason?: string): Promise<SalesDocumentItem> {
+export async function cancelDocument(
+  documentId: number,
+  reason?: string
+): Promise<ActionResult<SalesDocumentItem>> {
+  return actionResult(() => cancelDocumentImpl(documentId, reason));
+}
+
+async function cancelDocumentImpl(documentId: number, reason?: string): Promise<SalesDocumentItem> {
   await assertOwner();
   const d = requireDb();
 

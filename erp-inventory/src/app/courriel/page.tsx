@@ -26,6 +26,7 @@ import {
   deleteSupplierEmail,
 } from "@/lib/actions/emails";
 import { useToast } from "@/components/ui/ToastProvider";
+import { unwrap } from "@/lib/action-result";
 
 export default function CourrielPage() {
   const company = useSettings();
@@ -81,7 +82,7 @@ export default function CourrielPage() {
   const handleSelectEmail = async (email: SupplierEmailItem) => {
     setSelectedEmail(email);
     if (!email.isRead) {
-      await markEmailAsRead(email.id);
+      unwrap(await markEmailAsRead(email.id));
       setEmails((prev) =>
         prev.map((e) => (e.id === email.id ? { ...e, isRead: true } : e))
       );
@@ -90,7 +91,7 @@ export default function CourrielPage() {
 
   const handleDelete = async (id: number) => {
     if (confirm("Supprimer ce courriel de la boîte ?")) {
-      await deleteSupplierEmail(id);
+      unwrap(await deleteSupplierEmail(id));
       if (selectedEmail?.id === id) {
         setSelectedEmail(null);
       }
@@ -153,7 +154,7 @@ Comptabilité - ${company.raisonSociale}`);
     setIsSending(true);
     try {
       const supp = suppliersList.find((s) => s.id === composeSupplierId);
-      const newMail = await sendSupplierEmail({
+      const newMail = unwrap(await sendSupplierEmail({
         supplierId: composeSupplierId,
         supplierName: supp ? supp.name : "Fournisseur",
         toAddress: composeTo,
@@ -165,7 +166,7 @@ Comptabilité - ${company.raisonSociale}`);
           size: a.size,
           mimeType: "application/pdf",
         })),
-      });
+      }));
 
       setIsComposeOpen(false);
       setComposeSubject("");

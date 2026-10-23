@@ -23,6 +23,7 @@ import { revokeAllSessions } from "@/lib/actions/auth";
 import { clearAppCaches } from "@/components/pwa/clear-app-caches";
 import { UsersSection } from "@/components/settings/UsersSection";
 import { useToast } from "@/components/ui/ToastProvider";
+import { unwrap } from "@/lib/action-result";
 
 export default function ParametresPage() {
   const router = useRouter();
@@ -132,7 +133,7 @@ export default function ParametresPage() {
     const capitalCents = Number(companyInfo.capital.replace(/[^\d]/g, "")) * 100;
     const vatId = vatRates.find((r) => r.ratePercent === fiscalSettings.defaultTvaRate)?.id ?? null;
     try {
-      await saveSettings({
+      unwrap(await saveSettings({
         raisonSociale: companyInfo.name,
         tradeName: companyInfo.tradeName,
         legalForm: companyInfo.legalForm,
@@ -160,7 +161,7 @@ export default function ParametresPage() {
         bank2Name: bankSettings.bank2Name,
         bank2Agency: bankSettings.bank2Agency,
         bank2Rib: bankSettings.bank2Rib,
-      });
+      }));
       setSavedNotification(true);
       setTimeout(() => setSavedNotification(false), 3000);
       // Revalide le layout serveur (paramètres société) pour que la caisse
@@ -178,7 +179,7 @@ export default function ParametresPage() {
       return;
     }
     try {
-      const saved = await saveVatRate({ ratePercent: rate, label: newVatLabel });
+      const saved = unwrap(await saveVatRate({ ratePercent: rate, label: newVatLabel }));
       const rates = await getVatRates();
       setVatRates(rates.map((r) => ({ id: r.id, ratePercent: r.ratePercent, label: r.label })));
       setFiscalSettings((f) => ({ ...f, defaultTvaRate: saved.ratePercent }));

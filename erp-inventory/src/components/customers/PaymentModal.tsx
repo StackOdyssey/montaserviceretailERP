@@ -5,6 +5,7 @@ import { X, Banknote } from "lucide-react";
 import { CustomerItem, recordCustomerPayment, getCustomerStatement } from "@/lib/actions/customers";
 import { formatMoney, toCentimes } from "@/lib/money";
 import { useParameters } from "@/components/layout/SettingsProvider";
+import { unwrap } from "@/lib/action-result";
 
 const MOROCCAN_BANKS = [
   "Attijariwafa Bank",
@@ -84,7 +85,7 @@ export function PaymentModal({
       const amountCents = toCentimes(parsedDh);
       const docId = targetDocId === "AUTO" ? null : parseInt(targetDocId, 10);
 
-      await recordCustomerPayment({
+      unwrap(await recordCustomerPayment({
         customerId: selectedCustomerId,
         amountCents,
         paymentMethod,
@@ -93,7 +94,7 @@ export function PaymentModal({
         chequeDueDate: paymentMethod === "CHEQUE" || paymentMethod === "EFFET_LCN" ? chequeDueDate : undefined,
         bankName: paymentMethod === "CHEQUE" || paymentMethod === "EFFET_LCN" || paymentMethod === "VIREMENT" ? bankName : undefined,
         notes: notes.trim() || undefined,
-      });
+      }));
 
       onSaved();
       onClose();

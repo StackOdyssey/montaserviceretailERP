@@ -30,6 +30,7 @@ import { StockAdjustmentModal } from "@/components/stock/StockAdjustmentModal";
 import { CsvModal } from "@/components/stock/CsvModal";
 import { useBusinessLine } from "@/components/layout/BusinessLineProvider";
 import { useSettings } from "@/components/layout/SettingsProvider";
+import { unwrap } from "@/lib/action-result";
 
 const PAGE_SIZE = 50;
 
@@ -108,19 +109,19 @@ export default function StockCataloguePage() {
 
   // Sauvegarder un produit
   const handleSaveProduct = async (productData: Parameters<typeof saveProduct>[0]) => {
-    await saveProduct(productData);
+    unwrap(await saveProduct(productData));
     fetchProducts(page);
   };
 
   // Ajuster un stock
   const handleAdjustStock = async (data: Parameters<typeof recordStockMovement>[0]) => {
-    await recordStockMovement(data);
+    unwrap(await recordStockMovement(data));
     fetchProducts(page);
   };
 
   // Importer CSV
   const handleImportCsv = async (items: Parameters<typeof importProductsBatch>[0]) => {
-    await importProductsBatch(items);
+    unwrap(await importProductsBatch(items));
     fetchProducts(page);
   };
 

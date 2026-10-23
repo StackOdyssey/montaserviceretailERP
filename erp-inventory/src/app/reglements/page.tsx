@@ -25,6 +25,7 @@ import { PaymentModal } from "@/components/customers/PaymentModal";
 import { CustomerModal } from "@/components/customers/CustomerModal";
 import { CustomerStatementModal } from "@/components/customers/CustomerStatementModal";
 import { useToast } from "@/components/ui/ToastProvider";
+import { unwrap } from "@/lib/action-result";
 
 export default function ReglementsPage() {
   const toast = useToast();
@@ -72,7 +73,7 @@ export default function ReglementsPage() {
   const handleUpdateChequeStatus = async (paymentId: number, newStatus: string) => {
     startTransition(async () => {
       try {
-        await updatePaymentStatus(paymentId, newStatus);
+        unwrap(await updatePaymentStatus(paymentId, newStatus));
         loadData();
       } catch (e) {
         toast.error((e as Error).message);

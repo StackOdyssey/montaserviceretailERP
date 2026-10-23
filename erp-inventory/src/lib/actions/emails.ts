@@ -3,6 +3,7 @@
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { db, settings, supplierEmails, suppliers } from "@/db";
 import { assertAuthenticated } from "@/lib/action-guard";
+import { actionResult, type ActionResult } from "@/lib/action-result";
 
 export interface EmailAttachment {
   name: string;
@@ -110,6 +111,26 @@ export async function sendSupplierEmail(data: {
   bodyText: string;
   bodyHtml?: string;
   attachments?: EmailAttachment[];
+}): Promise<ActionResult<SupplierEmailItem>> {
+  return actionResult(() => sendSupplierEmailImpl(data));
+}
+
+export async function markEmailAsRead(id: number): Promise<ActionResult<Awaited<ReturnType<typeof markEmailAsReadImpl>>>> {
+  return actionResult(() => markEmailAsReadImpl(id));
+}
+
+export async function deleteSupplierEmail(id: number): Promise<ActionResult<Awaited<ReturnType<typeof deleteSupplierEmailImpl>>>> {
+  return actionResult(() => deleteSupplierEmailImpl(id));
+}
+
+async function sendSupplierEmailImpl(data: {
+  supplierId: number;
+  supplierName: string;
+  toAddress: string;
+  subject: string;
+  bodyText: string;
+  bodyHtml?: string;
+  attachments?: EmailAttachment[];
 }): Promise<SupplierEmailItem> {
   await assertAuthenticated();
   const d = requireDb();
@@ -165,7 +186,7 @@ export async function sendSupplierEmail(data: {
 }
 
 /** Marque un courriel comme lu. */
-export async function markEmailAsRead(id: number) {
+async function markEmailAsReadImpl(id: number) {
   await assertAuthenticated();
   const d = requireDb();
   await d.update(supplierEmails).set({ isRead: true }).where(eq(supplierEmails.id, id));
@@ -173,7 +194,7 @@ export async function markEmailAsRead(id: number) {
 }
 
 /** Supprime un courriel. */
-export async function deleteSupplierEmail(id: number) {
+async function deleteSupplierEmailImpl(id: number) {
   await assertAuthenticated();
   const d = requireDb();
   await d.delete(supplierEmails).where(eq(supplierEmails.id, id));

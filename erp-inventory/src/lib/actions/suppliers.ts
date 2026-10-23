@@ -22,6 +22,7 @@ import { applyMovement, type CmupState } from "@/lib/stock";
 import { matchTokens } from "@/lib/search";
 import { effectiveVatRate } from "@/lib/vat-regime";
 import { validateInput, createSupplierReceiptSchema, recordSupplierPaymentSchema } from "@/lib/action-validation";
+import { actionResult, type ActionResult } from "@/lib/action-result";
 
 export interface SupplierItem {
   id: number;
@@ -262,6 +263,59 @@ export async function createSupplierReceipt(data: {
   supplierInvoiceNumber?: string;
   lines: Array<{ productId: number; productName: string; sku: string; quantity: number; unitCostCents: number }>;
   notes?: string;
+}): Promise<ActionResult<SupplierReceiptItem>> {
+  return actionResult(() => createSupplierReceiptImpl(data));
+}
+
+export async function recordSupplierPayment(data: {
+  supplierId: number;
+  amountCents: number;
+  paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT";
+  receiptId?: number | null;
+  referenceNumber?: string;
+  dueDate?: string;
+  bankName?: string;
+  notes?: string;
+}): Promise<ActionResult<SupplierPaymentItem & { warning?: string }>> {
+  return actionResult(() => recordSupplierPaymentImpl(data));
+}
+
+export async function mergeSuppliers(sourceId: number, targetId: number): Promise<ActionResult<SupplierItem>> {
+  return actionResult(() => mergeSuppliersImpl(sourceId, targetId));
+}
+
+export async function saveSupplier(data: {
+  id?: number;
+  name: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+  city?: string;
+  ice?: string;
+  isActive?: boolean;
+  externalRef?: string;
+  notes?: string;
+}): Promise<ActionResult<SupplierItem>> {
+  return actionResult(() => saveSupplierImpl(data));
+}
+
+export async function deleteSupplier(id: number): Promise<ActionResult<{ success: boolean }>> {
+  return actionResult(() => deleteSupplierImpl(id));
+}
+
+export async function createSupplierPriceCreditNote(data: {
+  receiptId: number;
+  lines: Array<{ lineId: number; amountHtCents: number }>;
+  reason?: string;
+}): Promise<ActionResult<{ success: boolean; totalCreditHtCents: number }>> {
+  return actionResult(() => createSupplierPriceCreditNoteImpl(data));
+}
+
+async function createSupplierReceiptImpl(data: {
+  supplierId: number;
+  supplierInvoiceNumber?: string;
+  lines: Array<{ productId: number; productName: string; sku: string; quantity: number; unitCostCents: number }>;
+  notes?: string;
 }): Promise<SupplierReceiptItem> {
   await assertAuthenticated();
   data = validateInput(createSupplierReceiptSchema, data);
@@ -371,7 +425,7 @@ export async function createSupplierReceipt(data: {
 /**
  * Enregistre un règlement émis à un fournisseur (et met à jour la réception ciblée).
  */
-export async function recordSupplierPayment(data: {
+async function recordSupplierPaymentImpl(data: {
   supplierId: number;
   amountCents: number;
   paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT";
@@ -500,7 +554,7 @@ export async function findSupplierDuplicates(
  * Fusionne deux fournisseurs : ré-affecte réceptions + règlements à la cible puis
  * archive (soft-delete) la source. Miroir de `mergeCustomers` (T3.2).
  */
-export async function mergeSuppliers(sourceId: number, targetId: number): Promise<SupplierItem> {
+async function mergeSuppliersImpl(sourceId: number, targetId: number): Promise<SupplierItem> {
   await assertAuthenticated();
   const d = requireDb();
   if (sourceId === targetId) throw new Error("La source et la cible sont identiques");
@@ -529,7 +583,7 @@ export async function mergeSuppliers(sourceId: number, targetId: number): Promis
 /**
  * Crée ou met à jour un fournisseur.
  */
-export async function saveSupplier(data: {
+async function saveSupplierImpl(data: {
   id?: number;
   name: string;
   contactName?: string;
@@ -588,7 +642,7 @@ export async function saveSupplier(data: {
 /**
  * Archive (soft-delete) un fournisseur.
  */
-export async function deleteSupplier(id: number): Promise<{ success: boolean }> {
+async function deleteSupplierImpl(id: number): Promise<{ success: boolean }> {
   await assertAuthenticated();
   const d = requireDb();
   await d.update(suppliers).set({ deletedAt: new Date() }).where(eq(suppliers.id, id));
@@ -704,7 +758,7 @@ export async function getCashToSupplierUsage(supplierId: number): Promise<CashSu
  * recalculé (nouveau CMUP = (qté × CMUP − avoir HT) / qté). Le total du bon de
  * réception est réduit en HT, TVA et TTC.
  */
-export async function createSupplierPriceCreditNote(data: {
+async function createSupplierPriceCreditNoteImpl(data: {
   receiptId: number;
   lines: Array<{ lineId: number; amountHtCents: number }>;
   reason?: string;

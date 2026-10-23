@@ -9,6 +9,7 @@ import {
   createSupplierPriceCreditNote,
 } from "@/lib/actions/suppliers";
 import { formatMoney, toCentimes } from "@/lib/money";
+import { unwrap } from "@/lib/action-result";
 
 interface SupplierPriceCreditModalProps {
   isOpen: boolean;
@@ -82,11 +83,11 @@ export function SupplierPriceCreditModal({
     try {
       setIsSubmitting(true);
       setError(null);
-      await createSupplierPriceCreditNote({
+      unwrap(await createSupplierPriceCreditNote({
         receiptId: receipt.id,
         lines,
         reason: reason.trim() || undefined,
-      });
+      }));
       onSaved();
       onClose();
     } catch (err) {

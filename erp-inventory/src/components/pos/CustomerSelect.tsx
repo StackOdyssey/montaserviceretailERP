@@ -9,6 +9,7 @@ import {
 } from "@/lib/actions/customers";
 import { useCustomerSearch, type CustomerMatch } from "@/lib/hooks/useCustomerSearch";
 import { formatMoney } from "@/lib/money";
+import { unwrap } from "@/lib/action-result";
 
 type SearchRow = CustomerMatch;
 
@@ -115,13 +116,13 @@ export function CustomerSelect({
     setDuplicates([]);
     setCreatedOk(null);
     try {
-      const created = await saveCustomer({
+      const created = unwrap(await saveCustomer({
         name: cleanName,
         phone: cleanPhone,
         city: cleanCity,
         ice: cleanIce || undefined,
         isProfessional,
-      });
+      }));
       setId(created.id);
       setName(created.name);
       setPhone(created.phone || cleanPhone);

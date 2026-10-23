@@ -10,6 +10,7 @@ import {
 } from "@/lib/actions/suppliers";
 import { toCentimes, formatMoney } from "@/lib/money";
 import { useParameters } from "@/components/layout/SettingsProvider";
+import { unwrap } from "@/lib/action-result";
 
 const MOROCCAN_BANKS = [
   "Attijariwafa Bank",
@@ -96,7 +97,7 @@ export function SupplierPaymentModal({
       setIsSubmitting(true);
       setError(null);
 
-      await recordSupplierPayment({
+      unwrap(await recordSupplierPayment({
         supplierId: selectedSupplierId,
         amountCents: toCentimes(parsedDh),
         paymentMethod,
@@ -104,7 +105,7 @@ export function SupplierPaymentModal({
         referenceNumber: referenceNumber.trim() || undefined,
         dueDate: paymentMethod === "CHEQUE" || paymentMethod === "EFFET_LCN" ? dueDate : undefined,
         notes: notes.trim() || undefined,
-      });
+      }));
 
       onSaved();
       onClose();

@@ -20,6 +20,7 @@ import { useParameters } from "@/components/layout/SettingsProvider";
 
 import { formatMoney } from "@/lib/money";
 import { ExpenseModal } from "@/components/expenses/ExpenseModal";
+import { unwrap } from "@/lib/action-result";
 
 export default function DepensesPage() {
   const { expenseCategories } = useParameters();
@@ -59,7 +60,7 @@ export default function DepensesPage() {
 
   const handleDelete = async (id: number) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer cette dépense de caisse ?")) {
-      await deleteExpense(id);
+      unwrap(await deleteExpense(id));
       loadData();
     }
   };

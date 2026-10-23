@@ -5,6 +5,7 @@ import { X, UserPlus, Building, Phone, Mail, MapPin, FileText } from "lucide-rea
 import { CustomerItem, saveCustomer } from "@/lib/actions/customers";
 import { useParameters } from "@/components/layout/SettingsProvider";
 import { toCentimes } from "@/lib/money";
+import { unwrap } from "@/lib/action-result";
 
 interface CustomerModalProps {
   isOpen: boolean;
@@ -49,7 +50,7 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
       setIsSubmitting(true);
       setError(null);
       const parsedLimit = creditLimitDh.trim() ? parseFloat(creditLimitDh.replace(",", ".")) : NaN;
-      await saveCustomer({
+      unwrap(await saveCustomer({
         id: customer?.id,
         name,
         phone,
@@ -67,7 +68,7 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
         externalRef,
         notes,
         force,
-      });
+      }));
       onSaved();
       onClose();
     } catch (err) {

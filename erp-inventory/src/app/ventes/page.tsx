@@ -26,6 +26,7 @@ import {
   cancelDocument,
 } from "@/lib/actions/sales-documents";
 import { getDocumentUbl } from "@/lib/actions/dgi";
+import { unwrap } from "@/lib/action-result";
 import { formatMoney } from "@/lib/money";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
 import { useSettings } from "@/components/layout/SettingsProvider";
@@ -120,7 +121,7 @@ export default function VentesListPage() {
 
   const handleConvert = (doc: SalesDocumentItem) => {
     if (!confirm(`Convertir le ${doc.docNumber} en facture ?`)) return;
-    runAction(doc, () => convertBlToFacture([doc.id]));
+    runAction(doc, async () => unwrap(await convertBlToFacture([doc.id])));
   };
 
   const handleAvoir = (doc: SalesDocumentItem) => {
@@ -134,23 +135,23 @@ export default function VentesListPage() {
     const label =
       avType === "RETOUR" ? "retour, stock réintégré" : avType === "COMMERCIAL" ? "geste commercial" : "correction";
     if (!confirm(`Créer un avoir total (${label}) sur ${doc.docNumber} ?`)) return;
-    runAction(doc, () =>
-      createAvoir({
+    runAction(doc, async () =>
+      unwrap(await createAvoir({
         sourceDocumentId: doc.id,
         returns: doc.lines.map((l) => ({ lineId: l.id, quantity: l.quantity })),
         avType,
-      })
+      }))
     );
   };
 
   const handleCancel = (doc: SalesDocumentItem) => {
     if (!confirm(`Annuler le ${doc.docNumber} ? L'opération est irréversible.`)) return;
-    runAction(doc, () => cancelDocument(doc.id, "Annulation manuelle"));
+    runAction(doc, async () => unwrap(await cancelDocument(doc.id, "Annulation manuelle")));
   };
 
   const handleUbl = (doc: SalesDocumentItem) => {
     runAction(doc, async () => {
-      const { filename, xml } = await getDocumentUbl(doc.id);
+      const { filename, xml } = unwrap(await getDocumentUbl(doc.id));
       const blob = new Blob([xml], { type: "application/xml" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

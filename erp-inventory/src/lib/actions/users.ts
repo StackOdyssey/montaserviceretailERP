@@ -5,6 +5,7 @@ import { assertOwner } from "@/lib/action-guard";
 import { pinHmac, verifyAdminPin } from "@/lib/auth";
 import { validateInput, saveUserSchema } from "@/lib/action-validation";
 import { auditLogs, db, users } from "@/db";
+import { actionResult, type ActionResult } from "@/lib/action-result";
 
 export interface UserItem {
   id: number;
@@ -60,6 +61,19 @@ function assertPinNotMaster(pin: string) {
  * `pin` : obligatoire à la création, optionnel à l'édition (réinitialisation).
  */
 export async function saveUser(data: {
+  id?: number;
+  displayName: string;
+  pin?: string;
+  role: "GERANT" | "CAISSIER";
+}): Promise<ActionResult<{ id: number }>> {
+  return actionResult(() => saveUserImpl(data));
+}
+
+export async function setUserActive(id: number, isActive: boolean): Promise<ActionResult<void>> {
+  return actionResult(() => setUserActiveImpl(id, isActive));
+}
+
+async function saveUserImpl(data: {
   id?: number;
   displayName: string;
   pin?: string;
@@ -130,7 +144,7 @@ export async function saveUser(data: {
  * La désactivation coupe les accès dès la prochaine action (contrôle is_active
  * dans assertAuthenticated — le jeton existant devient inutilisable).
  */
-export async function setUserActive(id: number, isActive: boolean): Promise<void> {
+async function setUserActiveImpl(id: number, isActive: boolean): Promise<void> {
   const session = await assertOwner();
   const d = requireDb();
   const u = (await d.select().from(users).where(eq(users.id, id)).limit(1))[0];

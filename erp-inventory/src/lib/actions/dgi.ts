@@ -7,6 +7,7 @@ import { assertAuthenticated } from "@/lib/action-guard";
 import { getSalesDocumentById } from "./sales";
 import { getSettings } from "./settings";
 import { buildUblInvoice, type UblDocument } from "@/lib/ubl";
+import { actionResult, type ActionResult } from "@/lib/action-result";
 
 function requireDb() {
   if (!db) throw new Error("BASE_INDISPONIBLE: DATABASE_URL non configurée");
@@ -28,7 +29,20 @@ export async function isDgiIntegrationEnabled(): Promise<boolean> {
  * Export UBL 2.1 d'un document validé (couche isolée, readiness DGI).
  * Aucun envoi vers la DGI : le XML est produit et retourné tel quel.
  */
-export async function getDocumentUbl(documentId: number): Promise<{ filename: string; xml: string }> {
+export async function getDocumentUbl(documentId: number): Promise<ActionResult<{ filename: string; xml: string }>> {
+  return actionResult(() => getDocumentUblImpl(documentId));
+}
+
+export async function createArchiveManifest(data: {
+  periodLabel: string;
+  objectKey: string;
+  content: string;
+  docCount: number;
+}): Promise<ActionResult<ArchiveManifestItem>> {
+  return actionResult(() => createArchiveManifestImpl(data));
+}
+
+async function getDocumentUblImpl(documentId: number): Promise<{ filename: string; xml: string }> {
   await assertAuthenticated();
   const doc = await getSalesDocumentById(documentId);
   if (!doc) throw new Error("Document introuvable");
@@ -110,7 +124,7 @@ export async function getArchiveManifests(limit = 50): Promise<ArchiveManifestIt
  * Question ouverte « Retention-Q4 » : archivage append-only, aucune purge tant
  * que la durée de conservation n'est pas tranchée.
  */
-export async function createArchiveManifest(data: {
+async function createArchiveManifestImpl(data: {
   periodLabel: string;
   objectKey: string;
   content: string;

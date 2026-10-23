@@ -13,6 +13,7 @@ import { getProducts, ProductItem } from "@/lib/actions/products";
 import { formatMoney, toCentimes } from "@/lib/money";
 import { useSettings } from "@/components/layout/SettingsProvider";
 import { effectiveVatRate } from "@/lib/vat-regime";
+import { unwrap } from "@/lib/action-result";
 
 interface SupplierReceiptModalProps {
   isOpen: boolean;
@@ -181,13 +182,13 @@ export function SupplierReceiptModal({
         setError("Fournisseur peut-être déjà existant — sélectionnez-le plutôt que créer un doublon.");
         return;
       }
-      const created = await saveSupplier({
+      const created = unwrap(await saveSupplier({
         name: cleanName,
         contactName: qcContact.trim() || undefined,
         phone: qcPhone.trim() || undefined,
         city: qcCity.trim() || undefined,
         ice: qcIce.trim() || undefined,
-      });
+      }));
       setLocalSuppliers((prev) => [created, ...prev]);
       setSelectedSupplierId(created.id);
       setShowQuickCreate(false);
@@ -292,12 +293,12 @@ export function SupplierReceiptModal({
         };
       });
 
-      await createSupplierReceipt({
+      unwrap(await createSupplierReceipt({
         supplierId: selectedSupplierId,
         supplierInvoiceNumber: supplierInvoiceNumber.trim() || undefined,
         lines: processedLines,
         notes: notes.trim() || undefined,
-      });
+      }));
 
       onSaved();
       onClose();

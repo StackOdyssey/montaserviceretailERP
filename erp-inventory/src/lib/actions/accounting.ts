@@ -14,6 +14,7 @@ import {
   supplierPayments,
 } from "@/db";
 import { assertAuthenticated, assertOwner } from "@/lib/action-guard";
+import { actionResult, type ActionResult } from "@/lib/action-result";
 import { getTvaAccountingExport } from "./analytics";
 
 export type PeriodStatus = "OPEN" | "REVIEWED" | "EXPORTED" | "LOCKED";
@@ -65,6 +66,24 @@ export async function setPeriodStatus(
   month: number,
   status: PeriodStatus,
   notes?: string
+): Promise<ActionResult<AccountingPeriodItem>> {
+  return actionResult(() => setPeriodStatusImpl(year, month, status, notes));
+}
+
+export async function setPeriodLock(
+  year: number,
+  month: number,
+  locked: boolean,
+  notes?: string
+): Promise<ActionResult<AccountingPeriodItem>> {
+  return actionResult(() => setPeriodLockImpl(year, month, locked, notes));
+}
+
+async function setPeriodStatusImpl(
+  year: number,
+  month: number,
+  status: PeriodStatus,
+  notes?: string
 ): Promise<AccountingPeriodItem> {
   await assertOwner();
   const d = requireDb();
@@ -100,14 +119,14 @@ export async function setPeriodStatus(
 }
 
 /** Verrouille (clôture = LOCKED) ou rouvre (OPEN) une période comptable. */
-export async function setPeriodLock(
+async function setPeriodLockImpl(
   year: number,
   month: number,
   locked: boolean,
   notes?: string
 ): Promise<AccountingPeriodItem> {
   await assertOwner();
-  return setPeriodStatus(year, month, locked ? "LOCKED" : "OPEN", notes);
+  return setPeriodStatusImpl(year, month, locked ? "LOCKED" : "OPEN", notes);
 }
 
 export interface ValidationIssue {

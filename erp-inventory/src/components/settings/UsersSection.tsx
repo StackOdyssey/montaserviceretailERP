@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { UserPlus, ShieldCheck, UserX, UserCheck, KeyRound } from "lucide-react";
 import { getUsers, saveUser, setUserActive, type UserItem } from "@/lib/actions/users";
+import { unwrap } from "@/lib/action-result";
 
 /**
  * Gestion des utilisateurs caisse (gérant uniquement, section Sécurité).
@@ -43,7 +44,7 @@ export function UsersSection() {
     setError(null);
     setNotice(null);
     try {
-      await saveUser({ displayName: name.trim(), pin: pin.trim(), role });
+      unwrap(await saveUser({ displayName: name.trim(), pin: pin.trim(), role }));
       setName("");
       setPin("");
       setRole("CAISSIER");
@@ -61,7 +62,7 @@ export function UsersSection() {
     setError(null);
     setNotice(null);
     try {
-      await saveUser({ id: u.id, displayName: u.displayName, pin: resetPin.trim(), role: u.role });
+      unwrap(await saveUser({ id: u.id, displayName: u.displayName, pin: resetPin.trim(), role: u.role }));
       setResetFor(null);
       setResetPin("");
       setNotice(`PIN réinitialisé pour ${u.displayName}.`);
@@ -76,7 +77,7 @@ export function UsersSection() {
     setError(null);
     setNotice(null);
     try {
-      await setUserActive(u.id, !u.isActive);
+      unwrap(await setUserActive(u.id, !u.isActive));
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur lors du changement d'état.");

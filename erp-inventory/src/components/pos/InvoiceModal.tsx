@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { X, Printer, Check, Ban } from "lucide-react";
 import { SalesDocumentItem } from "@/lib/actions/sales";
 import { cancelDocument } from "@/lib/actions/sales-documents";
+import { unwrap } from "@/lib/action-result";
 import { formatMoney } from "@/lib/money";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
 
@@ -33,7 +34,7 @@ export function InvoiceModal({ document, onClose, onCancelled }: InvoiceModalPro
     try {
       setIsCancelling(true);
       setCancelError(null);
-      const updated = await cancelDocument(currentDocument.id, "Annulation au comptoir (POS)");
+      const updated = unwrap(await cancelDocument(currentDocument.id, "Annulation au comptoir (POS)"));
       setCurrentDocument(updated);
       onCancelled?.(updated);
     } catch (err) {

@@ -3,6 +3,7 @@
 import { asc, eq } from "drizzle-orm";
 import { auditLogs, db, settings, vatRates } from "@/db";
 import { assertAuthenticated, assertOwner } from "@/lib/action-guard";
+import { actionResult, type ActionResult } from "@/lib/action-result";
 
 export type SettingsRow = typeof settings.$inferSelect;
 
@@ -67,7 +68,15 @@ export async function getSettings(): Promise<SettingsRow | null> {
 }
 
 /** Enregistre (crée ou met à jour) la configuration société. */
-export async function saveSettings(data: SettingsData): Promise<{ id: number }> {
+export async function saveSettings(data: SettingsData): Promise<ActionResult<{ id: number }>> {
+  return actionResult(() => saveSettingsImpl(data));
+}
+
+export async function saveVatRate(data: { id?: number; ratePercent: number; label?: string; isDefault?: boolean }): Promise<ActionResult<Awaited<ReturnType<typeof saveVatRateImpl>>>> {
+  return actionResult(() => saveVatRateImpl(data));
+}
+
+async function saveSettingsImpl(data: SettingsData): Promise<{ id: number }> {
   await assertOwner();
   const d = requireDb();
   const existing = (await d.select().from(settings).limit(1))[0];
@@ -106,7 +115,7 @@ export async function getVatRates() {
 }
 
 /** Crée ou met à jour un taux de TVA (paramétrable, non codé en dur). */
-export async function saveVatRate(data: { id?: number; ratePercent: number; label?: string; isDefault?: boolean }) {
+async function saveVatRateImpl(data: { id?: number; ratePercent: number; label?: string; isDefault?: boolean }) {
   await assertOwner();
   const d = requireDb();
   if (!Number.isFinite(data.ratePercent) || data.ratePercent < 0 || data.ratePercent > 100) {

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X, Truck, User, Phone, Mail, MapPin, FileText } from "lucide-react";
 import { SupplierItem, saveSupplier } from "@/lib/actions/suppliers";
+import { unwrap } from "@/lib/action-result";
 
 interface SupplierModalProps {
   isOpen: boolean;
@@ -34,7 +35,7 @@ export function SupplierModal({ isOpen, onClose, onSaved, supplier }: SupplierMo
     try {
       setIsSubmitting(true);
       setError(null);
-      await saveSupplier({
+      unwrap(await saveSupplier({
         id: supplier?.id,
         name,
         contactName,
@@ -43,7 +44,7 @@ export function SupplierModal({ isOpen, onClose, onSaved, supplier }: SupplierMo
         city,
         ice,
         notes,
-      });
+      }));
       onSaved();
       onClose();
     } catch (err) {

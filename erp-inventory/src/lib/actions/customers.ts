@@ -8,6 +8,7 @@ import { initialStatusFor, statusesForMethod } from "@/lib/payments";
 import { matchTokens } from "@/lib/search";
 import { getSalesDocuments, type SalesDocumentItem } from "./sales";
 import { validateInput, recordCustomerPaymentSchema } from "@/lib/action-validation";
+import { actionResult, type ActionResult } from "@/lib/action-result";
 
 export interface CustomerItem {
   id: number;
@@ -264,6 +265,49 @@ export async function recordCustomerPayment(data: {
   chequeDueDate?: string;
   bankName?: string;
   notes?: string;
+}): Promise<ActionResult<CustomerPaymentItem>> {
+  return actionResult(() => recordCustomerPaymentImpl(data));
+}
+
+export async function updatePaymentStatus(paymentId: number, newStatus: string): Promise<ActionResult<CustomerPaymentItem>> {
+  return actionResult(() => updatePaymentStatusImpl(paymentId, newStatus));
+}
+
+export async function saveCustomer(data: {
+  id?: number;
+  name: string;
+  phone?: string;
+  email?: string;
+  city?: string;
+  address?: string;
+  ice?: string;
+  identityNumber?: string;
+  isWholesale?: boolean;
+  isProfessional?: boolean;
+  defaultPriceLevelId?: number | null;
+  creditLimitCents?: number | null;
+  paymentTerms?: string;
+  representative?: string;
+  externalRef?: string;
+  notes?: string;
+  force?: boolean;
+}): Promise<ActionResult<CustomerItem>> {
+  return actionResult(() => saveCustomerImpl(data));
+}
+
+export async function mergeCustomers(sourceId: number, targetId: number): Promise<ActionResult<CustomerItem>> {
+  return actionResult(() => mergeCustomersImpl(sourceId, targetId));
+}
+
+async function recordCustomerPaymentImpl(data: {
+  customerId: number;
+  amountCents: number;
+  paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT";
+  documentId?: number | null;
+  referenceNumber?: string;
+  chequeDueDate?: string;
+  bankName?: string;
+  notes?: string;
 }): Promise<CustomerPaymentItem> {
   await assertAuthenticated();
   data = validateInput(recordCustomerPaymentSchema, data);
@@ -356,7 +400,7 @@ export async function recordCustomerPayment(data: {
 /**
  * Met à jour le statut d'un chèque ou effet LCN.
  */
-export async function updatePaymentStatus(paymentId: number, newStatus: string): Promise<CustomerPaymentItem> {
+async function updatePaymentStatusImpl(paymentId: number, newStatus: string): Promise<CustomerPaymentItem> {
   await assertAuthenticated();
   const d = requireDb();
 
@@ -460,7 +504,7 @@ export async function findCustomerDuplicates(
 /**
  * Crée ou modifie un client. Détecte les doublons et applique la règle ICE (B2B).
  */
-export async function saveCustomer(data: {
+async function saveCustomerImpl(data: {
   id?: number;
   name: string;
   phone?: string;
@@ -558,7 +602,7 @@ export async function saveCustomer(data: {
  * Fusionne deux clients : ré-affecte documents + règlements à la cible puis
  * archive (soft-delete) la source.
  */
-export async function mergeCustomers(sourceId: number, targetId: number): Promise<CustomerItem> {
+async function mergeCustomersImpl(sourceId: number, targetId: number): Promise<CustomerItem> {
   await assertAuthenticated();
   const d = requireDb();
   if (sourceId === targetId) throw new Error("La source et la cible sont identiques");

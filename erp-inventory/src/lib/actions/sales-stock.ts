@@ -13,6 +13,7 @@ import { assertPeriodOpen } from "@/lib/accounting-period";
 import { lockProducts } from "@/lib/stock-lock";
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { requireDb } from "@/lib/sales/shared";
+import { actionResult, type ActionResult } from "@/lib/action-result";
 
 /**
  * Rebut / mise au rebut (Phase 5) : sortie de stock de marchandise défectueuse.
@@ -20,6 +21,22 @@ import { requireDb } from "@/lib/sales/shared";
  * le CMUP reste inchangé (une sortie ne modifie pas le coût moyen).
  */
 export async function writeOffStock(data: {
+  productId: number;
+  quantity: number;
+  reason?: string;
+}): Promise<ActionResult<{ success: boolean }>> {
+  return actionResult(() => writeOffStockImpl(data));
+}
+
+export async function createSupplierReturn(data: {
+  receiptId: number;
+  lines: Array<{ lineId: number; quantity: number }>;
+  reason?: string;
+}): Promise<ActionResult<{ success: boolean }>> {
+  return actionResult(() => createSupplierReturnImpl(data));
+}
+
+async function writeOffStockImpl(data: {
   productId: number;
   quantity: number;
   reason?: string;
@@ -65,7 +82,7 @@ export async function writeOffStock(data: {
  * Retour fournisseur (Phase 5) : sortie de stock valorisée au coût d'origine de
  * la ligne de réception, rattachée au bon de réception.
  */
-export async function createSupplierReturn(data: {
+async function createSupplierReturnImpl(data: {
   receiptId: number;
   lines: Array<{ lineId: number; quantity: number }>;
   reason?: string;

@@ -5,6 +5,7 @@ import { auditLogs, db, expenses, settings } from "@/db";
 import { assertAuthenticated } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
 import type { ExpenseCategory, ExpenseItem } from "@/lib/constants/expenses";
+import { actionResult, type ActionResult } from "@/lib/action-result";
 
 export type { ExpenseCategory, ExpenseItem };
 
@@ -115,6 +116,24 @@ export async function recordExpense(data: {
   expenseDate?: string;
   receiptPhotoUrl?: string;
   notes?: string;
+}): Promise<ActionResult<ExpenseItem>> {
+  return actionResult(() => recordExpenseImpl(data));
+}
+
+export async function deleteExpense(id: number): Promise<ActionResult<Awaited<ReturnType<typeof deleteExpenseImpl>>>> {
+  return actionResult(() => deleteExpenseImpl(id));
+}
+
+async function recordExpenseImpl(data: {
+  title: string;
+  category: string;
+  categoryId?: number | null;
+  amountHtCents?: number;
+  amountCents?: number; // legacy : TTC
+  tvaRate?: number;
+  expenseDate?: string;
+  receiptPhotoUrl?: string;
+  notes?: string;
 }): Promise<ExpenseItem> {
   await assertAuthenticated();
   const d = requireDb();
@@ -176,7 +195,7 @@ export async function recordExpense(data: {
 /**
  * Supprime une dépense.
  */
-export async function deleteExpense(id: number) {
+async function deleteExpenseImpl(id: number) {
   await assertAuthenticated();
   const d = requireDb();
   const existing = (await d.select().from(expenses).where(eq(expenses.id, id)).limit(1))[0];
