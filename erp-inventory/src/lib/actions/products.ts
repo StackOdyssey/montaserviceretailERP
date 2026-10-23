@@ -111,21 +111,18 @@ function rawToItem(r: ProductLike, lineCode: string, categoryName?: string | nul
   };
 }
 
-/**
- * Récupère les pièces du catalogue filtrées par ligne métier (défaut PIECES).
- */
-export async function getProducts(options?: {
+type ProductFilters = {
   search?: string;
   category?: string;
   categoryId?: number;
   stockFilter?: "all" | "low" | "negative";
   businessLineCode?: string;
-}): Promise<ProductItem[]> {
-  await assertAuthenticated();
-  const d = requireDb();
+};
+
+async function productConds(options?: ProductFilters) {
   const lineCode = options?.businessLineCode || "PIECES";
   const lineId = await lineIdByCode(lineCode);
-  if (!lineId) return [];
+  if (!lineId) return null;
 
   const search = options?.search?.trim() || "";
   const stockFilter = options?.stockFilter || "all";
@@ -151,6 +148,22 @@ export async function getProducts(options?: {
   if (stockFilter === "negative") conds.push(sql`${products.currentStock} < 0`);
   if (categoryName) conds.push(eq(categories.name, categoryName));
   if (categoryId) conds.push(eq(products.categoryId, categoryId));
+  return { conds, lineCode };
+}
+
+const PRODUCTS_PAGE_SIZE = 500;
+
+/**
+ * Récupère les pièces du catalogue filtrées par ligne métier (défaut PIECES).
+ * Limité à PRODUCTS_PAGE_SIZE : comparer avec getProductsCount pour détecter
+ * une troncature silencieuse.
+ */
+export async function getProducts(options?: ProductFilters): Promise<ProductItem[]> {
+  await assertAuthenticated();
+  const d = requireDb();
+  const ctx = await productConds(options);
+  if (!ctx) return [];
+  const { conds, lineCode } = ctx;
 
   const rows = await d
     .select({
@@ -178,9 +191,28 @@ export async function getProducts(options?: {
     .leftJoin(categories, eq(products.categoryId, categories.id))
     .where(and(...conds))
     .orderBy(asc(products.sku))
-    .limit(500);
+    .limit(PRODUCTS_PAGE_SIZE);
 
   return rows.map((r) => rawToItem(r, lineCode, r.categoryName));
+}
+
+/**
+ * Total de pièces correspondant aux filtres de getProducts (sans la limite).
+ * Sert à détecter « catalogue tronqué » côté UI.
+ */
+export async function getProductsCount(options?: ProductFilters): Promise<number> {
+  await assertAuthenticated();
+  const d = requireDb();
+  const ctx = await productConds(options);
+  if (!ctx) return 0;
+  const row = (
+    await d
+      .select({ n: sql<number>`count(*)` })
+      .from(products)
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(and(...ctx.conds))
+  )[0];
+  return Number(row?.n ?? 0);
 }
 
 /**

@@ -85,6 +85,13 @@ export default function NouveauBonDeLivraisonPage() {
     "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT" | "A_CREDIT"
   >("ESPECES");
 
+  // Clé d'idempotence par panier : un retry/double-clic renvoie le doc créé
+  // au lieu d'un doublon. Régénérée après chaque validation réussie.
+  const idempotencyKeyRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    idempotencyKeyRef.current = crypto.randomUUID();
+  }, []);
+
   // Notes
   const [notes, setNotes] = useState("");
 
@@ -251,10 +258,12 @@ export default function NouveauBonDeLivraisonPage() {
         paidAmountCents: paymentMethod === "A_CREDIT" ? 0 : totals.totalTTC,
         notes: notes.trim() || undefined,
         businessLineCode,
+        idempotencyKey: idempotencyKeyRef.current ?? undefined,
       });
 
       setCreatedDocument(doc);
       setCart([]);
+      idempotencyKeyRef.current = crypto.randomUUID();
     } catch (err: any) {
       setErrorMessage(err.message || "Erreur lors de la validation du BL");
     } finally {
@@ -474,8 +483,8 @@ export default function NouveauBonDeLivraisonPage() {
                 <LayoutGrid size={15} className="text-[#F7162D]" />
                 <span>
                   {searchTerm.trim()
-                    ? `Catalogue — résultats visuels (${searchResults.length})`
-                    : `Catalogue visuel (${catalogItems.length} pièces)`}
+                    ? `Catalogue — résultats visuels (${searchResults.length}${searchResults.length >= 500 ? "+" : ""})`
+                    : `Catalogue visuel (${catalogItems.length}${catalogItems.length >= 500 ? "+" : ""} pièces)`}
                 </span>
               </label>
               <ChevronDown
@@ -506,6 +515,11 @@ export default function NouveauBonDeLivraisonPage() {
                 )}
                 <p className="text-[11px] text-[#6B7280]">
                   Touchez une carte pour ajouter la pièce. La recherche ci-dessus filtre aussi ce catalogue.
+                  {catalogItems.length >= 500 && (
+                    <span className="block text-[#B45309] font-semibold mt-0.5">
+                      Catalogue plafonné à 500 pièces — utilisez la recherche pour trouver les autres.
+                    </span>
+                  )}
                 </p>
               </>
             )}

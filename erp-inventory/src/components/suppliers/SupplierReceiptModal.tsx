@@ -107,7 +107,9 @@ export function SupplierReceiptModal({
 
   // Charger le catalogue pour sélection des pièces
   useEffect(() => {
-    getProducts().then((res) => setCatalog(res));
+    getProducts()
+      .then((res) => setCatalog(res))
+      .catch(() => setCatalog([]));
   }, []);
 
   // Initialiser avec une première ligne dès que le catalogue est chargé

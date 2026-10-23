@@ -57,6 +57,13 @@ export default function POSPage() {
   // Payment and checkout state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Clé d'idempotence par panier : un retry/double-clic renvoie le doc créé
+  // au lieu d'un doublon. Régénérée après chaque encaissement réussi.
+  const idempotencyKeyRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    idempotencyKeyRef.current = crypto.randomUUID();
+  }, []);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [createdDocument, setCreatedDocument] = useState<SalesDocumentItem | null>(null);
 
@@ -214,6 +221,7 @@ export default function POSPage() {
         paidAmountCents: paymentData.paymentMethod === "A_CREDIT" ? 0 : totals.totalTTC,
         notes,
         businessLineCode,
+        idempotencyKey: idempotencyKeyRef.current ?? undefined,
       });
 
       setCreatedDocument(doc);
@@ -229,6 +237,7 @@ export default function POSPage() {
       setCustomerIsProfessional(false);
       setCustomerCreditLimitCents(null);
       setCustomerOutstandingCents(null);
+      idempotencyKeyRef.current = crypto.randomUUID();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Erreur lors de la validation");
     } finally {

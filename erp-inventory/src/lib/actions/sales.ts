@@ -246,10 +246,29 @@ export async function createSalesDocument(data: {
   businessLineCode?: string;
   /** Motif d'un prix négocié hors catalogue (question ouverte Prix-negocie). */
   overrideReason?: string;
+  /** Clé de déduplication caisse : un retry/double-clic renvoie le doc existant. */
+  idempotencyKey?: string;
 }): Promise<SalesDocumentItem> {
   await assertAuthenticated();
   data = validateInput(createSalesDocumentSchema, data);
   const d = requireDb();
+
+  // Idempotence : si la clé a déjà produit un document, on le renvoie tel quel
+  // (retry réseau / double-clic / F5 en cours de validation).
+  const findByIdemKey = async (key: string) => {
+    const row = (
+      await d
+        .select({ id: salesDocuments.id })
+        .from(salesDocuments)
+        .where(eq(salesDocuments.idempotencyKey, key))
+        .limit(1)
+    )[0];
+    return row ? loadDocumentById(row.id) : null;
+  };
+  if (data.idempotencyKey) {
+    const existing = await findByIdemKey(data.idempotencyKey);
+    if (existing) return existing;
+  }
 
   await assertPeriodOpen();
 
@@ -309,7 +328,8 @@ export async function createSalesDocument(data: {
       ? [data.notes?.trim(), VAT_NOT_LIABLE_MENTION].filter(Boolean).join(" — ")
       : data.notes;
 
-  await d.transaction(async (tx) => {
+  try {
+    await d.transaction(async (tx) => {
     await lockProducts(tx, data.lines.map((l) => l.productId));
     // Ligne métier (défaut PIECES)
     const line = (
@@ -417,6 +437,7 @@ export async function createSalesDocument(data: {
         .values({
           docType,
           docNumber,
+          idempotencyKey: data.idempotencyKey ?? null,
           businessLineId: line.id,
           docYear: year,
           sequenceNo,
@@ -520,6 +541,15 @@ export async function createSalesDocument(data: {
       }
     }
   });
+  } catch (err) {
+    // Contrainte unique sur idempotency_key : la transaction concurrente a gagné
+    // entre la pré-vérif et l'insert — on renvoie le document qu'elle a créé.
+    if (data.idempotencyKey) {
+      const existing = await findByIdemKey(data.idempotencyKey);
+      if (existing) return existing;
+    }
+    throw err;
+  }
 
   const created = await loadDocumentById(docId);
   if (!created) throw new Error("ECHEC_CREATION_DOCUMENT");

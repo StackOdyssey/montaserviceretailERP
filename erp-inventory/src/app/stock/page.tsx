@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import {
   getProducts,
+  getProductsCount,
   saveProduct,
   recordStockMovement,
   importProductsBatch,
@@ -33,6 +34,7 @@ import { useSettings } from "@/components/layout/SettingsProvider";
 
 export default function StockCataloguePage() {
   const [productsList, setProductsList] = useState<ProductItem[]>([]);
+  const [catalogTotal, setCatalogTotal] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "negative">("all");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -53,13 +55,17 @@ export default function StockCataloguePage() {
   // Charger les pièces avec recherche instantanée
   const fetchProducts = () => {
     startTransition(async () => {
-      const data = await getProducts({
+      const filters = {
         search: searchTerm,
         stockFilter,
         category: categoryFilter,
         businessLineCode: activeCode,
-      });
+      };
+      const data = await getProducts(filters);
       setProductsList(data);
+      // Le catalogue est plafonné à 500 lignes : si on atteint le plafond on
+      // récupère le total réel pour afficher un avertissement de troncature.
+      setCatalogTotal(data.length >= 500 ? await getProductsCount(filters) : null);
     });
   };
 
@@ -206,7 +212,7 @@ export default function StockCataloguePage() {
                 : "bg-[#F8F9FA] text-[#4B5563] hover:bg-[#E5E7EB]"
             }`}
           >
-            Tous les articles ({totalCount})
+            Tous les articles ({catalogTotal ?? totalCount})
           </button>
 
           <button
@@ -234,6 +240,16 @@ export default function StockCataloguePage() {
           </button>
         </div>
       </div>
+
+      {catalogTotal !== null && catalogTotal > productsList.length && (
+        <div className="flex items-center gap-2.5 bg-[#FFFBEB] border border-[#FDE68A] text-[#92400E] rounded-xl px-4 py-3 text-xs font-semibold">
+          <AlertTriangle size={15} className="shrink-0" />
+          <span>
+            Affichage limité aux {productsList.length} premiers articles sur {catalogTotal} —
+            affinez la recherche ou les filtres pour voir le reste du catalogue.
+          </span>
+        </div>
+      )}
 
       {/* ======================================================== */}
       {/* 3. TABLEAU DES ARTICLES (DESKTOP & MOBILE)               */}

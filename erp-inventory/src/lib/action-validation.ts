@@ -54,6 +54,7 @@ export const createSalesDocumentSchema = z.object({
   notes: optStr(2000),
   businessLineCode: optStr(30),
   overrideReason: optStr(500),
+  idempotencyKey: z.string().trim().min(8).max(64).optional(),
 });
 
 export const createSupplierReceiptSchema = z.object({

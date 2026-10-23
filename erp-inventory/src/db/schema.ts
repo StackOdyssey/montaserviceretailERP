@@ -374,6 +374,7 @@ export const salesDocuments = pgTable("sales_documents", {
   id: serial("id").primaryKey(),
   docType: text("doc_type").notNull().default("BL"), // BL, FACTURE, AVOIR
   docNumber: text("doc_number").notNull().unique(), // ex: "BL-2026-00001"
+  idempotencyKey: text("idempotency_key"), // dédup double-clic/retry caisse (NULL distinct)
   businessLineId: integer("business_line_id")
     .notNull()
     .references(() => businessLines.id),
@@ -415,6 +416,7 @@ export const salesDocuments = pgTable("sales_documents", {
     // Invariant §5.4 assoupli (régime non-assujetti) : FACTURE/AVOIR HIDDEN autorisé
     // uniquement avec mention « TVA non applicable ». Enforcement serveur régime-aware
     // dans createSalesDocument (la contrainte DB ne peut pas lire settings).
+    unique("sales_documents_idempotency_key_unique").on(table.idempotencyKey),
   ]
 );
 
