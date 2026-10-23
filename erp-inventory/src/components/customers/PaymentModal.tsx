@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, CheckCircle, Banknote, CreditCard, Building2, Calendar, FileText, ArrowRight } from "lucide-react";
+import { X, Banknote } from "lucide-react";
 import { CustomerItem, recordCustomerPayment, getCustomerStatement } from "@/lib/actions/customers";
 import { formatMoney, toCentimes } from "@/lib/money";
 import { useParameters } from "@/components/layout/SettingsProvider";
@@ -46,7 +46,7 @@ export function PaymentModal({
   const [bankName, setBankName] = useState<string>("Attijariwafa Bank");
   const [referenceNumber, setReferenceNumber] = useState<string>("");
   const [chequeDueDate, setChequeDueDate] = useState<string>(
-    new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split("T")[0]
+    () => new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split("T")[0]
   );
   const [targetDocId, setTargetDocId] = useState<string>(
     preselectedDocId ? preselectedDocId.toString() : "AUTO"
@@ -68,8 +68,6 @@ export function PaymentModal({
   }, [selectedCustomerId]);
 
   if (!isOpen) return null;
-
-  const currentCustomer = customers.find((c) => c.id === selectedCustomerId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,8 +97,8 @@ export function PaymentModal({
 
       onSaved();
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de l'enregistrement de l'encaissement.");
+    } catch (err) {
+      setError((err as Error).message || "Erreur lors de l'enregistrement de l'encaissement.");
     } finally {
       setIsSubmitting(false);
     }
@@ -189,7 +187,7 @@ export function PaymentModal({
                 <button
                   type="button"
                   key={m.id}
-                  onClick={() => setPaymentMethod(m.id as any)}
+                  onClick={() => setPaymentMethod(m.id as typeof paymentMethod)}
                   className={`py-2 px-3 text-xs font-bold rounded-xl border transition flex items-center justify-center text-center ${
                     paymentMethod === m.id
                       ? "bg-[#F7162D] text-white border-[#F7162D] shadow-xs"
@@ -222,7 +220,7 @@ export function PaymentModal({
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Date d'échéance <span className="text-[#F7162D]">*</span>
+                    Date d&apos;échéance <span className="text-[#F7162D]">*</span>
                   </label>
                   <div className="relative">
                     <input

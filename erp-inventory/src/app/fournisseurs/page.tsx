@@ -9,13 +9,12 @@ import {
   Building,
   Phone,
   Search,
-  Calendar,
   AlertCircle,
   CheckCircle2,
   FileText,
   ReceiptText,
 } from "lucide-react";
-import { SupplierItem, getSuppliers, SupplierReceiptItem } from "@/lib/actions/suppliers";
+import { SupplierItem, getSuppliers } from "@/lib/actions/suppliers";
 import { getSettings } from "@/lib/actions/settings";
 import { formatMoney } from "@/lib/money";
 import { SupplierModal } from "@/components/suppliers/SupplierModal";
@@ -27,7 +26,7 @@ export default function FournisseursPage() {
   const [activeTab, setActiveTab] = useState<"FOURNISSEURS" | "RECEPTIONS">("FOURNISSEURS");
   const [searchQuery, setSearchQuery] = useState("");
   const [suppliersList, setSuppliersList] = useState<SupplierItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   // Régime TVA global (réceptions sans TVA si non-assujetti).
   const [vatLiable, setVatLiable] = useState(true);
 
@@ -54,7 +53,9 @@ export default function FournisseursPage() {
   };
 
   useEffect(() => {
-    loadData();
+    const timer = setTimeout(loadData, 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
   const totalDettes = suppliersList.reduce((sum, s) => sum + Math.max(0, s.balanceDueCents || 0), 0);

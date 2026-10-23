@@ -11,9 +11,6 @@ import {
   ArrowUpDown,
   Edit2,
   Filter,
-  Check,
-  RefreshCw,
-  Tag,
   Package,
   ClipboardList,
 } from "lucide-react";
@@ -38,7 +35,7 @@ export default function StockCataloguePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "negative">("all");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [isLoading, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   // Modals state
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -78,19 +75,19 @@ export default function StockCataloguePage() {
   }, [searchTerm, stockFilter, categoryFilter, activeCode]);
 
   // Sauvegarder un produit
-  const handleSaveProduct = async (productData: any) => {
+  const handleSaveProduct = async (productData: Parameters<typeof saveProduct>[0]) => {
     await saveProduct(productData);
     fetchProducts();
   };
 
   // Ajuster un stock
-  const handleAdjustStock = async (data: any) => {
+  const handleAdjustStock = async (data: Parameters<typeof recordStockMovement>[0]) => {
     await recordStockMovement(data);
     fetchProducts();
   };
 
   // Importer CSV
-  const handleImportCsv = async (items: any[]) => {
+  const handleImportCsv = async (items: Parameters<typeof importProductsBatch>[0]) => {
     await importProductsBatch(items);
     fetchProducts();
   };

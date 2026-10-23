@@ -5,21 +5,16 @@ import Link from "next/link";
 import {
   TrendingUp,
   Receipt,
-  Boxes,
   AlertTriangle,
   PlusCircle,
-  ArrowUpRight,
   Printer,
   Share2,
   Calendar,
-  Clock,
-  CheckCircle2,
   ChevronRight,
   ShieldCheck,
   PackageCheck,
   Banknote,
   Percent,
-  Wallet,
   Sparkles,
 } from "lucide-react";
 import { formatMoney } from "@/lib/money";
@@ -31,7 +26,7 @@ import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
 export default function TableauDeBordPage() {
   const company = useSettings();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [selectedDocForPrint, setSelectedDocForPrint] = useState<SalesDocumentItem | null>(null);
 
   const loadData = async () => {

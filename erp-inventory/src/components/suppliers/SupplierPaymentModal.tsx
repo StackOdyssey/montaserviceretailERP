@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, CreditCard, Banknote, Building2, AlertTriangle } from "lucide-react";
+import { X, CreditCard, AlertTriangle } from "lucide-react";
 import {
   SupplierItem,
   recordSupplierPayment,
@@ -48,7 +48,7 @@ export function SupplierPaymentModal({
   const [bankName, setBankName] = useState<string>("Attijariwafa Bank");
   const [referenceNumber, setReferenceNumber] = useState<string>("");
   const [dueDate, setDueDate] = useState<string>(
-    new Date(Date.now() + 60 * 24 * 3600 * 1000).toISOString().split("T")[0] // Échéance à 60 jours habituelle
+    () => new Date(Date.now() + 60 * 24 * 3600 * 1000).toISOString().split("T")[0] // Échéance à 60 jours habituelle
   );
   const [notes, setNotes] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -108,8 +108,8 @@ export function SupplierPaymentModal({
 
       onSaved();
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de l'enregistrement du paiement.");
+    } catch (err) {
+      setError((err as Error).message || "Erreur lors de l'enregistrement du paiement.");
     } finally {
       setIsSubmitting(false);
     }
@@ -200,7 +200,7 @@ export function SupplierPaymentModal({
                 <button
                   type="button"
                   key={m.id}
-                  onClick={() => setPaymentMethod(m.id as any)}
+                  onClick={() => setPaymentMethod(m.id as typeof paymentMethod)}
                   className={`py-2 px-3 text-xs font-bold rounded-xl border transition flex items-center justify-center text-center ${
                     paymentMethod === m.id
                       ? "bg-purple-600 text-white border-purple-600 shadow-xs"
@@ -232,7 +232,7 @@ export function SupplierPaymentModal({
                 {(paymentMethod === "CHEQUE" || paymentMethod === "EFFET_LCN") && (
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      Date d'échéance émise
+                      Date d&apos;échéance émise
                     </label>
                     <input
                       type="date"

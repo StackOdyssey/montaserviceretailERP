@@ -2,12 +2,9 @@
 
 import { useEffect, useState } from "react";
 import {
-  FileText,
   Plus,
   Calendar,
   Receipt,
-  Search,
-  Filter,
   Trash2,
   Image,
   X,
@@ -34,8 +31,8 @@ export default function DepensesPage() {
   });
   const [period, setPeriod] = useState<"TODAY" | "THIS_WEEK" | "THIS_MONTH" | "ALL">("THIS_MONTH");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [searchQuery] = useState("");
+  const [, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
 
@@ -55,7 +52,9 @@ export default function DepensesPage() {
   };
 
   useEffect(() => {
-    loadData();
+    const timer = setTimeout(loadData, 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period, selectedCategory, searchQuery]);
 
   const handleDelete = async (id: number) => {
@@ -114,7 +113,7 @@ export default function DepensesPage() {
             {formatMoney(stats.todayTotalCents)}
           </div>
           <p className="text-xs text-gray-500 mt-1">
-            Sorties de caisse enregistrées aujourd'hui
+            Sorties de caisse enregistrées aujourd&apos;hui
           </p>
         </div>
 
@@ -160,7 +159,7 @@ export default function DepensesPage() {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setPeriod(tab.id as any)}
+              onClick={() => setPeriod(tab.id as typeof period)}
               className={`px-3 py-1.5 text-xs font-bold rounded-xl transition shrink-0 ${
                 period === tab.id
                   ? "bg-rose-600 text-white shadow-2xs"

@@ -46,8 +46,8 @@ export function SupplierModal({ isOpen, onClose, onSaved, supplier }: SupplierMo
       });
       onSaved();
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de l'enregistrement");
+    } catch (err) {
+      setError((err as Error).message || "Erreur lors de l'enregistrement");
     } finally {
       setIsSubmitting(false);
     }

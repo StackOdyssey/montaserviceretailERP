@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, UserPlus, Building, Phone, Mail, MapPin, FileText, CheckCircle2 } from "lucide-react";
+import { X, UserPlus, Building, Phone, Mail, MapPin, FileText } from "lucide-react";
 import { CustomerItem, saveCustomer } from "@/lib/actions/customers";
 import { useParameters } from "@/components/layout/SettingsProvider";
 import { toCentimes } from "@/lib/money";
@@ -31,7 +31,7 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
   );
   const [paymentTerms, setPaymentTerms] = useState(customer?.paymentTerms || "");
   const [representative, setRepresentative] = useState(customer?.representative || "");
-  const [externalRef, setExternalRef] = useState(customer?.externalRef || "");
+  const [externalRef] = useState(customer?.externalRef || "");
   const [force, setForce] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,8 +70,8 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
       });
       onSaved();
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de l'enregistrement");
+    } catch (err) {
+      setError((err as Error).message || "Erreur lors de l'enregistrement");
     } finally {
       setIsSubmitting(false);
     }
@@ -205,7 +205,7 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
-                Pièce d'identité (CIN / passeport) — optionnel
+                Pièce d&apos;identité (CIN / passeport) — optionnel
               </label>
               <div className="relative">
                 <FileText className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
@@ -258,7 +258,7 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
               </span>
             </label>
             <p className="text-[11px] text-gray-500">
-              Particulier : seuls le nom et le téléphone sont nécessaires (aucun numéro de pièce d'identité n'est
+              Particulier : seuls le nom et le téléphone sont nécessaires (aucun numéro de pièce d&apos;identité n&apos;est
               demandé — décision CNDP en attente, Q14).
             </p>
           </div>

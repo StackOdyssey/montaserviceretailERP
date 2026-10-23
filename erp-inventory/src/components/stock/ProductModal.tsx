@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Camera, Upload, Check, AlertCircle } from "lucide-react";
-import { ProductItem } from "@/lib/actions/products";
+import { X, Camera, Check, AlertCircle } from "lucide-react";
+import { ProductItem, saveProduct } from "@/lib/actions/products";
 import { compressImageToWebP } from "@/lib/image-compressor";
 import { getPhotoUploadUrl } from "@/lib/actions/media";
 import { toCentimes, toDirhams } from "@/lib/money";
@@ -11,7 +11,7 @@ import { useSettings } from "@/components/layout/SettingsProvider";
 interface ProductModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (product: any) => Promise<void>;
+  onSave: (product: Parameters<typeof saveProduct>[0]) => Promise<void>;
   productToEdit?: ProductItem | null;
 }
 
@@ -43,42 +43,45 @@ export function ProductModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (productToEdit) {
-      setSku(productToEdit.sku);
-      setOemCode(productToEdit.oemCode || "");
-      setName(productToEdit.name);
-      setBrand(productToEdit.brand || "Bashan");
-      setCategoryName(productToEdit.categoryName || "Général");
-      setPurchasePriceDH(toDirhams(productToEdit.purchasePriceCents).toString());
-      setSalePriceRetailDH(toDirhams(productToEdit.salePriceRetailCents).toString());
-      setSalePriceWholesaleDH(
-        productToEdit.salePriceWholesaleCents
-          ? toDirhams(productToEdit.salePriceWholesaleCents).toString()
-          : ""
-      );
-      setCurrentStock(productToEdit.currentStock.toString());
-      setMinStockAlert(productToEdit.minStockAlert.toString());
-      setShelfLocation(productToEdit.shelfLocation || "");
-      setBarcode(productToEdit.barcode || "");
-      setPhotoUrl(productToEdit.photoUrl);
-    } else {
-      // Réinitialisation pour nouveau produit
-      setSku(`BASH-${Math.floor(100 + Math.random() * 900)}`);
-      setOemCode("");
-      setName("");
-      setBrand("Bashan");
-      setCategoryName("Freinage");
-      setPurchasePriceDH("");
-      setSalePriceRetailDH("");
-      setSalePriceWholesaleDH("");
-      setCurrentStock("0");
-      setMinStockAlert("2");
-      setShelfLocation("");
-      setBarcode("");
-      setPhotoUrl(null);
-      setCompressionInfo(null);
-    }
-    setErrorMessage(null);
+    const timer = setTimeout(() => {
+      if (productToEdit) {
+        setSku(productToEdit.sku);
+        setOemCode(productToEdit.oemCode || "");
+        setName(productToEdit.name);
+        setBrand(productToEdit.brand || "Bashan");
+        setCategoryName(productToEdit.categoryName || "Général");
+        setPurchasePriceDH(toDirhams(productToEdit.purchasePriceCents).toString());
+        setSalePriceRetailDH(toDirhams(productToEdit.salePriceRetailCents).toString());
+        setSalePriceWholesaleDH(
+          productToEdit.salePriceWholesaleCents
+            ? toDirhams(productToEdit.salePriceWholesaleCents).toString()
+            : ""
+        );
+        setCurrentStock(productToEdit.currentStock.toString());
+        setMinStockAlert(productToEdit.minStockAlert.toString());
+        setShelfLocation(productToEdit.shelfLocation || "");
+        setBarcode(productToEdit.barcode || "");
+        setPhotoUrl(productToEdit.photoUrl);
+      } else {
+        // Réinitialisation pour nouveau produit
+        setSku(`BASH-${Math.floor(100 + Math.random() * 900)}`);
+        setOemCode("");
+        setName("");
+        setBrand("Bashan");
+        setCategoryName("Freinage");
+        setPurchasePriceDH("");
+        setSalePriceRetailDH("");
+        setSalePriceWholesaleDH("");
+        setCurrentStock("0");
+        setMinStockAlert("2");
+        setShelfLocation("");
+        setBarcode("");
+        setPhotoUrl(null);
+        setCompressionInfo(null);
+      }
+      setErrorMessage(null);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [productToEdit, isOpen]);
 
   if (!isOpen) return null;
@@ -147,24 +150,24 @@ export function ProductModal({
       await onSave({
         id: productToEdit?.id,
         sku: sku.trim().toUpperCase(),
-        oemCode: oemCode.trim() || null,
+        oemCode: oemCode.trim() || undefined,
         name: name.trim(),
         brand: brand.trim() || "Bashan",
         categoryName,
         purchasePriceCents: toCentimes(purchaseDH),
         salePriceRetailCents: toCentimes(saleRetailDH),
-        salePriceWholesaleCents: saleWholesaleDH > 0 ? toCentimes(saleWholesaleDH) : null,
+        salePriceWholesaleCents: saleWholesaleDH > 0 ? toCentimes(saleWholesaleDH) : undefined,
         tvaRate: company.defaultVatRate,
         minStockAlert: parseInt(minStockAlert, 10) || 2,
         currentStock: parseInt(currentStock, 10) || 0,
-        shelfLocation: shelfLocation.trim() || null,
-        barcode: barcode.trim() || null,
-        photoUrl,
+        shelfLocation: shelfLocation.trim() || undefined,
+        barcode: barcode.trim() || undefined,
+        photoUrl: photoUrl ?? undefined,
       });
 
       onClose();
-    } catch (err: any) {
-      setErrorMessage(err.message || "Erreur lors de l'enregistrement");
+    } catch (err) {
+      setErrorMessage((err as Error).message || "Erreur lors de l'enregistrement");
     } finally {
       setIsSaving(false);
     }

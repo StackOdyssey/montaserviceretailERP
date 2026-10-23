@@ -71,8 +71,8 @@ export function StockAdjustmentModal({
       });
 
       onClose();
-    } catch (err: any) {
-      setErrorMessage(err.message || "Erreur lors de l'ajustement");
+    } catch (err) {
+      setErrorMessage((err as Error).message || "Erreur lors de l'ajustement");
     } finally {
       setIsSubmitting(false);
     }

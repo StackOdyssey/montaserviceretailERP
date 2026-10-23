@@ -22,9 +22,11 @@ import { OPEN_QUESTIONS } from "@/lib/open-questions";
 import { revokeAllSessions } from "@/lib/actions/auth";
 import { clearAppCaches } from "@/components/pwa/clear-app-caches";
 import { UsersSection } from "@/components/settings/UsersSection";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export default function ParametresPage() {
   const router = useRouter();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<
     "SOCIETE" | "FISCAL" | "BANQUE" | "SECURITE" | "NUMEROTATION" | "CLOUD" | "DECISIONS"
   >("SOCIETE");
@@ -165,14 +167,14 @@ export default function ParametresPage() {
       // et les autres pages prennent le nouveau régime TVA sans F5.
       router.refresh();
     } catch (err) {
-      alert((err as Error).message);
+      toast.error((err as Error).message);
     }
   };
 
   const handleAddVatRate = async () => {
     const rate = parseFloat(newVatRate.replace(",", "."));
     if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
-      alert("Taux de TVA invalide (0–100).");
+      toast.error("Taux de TVA invalide (0–100).");
       return;
     }
     try {
@@ -183,7 +185,7 @@ export default function ParametresPage() {
       setNewVatRate("");
       setNewVatLabel("");
     } catch (err) {
-      alert((err as Error).message);
+      toast.error((err as Error).message);
     }
   };
 
@@ -197,7 +199,7 @@ export default function ParametresPage() {
             Paramètres de la Société & Système
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Identifiants légaux marocains (ICE, IF, RC), taux de TVA paramétrable, coordonnées bancaires et sécurité d'accès.
+            Identifiants légaux marocains (ICE, IF, RC), taux de TVA paramétrable, coordonnées bancaires et sécurité d&apos;accès.
           </p>
         </div>
 
@@ -224,7 +226,7 @@ export default function ParametresPage() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as typeof activeTab)}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                 activeTab === tab.id
                   ? "bg-[#F7162D] text-white shadow-xs"
@@ -294,7 +296,7 @@ export default function ParametresPage() {
                   placeholder="001892345000088"
                   required
                 />
-                <p className="text-[11px] text-gray-400 mt-1">Identifiant Commun de l'Entreprise obligatoire au Maroc</p>
+                <p className="text-[11px] text-gray-400 mt-1">Identifiant Commun de l&apos;Entreprise obligatoire au Maroc</p>
               </div>
 
               <div>
@@ -338,7 +340,7 @@ export default function ParametresPage() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
-                  Numéro d'affiliation CNSS
+                  Numéro d&apos;affiliation CNSS
                 </label>
                 <input
                   type="text"
@@ -488,7 +490,7 @@ export default function ParametresPage() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
-                  Devise d'Émission
+                  Devise d&apos;Émission
                 </label>
                 <input
                   type="text"
@@ -508,7 +510,7 @@ export default function ParametresPage() {
                       Règle de Calcul de la Remise Commerciale (%)
                     </h3>
                     <p className="text-xs text-amber-800 dark:text-amber-300/80 mt-1 leading-relaxed">
-                      Conformément à la convention de SARL BM Motors, la remise (%) est déduite directement du <strong>Total Brut HT</strong> pour obtenir le <strong>Total Net HT</strong>, sur lequel s'applique ensuite la TVA de {fiscalSettings.defaultTvaRate}%.
+                      Conformément à la convention de SARL BM Motors, la remise (%) est déduite directement du <strong>Total Brut HT</strong> pour obtenir le <strong>Total Net HT</strong>, sur lequel s&apos;applique ensuite la TVA de {fiscalSettings.defaultTvaRate}%.
                     </p>
                   </div>
                 </div>
@@ -560,7 +562,7 @@ export default function ParametresPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-500 mb-1">Relevé d'Identité Bancaire (RIB - 24 chiffres)</label>
+                  <label className="block text-[11px] font-bold text-gray-500 mb-1">Relevé d&apos;Identité Bancaire (RIB - 24 chiffres)</label>
                   <input
                     type="text"
                     value={bankSettings.bank1Rib}
@@ -585,7 +587,7 @@ export default function ParametresPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-500 mb-1">Relevé d'Identité Bancaire (RIB - 24 chiffres)</label>
+                  <label className="block text-[11px] font-bold text-gray-500 mb-1">Relevé d&apos;Identité Bancaire (RIB - 24 chiffres)</label>
                   <input
                     type="text"
                     value={bankSettings.bank2Rib}
@@ -609,7 +611,7 @@ export default function ParametresPage() {
                 Sécurité & Utilisateurs
               </h2>
               <p className="text-xs text-gray-500 mt-1">
-                PIN individuels par employé (attribution nominative des opérations). Le second facteur est assuré par Cloudflare Access devant l'application.
+                PIN individuels par employé (attribution nominative des opérations). Le second facteur est assuré par Cloudflare Access devant l&apos;application.
               </p>
             </div>
 
@@ -623,8 +625,8 @@ export default function ParametresPage() {
                   Code PIN comptoir
                 </span>
                 <p className="text-xs text-gray-500 leading-relaxed">
-                  Le code PIN est défini par la variable d'environnement <span className="font-mono font-bold">ADMIN_PIN</span> (Secret Manager en production).
-                  Aucun PIN n'est affiché ni modifiable depuis cette page : toute rotation se fait côté hébergement, sans valeur codée en dur.
+                  Le code PIN est défini par la variable d&apos;environnement <span className="font-mono font-bold">ADMIN_PIN</span> (Secret Manager en production).
+                  Aucun PIN n&apos;est affiché ni modifiable depuis cette page : toute rotation se fait côté hébergement, sans valeur codée en dur.
                 </p>
               </div>
 
@@ -634,8 +636,8 @@ export default function ParametresPage() {
                   Second facteur : Cloudflare Access
                 </span>
                 <p className="text-xs text-emerald-800 dark:text-emerald-300/80 leading-relaxed">
-                  L'accès applicatif est filtré en amont par Cloudflare Access (Zero Trust). Il n'y a pas de déverrouillage biométrique applicatif :
-                  la biométrie éventuelle de l'appareil reste du ressort du système, pas d'une session émise par l'ERP.
+                  L&apos;accès applicatif est filtré en amont par Cloudflare Access (Zero Trust). Il n&apos;y a pas de déverrouillage biométrique applicatif :
+                  la biométrie éventuelle de l&apos;appareil reste du ressort du système, pas d&apos;une session émise par l&apos;ERP.
                 </p>
               </div>
             </div>
@@ -725,7 +727,7 @@ export default function ParametresPage() {
                 Infrastructure & Sauvegardes Nocturnes (0,00 €/an)
               </h2>
               <p className="text-xs text-gray-500 mt-1">
-                État de l'hébergement serveur, de la base de données et des sauvegardes automatiques.
+                État de l&apos;hébergement serveur, de la base de données et des sauvegardes automatiques.
               </p>
             </div>
 

@@ -11,16 +11,12 @@ import {
   Paperclip,
   Trash2,
   Reply,
-  CheckCircle2,
   FileText,
-  Building2,
   Clock,
   Plus,
   RefreshCw,
   X,
   FileDown,
-  ArrowRight,
-  ExternalLink,
 } from "lucide-react";
 import {
   SupplierEmailItem,
@@ -29,9 +25,11 @@ import {
   markEmailAsRead,
   deleteSupplierEmail,
 } from "@/lib/actions/emails";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export default function CourrielPage() {
   const company = useSettings();
+  const toast = useToast();
   const [emails, setEmails] = useState<SupplierEmailItem[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<SupplierEmailItem | null>(null);
   const [activeFolder, setActiveFolder] = useState<"ALL" | "INBOX" | "SENT">("INBOX");
@@ -47,7 +45,6 @@ export default function CourrielPage() {
   const [composeBody, setComposeBody] = useState("");
   const [composeAttachments, setComposeAttachments] = useState<Array<{ name: string; size: string }>>([]);
   const [isSending, setIsSending] = useState(false);
-  const [sendSuccessToast, setSendSuccessToast] = useState(false);
 
   const suppliersList = [
     { id: 1, name: "Bashan Motorcycle Industrial Co., Ltd", email: "export@bashanmotor.com" },
@@ -76,7 +73,9 @@ export default function CourrielPage() {
   };
 
   useEffect(() => {
-    loadEmails();
+    const timer = setTimeout(loadEmails, 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFolder, selectedSupplierFilter, searchQuery]);
 
   const handleSelectEmail = async (email: SupplierEmailItem) => {
@@ -147,7 +146,7 @@ Comptabilité - ${company.raisonSociale}`);
   const handleSendEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!composeTo || !composeSubject || !composeBody) {
-      alert("Veuillez renseigner tous les champs obligatoires.");
+      toast.error("Veuillez renseigner tous les champs obligatoires.");
       return;
     }
 
@@ -172,12 +171,11 @@ Comptabilité - ${company.raisonSociale}`);
       setComposeSubject("");
       setComposeBody("");
       setComposeAttachments([]);
-      setSendSuccessToast(true);
-      setTimeout(() => setSendSuccessToast(false), 4000);
+      toast.success("Courriel envoyé avec succès via Resend");
       loadEmails();
       setSelectedEmail(newMail);
-    } catch (err: any) {
-      alert(err.message || "Erreur lors de l'envoi");
+    } catch (err) {
+      toast.error((err as Error).message || "Erreur lors de l'envoi");
     } finally {
       setIsSending(false);
     }
@@ -200,13 +198,6 @@ Comptabilité - ${company.raisonSociale}`);
         </div>
 
         <div className="flex items-center gap-2">
-          {sendSuccessToast && (
-            <div className="px-3.5 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 animate-in fade-in">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              Courriel envoyé avec succès via Resend
-            </div>
-          )}
-
           <button
             onClick={() => {
               const supp = suppliersList[0];
@@ -327,7 +318,6 @@ Comptabilité - ${company.raisonSociale}`);
             ) : (
               emails.map((email) => {
                 const isSelected = selectedEmail?.id === email.id;
-                const isBashan = email.supplierName.includes("Bashan");
 
                 return (
                   <div
@@ -528,7 +518,7 @@ Comptabilité - ${company.raisonSociale}`);
                           </div>
 
                           <button
-                            onClick={() => alert(`Téléchargement de : ${att.name}`)}
+                            onClick={() => toast.info(`Téléchargement de : ${att.name}`)}
                             className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition"
                             title="Télécharger la pièce"
                           >
@@ -546,7 +536,7 @@ Comptabilité - ${company.raisonSociale}`);
               <Mail className="w-12 h-12 text-gray-300 mb-2 stroke-1" />
               <p className="text-sm font-semibold">Sélectionnez un courriel pour lire son contenu</p>
               <p className="text-xs text-gray-400 mt-1">
-                Ou cliquez sur "Nouveau Courriel" pour envoyer un message avec Bon de Commande.
+                Ou cliquez sur &quot;Nouveau Courriel&quot; pour envoyer un message avec Bon de Commande.
               </p>
             </div>
           )}

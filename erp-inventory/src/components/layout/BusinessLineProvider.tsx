@@ -30,10 +30,13 @@ export function BusinessLineProvider({
 
   // Restaure la ligne mémorisée (préférence locale ; par utilisateur plus tard).
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved && lines.some((l) => l.code === saved)) {
-      setActiveCodeState(saved);
-    }
+    const timer = setTimeout(() => {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved && lines.some((l) => l.code === saved)) {
+        setActiveCodeState(saved);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [lines]);
 
   const setActiveCode = (code: string) => {

@@ -31,8 +31,11 @@ export default function InventoryPage() {
   };
 
   useEffect(() => {
-    refresh();
-    setSelected(null);
+    const timer = setTimeout(() => {
+      refresh();
+      setSelected(null);
+    }, 0);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCode]);
 

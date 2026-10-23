@@ -3,21 +3,14 @@
 import React, { useEffect, useState } from "react";
 import {
   BarChart3,
-  Download,
   Printer,
   FileSpreadsheet,
   Percent,
   Boxes,
-  TrendingUp,
   Receipt,
-  Building,
   Calendar,
-  ChevronRight,
   ShieldCheck,
   CheckCircle2,
-  DollarSign,
-  ArrowDownRight,
-  ArrowUpRight,
   AlertCircle,
   Lock,
   Unlock,
@@ -42,15 +35,17 @@ import { getCustomerAging, type PartyAgingRow, type AgingBuckets } from "@/lib/a
 import { getSupplierAging } from "@/lib/actions/suppliers";
 import { formatMoney } from "@/lib/money";
 import { useSettings } from "@/components/layout/SettingsProvider";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export default function ComptabilitePage() {
   const company = useSettings();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<"TVA" | "STOCK" | "MARGES" | "AGING" | "VALIDATION">("TVA");
   const [tvaData, setTvaData] = useState<TvaAccountingExport | null>(null);
   const [stockData, setStockData] = useState<StockValuation | null>(null);
   const [marginsData, setMarginsData] = useState<ProfitMarginsReport | null>(null);
   const [marginsPeriod, setMarginsPeriod] = useState<"THIS_MONTH" | "LAST_MONTH" | "ALL">("THIS_MONTH");
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const now = new Date();
   const [periodYear, setPeriodYear] = useState(now.getFullYear());
   const [periodMonth, setPeriodMonth] = useState(now.getMonth() + 1); // 1..12
@@ -85,7 +80,8 @@ export default function ComptabilitePage() {
   };
 
   useEffect(() => {
-    loadData();
+    const timer = setTimeout(loadData, 0);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [marginsPeriod, periodYear, periodMonth]);
 
@@ -95,7 +91,7 @@ export default function ComptabilitePage() {
       await setPeriodStatusAction(periodYear, periodMonth, status);
       setPeriodStatusState(status);
     } catch (e) {
-      alert((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setIsLocking(false);
     }
@@ -120,7 +116,7 @@ export default function ComptabilitePage() {
       link.click();
       document.body.removeChild(link);
     } catch (e) {
-      alert((e as Error).message);
+      toast.error((e as Error).message);
     }
   };
 
@@ -138,7 +134,7 @@ export default function ComptabilitePage() {
             Rapports, Marges & Déclaration TVA
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Déclaration périodique de TVA pour l'expert-comptable, valorisation du stock et rentabilité par pièce.
+            Déclaration périodique de TVA pour l&apos;expert-comptable, valorisation du stock et rentabilité par pièce.
           </p>
           {!company.vatLiable && (
             <p className="text-xs font-bold text-amber-700 dark:text-amber-300 mt-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2">
@@ -313,7 +309,7 @@ export default function ComptabilitePage() {
                 {formatMoney(tvaData.totalTvaDeductibleCents)}
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Achats pièces + charges d'exploitation
+                Achats pièces + charges d&apos;exploitation
               </p>
             </div>
 
@@ -357,7 +353,7 @@ export default function ComptabilitePage() {
                   Période : {tvaData.periodLabel}
                 </p>
                 <p className="text-[10px] text-gray-500">
-                  Régime d'imposition : Encaissements / Débits
+                  Régime d&apos;imposition : Encaissements / Débits
                 </p>
               </div>
             </div>
@@ -366,7 +362,7 @@ export default function ComptabilitePage() {
             <div className="my-6 space-y-2">
               <div className="flex justify-between items-center">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-gray-800">
-                  A. Chiffre d'Affaires & TVA Collectée sur les Ventes
+                  A. Chiffre d&apos;Affaires & TVA Collectée sur les Ventes
                 </h3>
                 <span className="text-xs font-bold text-gray-600">
                   Total Net HT : {formatMoney(tvaData.salesTaxableHtCents)}
@@ -501,7 +497,7 @@ export default function ComptabilitePage() {
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xs">
               <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                Valeur au Coût d'Achat HT
+                Valeur au Coût d&apos;Achat HT
               </span>
               <div className="text-2xl font-black text-gray-900 dark:text-white mt-1">
                 {formatMoney(stockData.totalCostHtCents)}
@@ -556,7 +552,7 @@ export default function ComptabilitePage() {
                   Articles à Forte Valeur de Stock (Top Immobilisation)
                 </h3>
                 <p className="text-xs text-gray-500">
-                  Pièces représentant le plus gros capital immobilisé au coût d'achat
+                  Pièces représentant le plus gros capital immobilisé au coût d&apos;achat
                 </p>
               </div>
             </div>
@@ -619,7 +615,7 @@ export default function ComptabilitePage() {
             ].map((p) => (
               <button
                 key={p.id}
-                onClick={() => setMarginsPeriod(p.id as any)}
+                onClick={() => setMarginsPeriod(p.id as "THIS_MONTH" | "LAST_MONTH" | "ALL")}
                 className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition ${
                   marginsPeriod === p.id
                     ? "bg-[#F7162D] text-white shadow-xs"
@@ -634,7 +630,7 @@ export default function ComptabilitePage() {
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xs">
               <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                Chiffre d'Affaires Net HT
+                Chiffre d&apos;Affaires Net HT
               </span>
               <div className="text-2xl font-black text-gray-900 dark:text-white mt-1">
                 {formatMoney(marginsData.totalRevenueHtCents)}
@@ -652,7 +648,7 @@ export default function ComptabilitePage() {
                 {formatMoney(marginsData.totalCostOfGoodsCents)}
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Prix d'achat des pièces vendues
+                Prix d&apos;achat des pièces vendues
               </p>
             </div>
 
@@ -688,7 +684,7 @@ export default function ComptabilitePage() {
                 Palmarès des Pièces les Plus Rentables
               </h3>
               <p className="text-xs text-gray-500">
-                Classement par chiffre d'affaires et marge brute générée
+                Classement par chiffre d&apos;affaires et marge brute générée
               </p>
             </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Printer, Share2, Phone, Building, CheckCircle2, Clock, AlertTriangle, FileText } from "lucide-react";
+import { X, Printer, Share2, FileText } from "lucide-react";
 import { CustomerAccountStatement, getCustomerStatement } from "@/lib/actions/customers";
 import { formatMoney } from "@/lib/money";
 import { paymentStatusLabel, isTerminalStatus } from "@/lib/payments";
@@ -24,11 +24,14 @@ export function CustomerStatementModal({
 
   useEffect(() => {
     if (!isOpen || !customerId) return;
-    setLoading(true);
-    getCustomerStatement(customerId).then((data) => {
-      setStatement(data);
-      setLoading(false);
-    });
+    const timer = setTimeout(() => {
+      setLoading(true);
+      getCustomerStatement(customerId).then((data) => {
+        setStatement(data);
+        setLoading(false);
+      });
+    }, 0);
+    return () => clearTimeout(timer);
   }, [isOpen, customerId]);
 
   if (!isOpen) return null;
@@ -133,7 +136,7 @@ export function CustomerStatementModal({
                     RELEVÉ DE COMPTE
                   </span>
                   <p className="text-xs text-gray-500 mt-2">
-                    Date d'édition : {new Date().toLocaleDateString("fr-FR")}
+                    Date d&apos;édition : {new Date().toLocaleDateString("fr-FR")}
                   </p>
                 </div>
               </div>

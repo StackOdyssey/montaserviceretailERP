@@ -2,19 +2,21 @@
 
 import React, { useState } from "react";
 import { X, Upload, Download, FileSpreadsheet, Check, AlertCircle } from "lucide-react";
-import { ProductItem } from "@/lib/actions/products";
+import { ProductItem, importProductsBatch } from "@/lib/actions/products";
 import { toDirhams } from "@/lib/money";
+
+type CsvImportItems = Parameters<typeof importProductsBatch>[0];
 
 interface CsvModalProps {
   isOpen: boolean;
   onClose: () => void;
   products: ProductItem[];
-  onImport: (items: any[]) => Promise<void>;
+  onImport: (items: CsvImportItems) => Promise<void>;
 }
 
 export function CsvModal({ isOpen, onClose, products, onImport }: CsvModalProps) {
-  const [csvText, setCsvText] = useState("");
-  const [parsedPreview, setParsedPreview] = useState<any[]>([]);
+  const [, setCsvText] = useState("");
+  const [parsedPreview, setParsedPreview] = useState<CsvImportItems>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -96,7 +98,7 @@ export function CsvModal({ isOpen, onClose, products, onImport }: CsvModalProps)
       const stockIdx = headers.findIndex((h) => h.includes("stock") || h.includes("qte"));
       const shelfIdx = headers.findIndex((h) => h.includes("rayon") || h.includes("empl"));
 
-      const items: any[] = [];
+      const items: CsvImportItems = [];
       for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(delimiter).map((c) => c.trim().replace(/^["']|["']$/g, ""));
         if (!cols[skuIdx] || !cols[nameIdx]) continue;

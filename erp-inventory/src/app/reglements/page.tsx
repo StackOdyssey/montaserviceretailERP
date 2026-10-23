@@ -5,17 +5,11 @@ import {
   Receipt,
   Search,
   Plus,
-  ArrowUpRight,
   Clock,
   AlertTriangle,
-  CheckCircle2,
-  Calendar,
   Building,
   Phone,
   FileText,
-  Filter,
-  Check,
-  XCircle,
   Banknote,
 } from "lucide-react";
 import {
@@ -30,14 +24,16 @@ import { nextStatuses, paymentStatusLabel, isTerminalStatus } from "@/lib/paymen
 import { PaymentModal } from "@/components/customers/PaymentModal";
 import { CustomerModal } from "@/components/customers/CustomerModal";
 import { CustomerStatementModal } from "@/components/customers/CustomerStatementModal";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export default function ReglementsPage() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<"SOLDE_CLIENTS" | "ECHEANCIER" | "HISTORIQUE">("SOLDE_CLIENTS");
   const [searchQuery, setSearchQuery] = useState("");
-  const [customersList, setCustomersList] = useState<any[]>([]);
+  const [customersList, setCustomersList] = useState<Awaited<ReturnType<typeof getCustomers>>>([]);
   const [chequesSchedule, setChequesSchedule] = useState<ChequeEffetAlert[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isPending, startTransition] = useTransition();
+  const [, setLoading] = useState(true);
+  const [, startTransition] = useTransition();
 
   // Modals state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -61,7 +57,9 @@ export default function ReglementsPage() {
   };
 
   useEffect(() => {
-    loadData();
+    const timer = setTimeout(loadData, 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
   // Totaux statistiques
@@ -77,7 +75,7 @@ export default function ReglementsPage() {
         await updatePaymentStatus(paymentId, newStatus);
         loadData();
       } catch (e) {
-        alert((e as Error).message);
+        toast.error((e as Error).message);
       }
     });
   };
@@ -150,7 +148,7 @@ export default function ReglementsPage() {
             {formatMoney(totalChequesEnAttente)}
           </div>
           <p className="text-xs text-gray-500 mt-1">
-            {chequesSchedule.filter((c) => c.status === "EN_ATTENTE").length} chèque(s) et effet(s) en attente d'encaissement
+            {chequesSchedule.filter((c) => c.status === "EN_ATTENTE").length} chèque(s) et effet(s) en attente d&apos;encaissement
           </p>
         </div>
 
@@ -315,7 +313,7 @@ export default function ReglementsPage() {
           <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-2xl flex items-start gap-3">
             <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div className="text-xs text-amber-800 dark:text-amber-300">
-              <strong>Gestion du portefeuille d'effets & chèques :</strong> Suivez les dates d'échéance des chèques et traites (LCN) remis par vos clients. Déposez-les en banque à date et validez leur encaissement en un clic.
+              <strong>Gestion du portefeuille d&apos;effets & chèques :</strong> Suivez les dates d&apos;échéance des chèques et traites (LCN) remis par vos clients. Déposez-les en banque à date et validez leur encaissement en un clic.
             </div>
           </div>
 

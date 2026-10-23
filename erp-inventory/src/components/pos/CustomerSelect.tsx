@@ -1,15 +1,16 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { User, X, Search, Plus, AlertTriangle, CheckCircle2 } from "lucide-react";
 import {
   getCustomers,
   saveCustomer,
   findCustomerDuplicates,
 } from "@/lib/actions/customers";
+import { useCustomerSearch, type CustomerMatch } from "@/lib/hooks/useCustomerSearch";
 import { formatMoney } from "@/lib/money";
 
-type SearchRow = Awaited<ReturnType<typeof getCustomers>>[number];
+type SearchRow = CustomerMatch;
 
 interface CustomerSelectProps {
   customerId: number | null;
@@ -52,42 +53,20 @@ export function CustomerSelect({
   const [isProfessional, setIsProfessional] = useState(customerIsProfessional);
   const [creditLimitCents, setCreditLimitCents] = useState<number | null>(null);
 
-  // T1.1 — recherche debouncée
+  // T1.1 — recherche debouncée (hook partagé avec /ventes/nouveau)
   const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchRow[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [hasSearched, setHasSearched] = useState(false);
+  const {
+    matches: searchResults,
+    hasSearched,
+    isSearching,
+    error: searchError,
+    clear: clearSearch,
+  } = useCustomerSearch(searchTerm, { limit: 10, minLength: 1, debounceMs: 200 });
 
   const handleSearchChange = (v: string) => {
     setSearchTerm(v);
-    if (!v.trim()) {
-      setSearchResults([]);
-      setHasSearched(false);
-      setSearchError(null);
-      setIsSearching(false);
-    } else {
-      setIsSearching(true);
-    }
+    if (!v.trim()) clearSearch();
   };
-
-  useEffect(() => {
-    const term = searchTerm.trim();
-    if (!term) return;
-    const timer = setTimeout(async () => {
-      try {
-        setSearchError(null);
-        const results = await getCustomers(term);
-        setSearchResults(results.slice(0, 10));
-        setHasSearched(true);
-      } catch (err) {
-        setSearchError(err instanceof Error ? err.message : "Recherche impossible");
-      } finally {
-        setIsSearching(false);
-      }
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
 
   // T1.2 — quick-create inline
   const [isCreating, setIsCreating] = useState(false);
@@ -108,9 +87,8 @@ export function CustomerSelect({
     setDuplicates([]);
     setCreateError(null);
     setCreatedOk(null);
-    setSearchResults([]);
     setSearchTerm("");
-    setHasSearched(false);
+    clearSearch();
   };
 
   const handleQuickCreate = async () => {

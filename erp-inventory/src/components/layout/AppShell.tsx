@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   ShoppingCart,
   Boxes,
-  Users,
   Truck,
   Receipt,
   FileText,
@@ -22,7 +21,6 @@ import {
   Menu,
   X,
   PlusCircle,
-  Bell,
   Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -40,6 +38,7 @@ import {
   type CompanySettingsInput,
   type Parameters,
 } from "@/components/layout/SettingsProvider";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 
 interface NavItem {
   label: string;
@@ -114,10 +113,13 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
 
   // Mémoriser l'état plié/déplié de la sidebar
   useEffect(() => {
-    const saved = localStorage.getItem("bm_sidebar_collapsed");
-    if (saved !== null) {
-      setIsCollapsed(saved === "true");
-    }
+    const timer = setTimeout(() => {
+      const saved = localStorage.getItem("bm_sidebar_collapsed");
+      if (saved !== null) {
+        setIsCollapsed(saved === "true");
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   // Sur la page de connexion, afficher l'écran plein écran sans la barre de navigation.
@@ -143,6 +145,7 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
     <SettingsProvider settings={settings}>
     <ParametersProvider parameters={parameters}>
     <BusinessLineProvider lines={lines}>
+    <ToastProvider>
     <div className="min-h-screen bg-[#F8F9FA] text-[#111827] flex flex-col md:flex-row">
       {/* ======================================================== */}
       {/* 1. SIDEBAR DESKTOP PLIABLE VERS LA GAUCHE                */}
@@ -489,6 +492,7 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
         </Link>
       </nav>
     </div>
+    </ToastProvider>
     </BusinessLineProvider>
     </ParametersProvider>
     </SettingsProvider>

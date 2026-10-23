@@ -4,9 +4,6 @@ import {
   formatMoney,
   toCentimes,
   toDirhams,
-  calculateLineTotal,
-  calculateDiscountAmount,
-  calculateNetHT,
   calculateTVAAmount,
   calculateDocumentTotals,
 } from "./money";

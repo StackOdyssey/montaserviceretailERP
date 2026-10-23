@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { X, Receipt, Camera, Upload, Trash2, CheckCircle2 } from "lucide-react";
+import { X, Receipt, Camera, Trash2 } from "lucide-react";
 import { recordExpense } from "@/lib/actions/expenses";
 import { useParameters, useSettings } from "@/components/layout/SettingsProvider";
 import { toCentimes } from "@/lib/money";
@@ -107,8 +107,8 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
 
       onSaved();
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de l'enregistrement de la dépense.");
+    } catch (err) {
+      setError((err as Error).message || "Erreur lors de l'enregistrement de la dépense.");
     } finally {
       setIsSubmitting(false);
     }

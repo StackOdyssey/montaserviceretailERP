@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X, CreditCard, Banknote, FileText, Check, AlertTriangle } from "lucide-react";
 import { formatMoney } from "@/lib/money";
+import { useToast } from "@/components/ui/ToastProvider";
 
 interface PaymentModalProps {
   totalTtc: number;
@@ -33,6 +34,7 @@ export function PaymentModal({
   onPayment,
   isSubmitting,
 }: PaymentModalProps) {
+  const toast = useToast();
   const [paymentMethod, setPaymentMethod] = useState<"ESPECES" | "CHEQUE" | "A_CREDIT">("ESPECES");
   const [chequeDetails, setChequeDetails] = useState({
     bankName: "",
@@ -55,7 +57,7 @@ export function PaymentModal({
     if (missingFile) return;
     if (paymentMethod === "CHEQUE") {
       if (!chequeDetails.bankName || !chequeDetails.chequeNumber) {
-        alert("Veuillez remplir les informations du chèque");
+        toast.error("Veuillez remplir les informations du chèque");
         return;
       }
       onPayment({

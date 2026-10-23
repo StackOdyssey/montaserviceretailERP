@@ -3,26 +3,21 @@
 import React, { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ShoppingCart,
   Search,
   Plus,
   Minus,
   Trash2,
   Percent,
-  Check,
   User,
-  Printer,
   Boxes,
   ArrowLeft,
   AlertCircle,
-  CreditCard,
-  Banknote,
   FileCheck,
   LayoutGrid,
   ChevronDown,
 } from "lucide-react";
 import { getProducts, ProductItem } from "@/lib/actions/products";
-import { getCustomers } from "@/lib/actions/customers";
+import { useCustomerSearch, type CustomerMatch } from "@/lib/hooks/useCustomerSearch";
 import { ProductGrid } from "@/components/pos/ProductGrid";
 import { createSalesDocument, SalesLineInput, SalesDocumentItem } from "@/lib/actions/sales";
 import { formatMoney, calculateDocumentTotals } from "@/lib/money";
@@ -69,13 +64,15 @@ export default function NouveauBonDeLivraisonPage() {
   // Recherche d'articles
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<ProductItem[]>([]);
-  const [isSearching, startSearch] = useTransition();
+  const [, startSearch] = useTransition();
 
   // Suggestions client (recherche tolérante : ben/bennani → EL BANNANI)
-  type CustomerMatch = Awaited<ReturnType<typeof getCustomers>>[number];
-  const [customerMatches, setCustomerMatches] = useState<CustomerMatch[]>([]);
-  const [hasCustomerSearched, setHasCustomerSearched] = useState(false);
-  const customerJustSelected = React.useRef(false);
+  const {
+    matches: customerMatches,
+    hasSearched: hasCustomerSearched,
+    suppress: suppressCustomerSearch,
+    clear: clearCustomerMatches,
+  } = useCustomerSearch(customerName, { ignoreTerm: "Client Comptoir Particulier" });
 
   // Remise personnalisée en %
   const [discountPercent, setDiscountPercent] = useState<number>(0);
@@ -93,7 +90,7 @@ export default function NouveauBonDeLivraisonPage() {
   }, []);
 
   // Notes
-  const [notes, setNotes] = useState("");
+  const [notes] = useState("");
 
   // État de validation
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -102,12 +99,11 @@ export default function NouveauBonDeLivraisonPage() {
 
   // Recherche instantanée
   useEffect(() => {
-    if (!searchTerm.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
     const timer = setTimeout(() => {
+      if (!searchTerm.trim()) {
+        setSearchResults([]);
+        return;
+      }
       startSearch(async () => {
         const results = await getProducts({ search: searchTerm, businessLineCode });
         setSearchResults(results.slice(0, 8)); // Top 8 résultats
@@ -117,39 +113,13 @@ export default function NouveauBonDeLivraisonPage() {
     return () => clearTimeout(timer);
   }, [searchTerm, businessLineCode]);
 
-  // Suggestions client au fil de la frappe (ne se déclenche pas après sélection)
-  useEffect(() => {
-    if (customerJustSelected.current) {
-      customerJustSelected.current = false;
-      return;
-    }
-    const term = customerName.trim();
-    if (term.length < 2 || term === "Client Comptoir Particulier") {
-      setCustomerMatches([]);
-      setHasCustomerSearched(false);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      try {
-        const results = await getCustomers(term);
-        setCustomerMatches(results.slice(0, 6));
-        setHasCustomerSearched(true);
-      } catch {
-        setCustomerMatches([]);
-      }
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [customerName]);
-
   const handleSelectCustomerMatch = (c: CustomerMatch) => {
-    customerJustSelected.current = true;
+    suppressCustomerSearch();
     setCustomerId(c.id);
     setCustomerName(c.name);
     setCustomerPhone(c.phone || "");
     setCustomerCity(c.city || "Casablanca");
     setCustomerIce(c.ice || "");
-    setCustomerMatches([]);
-    setHasCustomerSearched(false);
   };
 
   // Catalogue visuel avec photos (toucher une carte ajoute la pièce)
@@ -264,8 +234,8 @@ export default function NouveauBonDeLivraisonPage() {
       setCreatedDocument(doc);
       setCart([]);
       idempotencyKeyRef.current = crypto.randomUUID();
-    } catch (err: any) {
-      setErrorMessage(err.message || "Erreur lors de la validation du BL");
+    } catch (err) {
+      setErrorMessage((err as Error).message || "Erreur lors de la validation du BL");
     } finally {
       setIsSubmitting(false);
     }
@@ -348,7 +318,7 @@ export default function NouveauBonDeLivraisonPage() {
                   setCustomerName(e.target.value);
                   setCustomerId(null);
                 }}
-                onBlur={() => setTimeout(() => setCustomerMatches([]), 150)}
+                onBlur={() => setTimeout(() => clearCustomerMatches(), 150)}
                 placeholder="Nom du client ou garage..."
                 autoComplete="off"
                 className="w-full px-3.5 py-2 text-sm bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl font-semibold text-[#111827] outline-none focus:border-[#F7162D]"
@@ -727,7 +697,7 @@ export default function NouveauBonDeLivraisonPage() {
                   <button
                     key={m.id}
                     type="button"
-                    onClick={() => setPaymentMethod(m.id as any)}
+                    onClick={() => setPaymentMethod(m.id as typeof paymentMethod)}
                     className={`py-2 px-2.5 rounded-xl border text-center transition-all ${
                       paymentMethod === m.id
                         ? "border-[#111827] bg-[#111827] text-white"

@@ -24,6 +24,7 @@ import { getDocumentUbl } from "@/lib/actions/dgi";
 import { formatMoney } from "@/lib/money";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
 import { useSettings } from "@/components/layout/SettingsProvider";
+import { useToast } from "@/components/ui/ToastProvider";
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   BL: "Bon de Livraison",
@@ -43,6 +44,7 @@ const DOC_TYPE_BADGE: Record<string, string> = {
 
 export default function VentesListPage() {
   const company = useSettings();
+  const toast = useToast();
   const [documents, setDocuments] = useState<SalesDocumentItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -74,7 +76,7 @@ export default function VentesListPage() {
       try {
         await fn();
       } catch (err) {
-        alert((err as Error).message);
+        toast.error((err as Error).message);
       } finally {
         setBusyId(null);
         loadDocuments();

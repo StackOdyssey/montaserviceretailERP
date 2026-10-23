@@ -65,7 +65,7 @@ export default function LoginPage() {
         setPin("");
         setTimeout(() => setShake(false), 500);
       }
-    } catch (err: any) {
+    } catch {
       setError("Erreur de connexion au serveur.");
     } finally {
       setIsSubmitting(false);

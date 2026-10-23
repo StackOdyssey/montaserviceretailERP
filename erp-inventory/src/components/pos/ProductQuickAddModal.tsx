@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { X, Minus, Plus, Check, Image as ImageIcon } from "lucide-react";
 import { ProductItem } from "@/lib/actions/products";
 import { formatMoney } from "@/lib/money";
@@ -19,9 +19,13 @@ interface ProductQuickAddModalProps {
 export function ProductQuickAddModal({ product, onClose, onConfirm }: ProductQuickAddModalProps) {
   const [quantity, setQuantity] = useState(1);
 
-  useEffect(() => {
+  // Remise à 1 quand le produit affiché change (ajustement pendant le rendu,
+  // pattern officiel React — pas d'effet pour resynchroniser un état sur une prop).
+  const [prevProductId, setPrevProductId] = useState(product.id);
+  if (prevProductId !== product.id) {
+    setPrevProductId(product.id);
     setQuantity(1);
-  }, [product.id]);
+  }
 
   const clamp = (n: number) => (Number.isNaN(n) ? 1 : Math.min(999, Math.max(1, Math.floor(n))));
 
