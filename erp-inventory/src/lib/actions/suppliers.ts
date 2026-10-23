@@ -13,7 +13,7 @@ import {
   suppliers,
   vatRates,
 } from "@/db";
-import { assertAuthenticated } from "@/lib/action-guard";
+import { assertAuthenticated, currentActor } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
 import type { AgingBuckets, PartyAgingRow } from "./customers";
 import { nextDocumentNumber } from "@/lib/numbering";
@@ -319,6 +319,7 @@ export async function createSupplierReceipt(data: {
     await tx.insert(auditLogs).values({
       action: "RECEPTION_BR",
       entityType: "SUPPLIER_RECEIPT",
+      actorName: await currentActor(),
       entityId: receiptId,
       details: `BR ${docNumber} — ${supplier.name} — ${(totalTtcCents / 100).toFixed(2)} DH TTC`,
     });
@@ -459,6 +460,7 @@ export async function recordSupplierPayment(data: {
     await d.insert(auditLogs).values({
       action: "REGLEMENT_FOURNISSEUR",
       entityType: "SUPPLIER_PAYMENT",
+      actorName: await currentActor(),
       entityId: paymentId,
       details: `Décaissement ${(data.amountCents / 100).toFixed(2)} DH (${data.paymentMethod}) — ${supplier.name}${receiptNumber ? ` sur ${receiptNumber}` : ""}`,
     });
@@ -515,6 +517,7 @@ export async function mergeSuppliers(sourceId: number, targetId: number): Promis
     await tx.insert(auditLogs).values({
       action: "FUSION_FOURNISSEUR",
       entityType: "SUPPLIER",
+      actorName: await currentActor(),
       entityId: targetId,
       details: `Fusion #${sourceId} « ${source.name} » → #${targetId} « ${target.name} »`,
     });
@@ -571,6 +574,7 @@ export async function saveSupplier(data: {
       await d.insert(auditLogs).values({
         action: "CREATION_FOURNISSEUR",
         entityType: "SUPPLIER",
+        actorName: await currentActor(),
         entityId: saved.id,
         details: `Création fiche « ${saved.name} »${saved.phone ? ` (${saved.phone})` : ""}`,
       });
@@ -762,6 +766,7 @@ export async function createSupplierPriceCreditNote(data: {
     await tx.insert(auditLogs).values({
       action: "AVOIR_PRIX_FOURNISSEUR",
       entityType: "SUPPLIER_RECEIPT",
+      actorName: await currentActor(),
       entityId: receipt.id,
       details: `Avoir prix (sans retour) ${receipt.receiptNumber} : ${(totalCreditHt / 100).toFixed(2)} DH HT`,
     });

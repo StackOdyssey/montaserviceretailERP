@@ -552,6 +552,21 @@ export const expenses = pgTable("expenses", {
 });
 
 // ==========================================
+// 13b. UTILISATEURS (caissiers/gérants, PIN individuels — M4)
+// ==========================================
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  displayName: text("display_name").notNull(),
+  // HMAC-SESSION_SECRET("pin:<pin>") — sert à la fois de clé de recherche et de
+  // vérificateur : la base seule ne permet pas de retrouver le PIN.
+  pinHmac: text("pin_hmac").notNull().unique(),
+  role: text("role").notNull().default("CAISSIER"), // GERANT | CAISSIER
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ==========================================
 // 14. JOURNAL D'AUDIT
 // ==========================================
 export const auditLogs = pgTable("audit_logs", {
@@ -560,6 +575,7 @@ export const auditLogs = pgTable("audit_logs", {
   entityType: text("entity_type").notNull(),
   entityId: integer("entity_id"),
   ipAddress: text("ip_address"),
+  actorName: text("actor_name"), // utilisateur identifié (session) — attribution M4
   details: text("details"),
   createdAt: timestamp("created_at").defaultNow(),
 });

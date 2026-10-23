@@ -36,11 +36,24 @@ export async function verifyToken(token: string): Promise<boolean> {
  * Crée un cookie de session valide 30 jours, lié à la version de session courante
  * (incrémenter `settings.session_version` révoque toutes les sessions émises).
  */
-export async function createSessionToken(version: number): Promise<string> {
+export async function createSessionToken(
+  version: number,
+  identity?: { user: string; role: string; uid?: number | null }
+): Promise<string> {
+  const { user = "gerant", role = "ADMIN", uid = null } = identity ?? {};
   const payloadStr = btoa(
-    JSON.stringify({ user: "gerant", role: "ADMIN", v: version, exp: Date.now() + SESSION_TTL_MS })
+    JSON.stringify({ user, role, uid, v: version, exp: Date.now() + SESSION_TTL_MS })
   );
   return `${payloadStr}.${hmac(payloadStr).toString("hex")}`;
+}
+
+/**
+ * Empreinte HMAC d'un PIN (clé de recherche + vérificateur des PINs utilisateurs).
+ * Déterministe : permet le lookup users.pin_hmac sans sel, et la base seule ne
+ * permet pas de retrouver le PIN (il faudrait SESSION_SECRET).
+ */
+export function pinHmac(pin: string): string {
+  return hmac(`pin:${pin.trim()}`).toString("hex");
 }
 
 /**
@@ -61,6 +74,8 @@ export function verifyAdminPin(pin: string): boolean {
 export interface SessionInfo {
   user: string;
   role: string;
+  /** users.id pour les sessions nominatives ; null pour la clé maîtresse ADMIN_PIN. */
+  uid: number | null;
   /** Version de session (révocation globale). */
   v: number;
   exp: number;
@@ -79,6 +94,7 @@ export function parseSession(token: string): SessionInfo | null {
     return {
       user: String(data.user ?? ""),
       role: String(data.role ?? ""),
+      uid: typeof data.uid === "number" ? data.uid : null,
       // Jetons émis avant l'introduction de la version : version initiale (1).
       v: typeof data.v === "number" ? data.v : 1,
       exp: data.exp,

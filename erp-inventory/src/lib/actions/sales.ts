@@ -21,7 +21,7 @@ import {
 import { calculateDocumentTotals } from "@/lib/money";
 import { effectiveVatRate, VAT_NOT_LIABLE_MENTION } from "@/lib/vat-regime";
 import { nextDocumentNumber } from "@/lib/numbering";
-import { assertAuthenticated } from "@/lib/action-guard";
+import { assertAuthenticated, assertOwner, currentActor } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
 import { lockProducts } from "@/lib/stock-lock";
 import { applyMovement, type CmupState } from "@/lib/stock";
@@ -402,6 +402,7 @@ export async function createSalesDocument(data: {
         await tx.insert(auditLogs).values({
           action: "PRIX_FIXE",
           entityType: "PRODUCT",
+          actorName: await currentActor(),
           entityId: p.id,
           details: `${p.sku}: prix catalogue ${catalogPrices.join("/")} → ${l.unitPriceHTCents} — motif: ${data.overrideReason.trim()}`,
         });
@@ -486,6 +487,7 @@ export async function createSalesDocument(data: {
     await tx.insert(auditLogs).values({
       action: "VALIDATION_DOCUMENT",
       entityType: docType,
+      actorName: await currentActor(),
       entityId: docId,
       details: `${docType} ${docNumber} — ${data.customerName || "Client Comptoir Particulier"} — ${(totals.totalTTC / 100).toFixed(2)} DH TTC (${data.paymentMethod}${isFullyPaid ? ", soldé" : ", à crédit"})`,
     });
@@ -823,6 +825,7 @@ export async function convertBlToFacture(
     await tx.insert(auditLogs).values({
       action: "CONVERSION_BL_FAC",
       entityType: "FACTURE",
+      actorName: await currentActor(),
       entityId: docId,
       details: `Facture ${docNumber} issue des BL : ${active.map((b) => b.docNumber).join(", ")} — ${((totalBrutHt + tvaAmount) / 100).toFixed(2)} DH TTC`,
     });
@@ -961,6 +964,7 @@ export async function createAvoir(data: {
     await tx.insert(auditLogs).values({
       action: "AVOIR_EMIS",
       entityType: "AVOIR",
+      actorName: await currentActor(),
       entityId: docId,
       details: `Avoir ${docNumber} (${avType}) sur ${source.docNumber} — ${((totalHt + tvaAmount) / 100).toFixed(2)} DH TTC`,
     });
@@ -1002,7 +1006,7 @@ export async function createAvoir(data: {
  * Contrepasse les mouvements de stock du document et journalise l'action.
  */
 export async function cancelDocument(documentId: number, reason?: string): Promise<SalesDocumentItem> {
-  await assertAuthenticated();
+  await assertOwner();
   const d = requireDb();
 
   const doc = (await d.select().from(salesDocuments).where(eq(salesDocuments.id, documentId)).limit(1))[0];
@@ -1047,6 +1051,7 @@ export async function cancelDocument(documentId: number, reason?: string): Promi
     await tx.insert(auditLogs).values({
       action: "ANNULATION_DOCUMENT",
       entityType: doc.docType,
+      actorName: await currentActor(),
       entityId: documentId,
       details: `Annulation ${doc.docNumber}${reason ? " — " + reason : ""}`,
     });
@@ -1095,6 +1100,7 @@ export async function writeOffStock(data: {
     await tx.insert(auditLogs).values({
       action: "REBUT_STOCK",
       entityType: "PRODUCT",
+      actorName: await currentActor(),
       entityId: p.id,
       details: `Rebut de ${data.quantity} × ${p.sku} — perte ${((data.quantity * p.cmupCents) / 100).toFixed(2)} MAD`,
     });
@@ -1152,6 +1158,7 @@ export async function createSupplierReturn(data: {
     await tx.insert(auditLogs).values({
       action: "RETOUR_FOURNISSEUR",
       entityType: "SUPPLIER_RECEIPT",
+      actorName: await currentActor(),
       entityId: receipt.id,
       details: `Retour fournisseur (${returned} u.) sur ${receipt.receiptNumber}`,
     });

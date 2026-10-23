@@ -12,7 +12,7 @@ import {
   stockMovements,
 } from "@/db";
 import { applyMovement, type CmupState } from "@/lib/stock";
-import { assertAuthenticated } from "@/lib/action-guard";
+import { assertAuthenticated, assertOwner } from "@/lib/action-guard";
 import { lockProducts } from "@/lib/stock-lock";
 
 export interface StockCountSummary {
@@ -182,7 +182,7 @@ export async function setStockCountLine(lineId: number, countedQty: number): Pro
  * via le moteur CMUP, puis passe l'inventaire à VALIDATED.
  */
 export async function validateStockCount(id: number): Promise<{ adjusted: number }> {
-  await assertAuthenticated();
+  const session = await assertOwner();
   const d = requireDb();
 
   // Une seule transaction : en-tête verrouillé (pas de double validation), produits
@@ -265,6 +265,7 @@ export async function validateStockCount(id: number): Promise<{ adjusted: number
     await d.insert(auditLogs).values({
       action: "INVENTAIRE_VALIDE",
       entityType: "STOCK_COUNT",
+      actorName: session.user,
       entityId: id,
       details: `Inventaire ${code} validé — ${adjusted} ligne(s) ajustée(s)`,
     });
@@ -275,7 +276,7 @@ export async function validateStockCount(id: number): Promise<{ adjusted: number
 }
 
 export async function cancelStockCount(id: number): Promise<void> {
-  await assertAuthenticated();
+  const session = await assertOwner();
   const d = requireDb();
   const header = (await d.select({ code: stockCounts.code }).from(stockCounts).where(eq(stockCounts.id, id)).limit(1))[0];
   await d.update(stockCounts).set({ status: "CANCELLED" }).where(eq(stockCounts.id, id));
@@ -283,6 +284,7 @@ export async function cancelStockCount(id: number): Promise<void> {
     await d.insert(auditLogs).values({
       action: "INVENTAIRE_ANNULE",
       entityType: "STOCK_COUNT",
+      actorName: session.user,
       entityId: id,
       details: `Inventaire ${header?.code ?? `#${id}`} annulé`,
     });

@@ -21,6 +21,7 @@ import { getSettings, saveSettings, getVatRates, saveVatRate } from "@/lib/actio
 import { OPEN_QUESTIONS } from "@/lib/open-questions";
 import { revokeAllSessions } from "@/lib/actions/auth";
 import { clearAppCaches } from "@/components/pwa/clear-app-caches";
+import { UsersSection } from "@/components/settings/UsersSection";
 
 export default function ParametresPage() {
   const router = useRouter();
@@ -605,12 +606,15 @@ export default function ParametresPage() {
             <div className="border-b border-gray-100 dark:border-gray-800 pb-4">
               <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <Lock className="w-5 h-5 text-[#F7162D]" />
-                Sécurité Monoutilisateur & Code PIN
+                Sécurité & Utilisateurs
               </h2>
               <p className="text-xs text-gray-500 mt-1">
-                Protection par code PIN tactile à 4 chiffres. Le second facteur est assuré par Cloudflare Access devant l'application.
+                PIN individuels par employé (attribution nominative des opérations). Le second facteur est assuré par Cloudflare Access devant l'application.
               </p>
             </div>
+
+            {/* Utilisateurs caisse (PIN individuels + rôles) */}
+            <UsersSection />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Code PIN géré par l'environnement */}

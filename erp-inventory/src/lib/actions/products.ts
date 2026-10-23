@@ -10,7 +10,7 @@ export interface CategoryItem {
   sortOrder: number;
 }
 import { applyMovement, type CmupState } from "@/lib/stock";
-import { assertAuthenticated } from "@/lib/action-guard";
+import { assertAuthenticated, currentActor } from "@/lib/action-guard";
 import { lockProducts } from "@/lib/stock-lock";
 import { validateInput, saveProductSchema, recordStockMovementSchema } from "@/lib/action-validation";
 
@@ -303,6 +303,7 @@ export async function saveProduct(data: {
   await d.insert(auditLogs).values({
     action: data.id ? "PRODUIT_MODIFIE" : "PRODUIT_CREE",
     entityType: "PRODUCT",
+    actorName: await currentActor(),
     entityId: savedId,
     details: `${values.sku} — ${values.name} — vente ${(values.salePriceHtCents / 100).toFixed(2)} DH, stock ${values.currentStock}`,
   });
@@ -382,6 +383,7 @@ export async function recordStockMovement(data: {
     await tx.insert(auditLogs).values({
       action: "MOUVEMENT_STOCK_MANUEL",
       entityType: "PRODUCT",
+      actorName: await currentActor(),
       entityId: p.id,
       details: `${p.sku} — ${data.movementType} ${data.quantity > 0 ? "+" : ""}${data.quantity} — ${data.reason} — stock ${next.quantity}`,
     });

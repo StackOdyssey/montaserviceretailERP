@@ -2,11 +2,11 @@
 
 import { and, count, eq, gte } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
-import { createSessionToken, verifyAdminPin, SESSION_COOKIE_NAME } from "@/lib/auth";
+import { createSessionToken, verifyAdminPin, pinHmac, SESSION_COOKIE_NAME } from "@/lib/auth";
 import { assertAuthenticated } from "@/lib/action-guard";
 import { isLiveSession } from "@/lib/session";
 import { bumpSessionVersion, getSessionVersion } from "@/lib/session-version";
-import { auditLogs, db } from "@/db";
+import { auditLogs, db, users } from "@/db";
 import { logEvent, logWarn } from "@/lib/observability";
 
 export interface AuthResult {
@@ -64,7 +64,24 @@ export async function loginWithPin(pin: string): Promise<AuthResult> {
     };
   }
 
-  if (!verifyAdminPin(String(pin ?? ""))) {
+  // Identification : PIN utilisateur nominatif (users.pin_hmac) ou clé maîtresse
+  // ADMIN_PIN. Les deux comparaisons passent par le même HMAC (temps constant).
+  const pinStr = String(pin ?? "");
+  let identity: { user: string; role: string; uid: number | null } | null = null;
+  if (verifyAdminPin(pinStr)) {
+    identity = { user: "gerant", role: "ADMIN", uid: null };
+  } else {
+    const u = (
+      await db
+        .select({ id: users.id, displayName: users.displayName, role: users.role })
+        .from(users)
+        .where(and(eq(users.pinHmac, pinHmac(pinStr)), eq(users.isActive, true)))
+        .limit(1)
+    )[0];
+    if (u) identity = { user: u.displayName, role: u.role === "GERANT" ? "GERANT" : "CAISSIER", uid: u.id };
+  }
+
+  if (!identity) {
     logWarn("auth.pin_failed", { ip });
     await db.insert(auditLogs).values({
       action: "PIN_ECHEC",
@@ -78,7 +95,7 @@ export async function loginWithPin(pin: string): Promise<AuthResult> {
     };
   }
 
-  const token = await createSessionToken(await getSessionVersion());
+  const token = await createSessionToken(await getSessionVersion(), identity);
   const cookieStore = await cookies();
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
@@ -89,14 +106,15 @@ export async function loginWithPin(pin: string): Promise<AuthResult> {
     path: "/",
   });
 
-  logEvent("auth.pin_success");
+  logEvent("auth.pin_success", { user: identity.user, role: identity.role });
   // Marqueur d'ouverture de session dans le journal des opérations.
   try {
     await db.insert(auditLogs).values({
       action: "CONNEXION",
       entityType: "SESSION",
       ipAddress: ip,
-      details: "Ouverture de session (PIN gérant).",
+      actorName: identity.user,
+      details: `Ouverture de session — ${identity.user} (${identity.role}).`,
     });
   } catch {
     // journal non bloquant : la connexion reste valide même si le log échoue
@@ -108,13 +126,21 @@ export async function loginWithPin(pin: string): Promise<AuthResult> {
  * Déconnexion.
  */
 export async function logout(): Promise<void> {
-  // Marqueur de fermeture de session (non bloquant).
+  // Marqueur de fermeture de session (non bloquant), avec attribution.
+  let actor = "";
+  try {
+    const session = await assertAuthenticated();
+    actor = session.user;
+  } catch {
+    // session déjà invalide : on journalise sans acteur
+  }
   try {
     if (db) {
       await db.insert(auditLogs).values({
         action: "DECONNEXION",
         entityType: "SESSION",
-        details: "Fermeture de session.",
+        actorName: actor || null,
+        details: actor ? `Fermeture de session — ${actor}.` : "Fermeture de session.",
       });
     }
   } catch {
@@ -149,4 +175,16 @@ export async function revokeAllSessions(): Promise<void> {
 export async function checkSession(): Promise<boolean> {
   const cookieStore = await cookies();
   return isLiveSession(cookieStore.get(SESSION_COOKIE_NAME)?.value);
+}
+
+/**
+ * Identité de l'utilisateur connecté (nom + rôle) pour affichage dans l'UI.
+ */
+export async function currentUser(): Promise<{ user: string; role: string } | null> {
+  try {
+    const session = await assertAuthenticated();
+    return { user: session.user, role: session.role };
+  } catch {
+    return null;
+  }
 }

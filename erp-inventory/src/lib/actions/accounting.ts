@@ -13,7 +13,7 @@ import {
   suppliers,
   supplierPayments,
 } from "@/db";
-import { assertAuthenticated } from "@/lib/action-guard";
+import { assertAuthenticated, assertOwner } from "@/lib/action-guard";
 import { getTvaAccountingExport } from "./analytics";
 
 export type PeriodStatus = "OPEN" | "REVIEWED" | "EXPORTED" | "LOCKED";
@@ -66,7 +66,7 @@ export async function setPeriodStatus(
   status: PeriodStatus,
   notes?: string
 ): Promise<AccountingPeriodItem> {
-  await assertAuthenticated();
+  await assertOwner();
   const d = requireDb();
   const allowed: PeriodStatus[] = ["OPEN", "REVIEWED", "EXPORTED", "LOCKED"];
   if (!allowed.includes(status)) throw new Error("STATUT_PERIODE_INVALIDE");
@@ -106,7 +106,7 @@ export async function setPeriodLock(
   locked: boolean,
   notes?: string
 ): Promise<AccountingPeriodItem> {
-  await assertAuthenticated();
+  await assertOwner();
   return setPeriodStatus(year, month, locked ? "LOCKED" : "OPEN", notes);
 }
 

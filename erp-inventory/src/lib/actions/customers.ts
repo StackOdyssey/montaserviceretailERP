@@ -2,7 +2,7 @@
 
 import { and, asc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { auditLogs, customerPayments, customers, db, salesDocuments } from "@/db";
-import { assertAuthenticated } from "@/lib/action-guard";
+import { assertAuthenticated, currentActor } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
 import { initialStatusFor, statusesForMethod } from "@/lib/payments";
 import { matchTokens } from "@/lib/search";
@@ -343,6 +343,7 @@ export async function recordCustomerPayment(data: {
     await d.insert(auditLogs).values({
       action: "REGLEMENT_CLIENT",
       entityType: "CUSTOMER_PAYMENT",
+      actorName: await currentActor(),
       entityId: paymentId,
       details: `Encaissement ${(data.amountCents / 100).toFixed(2)} DH (${data.paymentMethod}) — ${customer.name}${docNumber ? ` sur ${docNumber}` : ""}`,
     });
@@ -375,6 +376,7 @@ export async function updatePaymentStatus(paymentId: number, newStatus: string):
     await d.insert(auditLogs).values({
       action: "STATUT_REGLEMENT",
       entityType: "CUSTOMER_PAYMENT",
+      actorName: await currentActor(),
       entityId: paymentId,
       details: `${updated.paymentMethod} ${(updated.amountCents / 100).toFixed(2)} DH — ${customer?.name ?? ""} : statut → ${newStatus}`,
     });
@@ -541,6 +543,7 @@ export async function saveCustomer(data: {
       await d.insert(auditLogs).values({
         action: "CREATION_CLIENT",
         entityType: "CUSTOMER",
+        actorName: await currentActor(),
         entityId: saved.id,
         details: `Création fiche « ${saved.name} »${saved.phone ? ` (${saved.phone})` : ""}${isProfessional ? " [PRO]" : ""}`,
       });
@@ -572,6 +575,7 @@ export async function mergeCustomers(sourceId: number, targetId: number): Promis
     await tx.insert(auditLogs).values({
       action: "FUSION_CLIENT",
       entityType: "CUSTOMER",
+      actorName: await currentActor(),
       entityId: targetId,
       details: `Fusion #${sourceId} « ${source.name} » → #${targetId} « ${target.name} »`,
     });

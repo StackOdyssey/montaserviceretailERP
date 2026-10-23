@@ -123,3 +123,13 @@ export const recordSupplierPaymentSchema = z.object({
   bankName: optStr(100),
   notes: optStr(2000),
 });
+
+export const saveUserSchema = z.object({
+  id: id.optional(),
+  displayName: name,
+  pin: z
+    .string()
+    .regex(/^\d{4,8}$/, "le PIN doit faire 4 à 8 chiffres")
+    .optional(),
+  role: z.enum(["GERANT", "CAISSIER"]),
+});

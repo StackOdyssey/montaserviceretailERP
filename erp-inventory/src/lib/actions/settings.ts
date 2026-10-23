@@ -2,7 +2,7 @@
 
 import { asc, eq } from "drizzle-orm";
 import { auditLogs, db, settings, vatRates } from "@/db";
-import { assertAuthenticated } from "@/lib/action-guard";
+import { assertAuthenticated, assertOwner } from "@/lib/action-guard";
 
 export type SettingsRow = typeof settings.$inferSelect;
 
@@ -68,7 +68,7 @@ export async function getSettings(): Promise<SettingsRow | null> {
 
 /** Enregistre (crée ou met à jour) la configuration société. */
 export async function saveSettings(data: SettingsData): Promise<{ id: number }> {
-  await assertAuthenticated();
+  await assertOwner();
   const d = requireDb();
   const existing = (await d.select().from(settings).limit(1))[0];
 
@@ -107,7 +107,7 @@ export async function getVatRates() {
 
 /** Crée ou met à jour un taux de TVA (paramétrable, non codé en dur). */
 export async function saveVatRate(data: { id?: number; ratePercent: number; label?: string; isDefault?: boolean }) {
-  await assertAuthenticated();
+  await assertOwner();
   const d = requireDb();
   if (!Number.isFinite(data.ratePercent) || data.ratePercent < 0 || data.ratePercent > 100) {
     throw new Error("Taux de TVA invalide (0–100).");
