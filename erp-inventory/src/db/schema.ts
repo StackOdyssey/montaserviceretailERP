@@ -406,6 +406,11 @@ export const salesDocuments = pgTable("sales_documents", {
   commercialName: text("commercial_name"),
   livreurId: integer("livreur_id"),
   livreurName: text("livreur_name"),
+  // Cycle de préparation / livraison (legacy: bons de préparation + feuille de route).
+  // NULL = pas de préparation requise (vente comptoir directe).
+  prepStatus: text("prep_status"), // A_PREPARER | EN_PREPARATION | PREPARE | LIVRE | NON_LIVRE
+  preparedAt: timestamp("prepared_at"), // accord de préparation (stock pické)
+  deliveredAt: timestamp("delivered_at"),
   // Champs réservés DGI (Phase 9 — readiness, aucune intégration active)
   dgiValidationId: text("dgi_validation_id"),
   dgiStatus: text("dgi_status"),

@@ -17,6 +17,7 @@ import {
   Mail,
   LogOut,
   Lock,
+  Package,
   ChevronLeft,
   ChevronRight,
   Menu,
@@ -77,6 +78,11 @@ const navItems: NavItem[] = [
     label: "Fournisseurs",
     href: "/fournisseurs",
     icon: Truck,
+  },
+  {
+    label: "Livraisons",
+    href: "/livraisons",
+    icon: Package,
   },
   {
     label: "Courriels Fournisseurs",

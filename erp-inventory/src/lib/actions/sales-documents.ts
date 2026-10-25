@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import {
   auditLogs,
   businessLineDocumentSettings,
@@ -27,6 +27,7 @@ import {
   type CompanyPrintInfo,
 } from "@/lib/sales/shared";
 import { actionResult, type ActionResult } from "@/lib/action-result";
+import { PREP_TRANSITIONS } from "@/lib/prep";
 import { Resend } from "resend";
 
 export type { SalesDocumentItem, DocumentPrintContext, CompanyPrintInfo } from "@/lib/sales/shared";
@@ -536,4 +537,126 @@ async function cancelDocumentImpl(documentId: number, reason?: string): Promise<
   const updated = await loadDocumentById(documentId);
   if (!updated) throw new Error("ECHEC_ANNULATION");
   return updated;
+}
+
+// ==========================================
+// BONS DE PRÉPARATION + FEUILLE DE ROUTE (G2)
+// ==========================================
+
+
+
+/**
+ * Crée un bon de préparation sur un document de vente (BC/BL/DEVIS).
+ * Le BP est un état du document : pas de doc séparé, l'imprimé = DocumentPrintView.
+ */
+export async function createBonPreparation(
+  documentId: number
+): Promise<ActionResult<SalesDocumentItem>> {
+  return actionResult(async () => {
+    await assertAuthenticated();
+    const d = requireDb();
+    const doc = (await d.select().from(salesDocuments).where(eq(salesDocuments.id, documentId)).limit(1))[0];
+    if (!doc) throw new Error("Document introuvable");
+    if (doc.status === "ANNULE") throw new Error("Document annulé — préparation impossible");
+    if (!["BC", "BL", "DEVIS"].includes(doc.docType)) {
+      throw new Error("Bon de préparation réservé aux BC, BL et Devis");
+    }
+    if (doc.prepStatus) throw new Error("Un bon de préparation existe déjà pour ce document");
+
+    await d.update(salesDocuments).set({ prepStatus: "A_PREPARER" }).where(eq(salesDocuments.id, documentId));
+    await d.insert(auditLogs).values({
+      action: "CREATION_BP",
+      entityType: "SALES_DOCUMENT",
+      actorName: await currentActor(),
+      entityId: documentId,
+      details: `Bon de préparation créé — ${doc.docNumber}`,
+    });
+    const updated = await loadDocumentById(documentId);
+    if (!updated) throw new Error("Document introuvable");
+    return updated;
+  });
+}
+
+/** Transition d'état de préparation / livraison (accord préparateur, statut livreur). */
+export async function updatePrepStatus(
+  documentId: number,
+  newStatus: "A_PREPARER" | "EN_PREPARATION" | "PREPARE" | "LIVRE" | "NON_LIVRE"
+): Promise<ActionResult<SalesDocumentItem>> {
+  return actionResult(async () => {
+    await assertAuthenticated();
+    const d = requireDb();
+    const doc = (await d.select().from(salesDocuments).where(eq(salesDocuments.id, documentId)).limit(1))[0];
+    if (!doc) throw new Error("Document introuvable");
+    if (!doc.prepStatus) throw new Error("Créez d'abord le bon de préparation");
+    if (doc.status === "ANNULE") throw new Error("Document annulé");
+    const allowed = PREP_TRANSITIONS[doc.prepStatus] ?? [];
+    if (!allowed.includes(newStatus)) {
+      throw new Error(`Transition invalide : ${doc.prepStatus} → ${newStatus}`);
+    }
+
+    await d.update(salesDocuments).set({
+      prepStatus: newStatus,
+      preparedAt: newStatus === "PREPARE" ? new Date() : doc.preparedAt,
+      deliveredAt: newStatus === "LIVRE" || newStatus === "NON_LIVRE" ? new Date() : doc.deliveredAt,
+    }).where(eq(salesDocuments.id, documentId));
+
+    await d.insert(auditLogs).values({
+      action: "STATUT_PREPARATION",
+      entityType: "SALES_DOCUMENT",
+      actorName: await currentActor(),
+      entityId: documentId,
+      details: `${doc.docNumber} : ${doc.prepStatus} → ${newStatus}`,
+    });
+    const updated = await loadDocumentById(documentId);
+    if (!updated) throw new Error("Document introuvable");
+    return updated;
+  });
+}
+
+export interface RouteSheetDoc {
+  id: number;
+  docNumber: string;
+  docType: string;
+  customerName: string;
+  customerCity?: string | null;
+  customerPhone?: string | null;
+  totalTtcCents: number;
+  docDate: string;
+  prepStatus: string;
+  commercialName: string | null;
+  livreurId: number | null;
+  livreurName: string | null;
+}
+
+/** Feuille de route : documents avec préparation, regroupables par livreur/date. */
+export async function getDeliveryRouteSheet(from: string, to: string): Promise<RouteSheetDoc[]> {
+  await assertAuthenticated();
+  const d = requireDb();
+  const fromDate = new Date(`${from}T00:00:00`);
+  const toDate = new Date(`${to}T23:59:59.999`);
+  const rows = await d
+    .select()
+    .from(salesDocuments)
+    .where(
+      and(
+        isNotNull(salesDocuments.prepStatus),
+        gte(salesDocuments.docDate, fromDate),
+        lte(salesDocuments.docDate, toDate)
+      )
+    )
+    .orderBy(asc(salesDocuments.livreurName), asc(salesDocuments.docDate));
+  return rows.map((r) => ({
+    id: r.id,
+    docNumber: r.docNumber,
+    docType: r.docType,
+    customerName: r.customerName,
+    customerCity: r.customerCity,
+    customerPhone: r.customerPhone,
+    totalTtcCents: r.totalTtcCents,
+    docDate: (r.docDate ?? r.createdAt ?? new Date()).toISOString(),
+    prepStatus: r.prepStatus!,
+    commercialName: r.commercialName,
+    livreurId: r.livreurId,
+    livreurName: r.livreurName,
+  }));
 }

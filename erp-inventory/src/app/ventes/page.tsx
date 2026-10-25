@@ -14,6 +14,7 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Package,
 } from "lucide-react";
 import {
   getSalesDocuments,
@@ -24,8 +25,11 @@ import {
   convertBlToFacture,
   createAvoir,
   cancelDocument,
+  createBonPreparation,
+  updatePrepStatus,
 } from "@/lib/actions/sales-documents";
 import { getDocumentUbl } from "@/lib/actions/dgi";
+import { PREP_STATUS_LABELS, PREP_TRANSITIONS } from "@/lib/prep";
 import { unwrap } from "@/lib/action-result";
 import { formatMoney } from "@/lib/money";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
@@ -147,6 +151,16 @@ export default function VentesListPage() {
   const handleCancel = (doc: SalesDocumentItem) => {
     if (!confirm(`Annuler le ${doc.docNumber} ? L'opération est irréversible.`)) return;
     runAction(doc, async () => unwrap(await cancelDocument(doc.id, "Annulation manuelle")));
+  };
+
+  const handleCreateBp = (doc: SalesDocumentItem) => {
+    runAction(doc, async () => unwrap(await createBonPreparation(doc.id)));
+  };
+
+  const handlePrepStatus = (doc: SalesDocumentItem, status: string) => {
+    runAction(doc, async () =>
+      unwrap(await updatePrepStatus(doc.id, status as "A_PREPARER" | "EN_PREPARATION" | "PREPARE" | "LIVRE" | "NON_LIVRE"))
+    );
   };
 
   const handleUbl = (doc: SalesDocumentItem) => {
@@ -300,6 +314,14 @@ export default function VentesListPage() {
                       >
                         {doc.status === "PAYE" ? "Payé" : doc.status === "ANNULE" ? "Annulé" : "Ouvert"}
                       </span>
+                      {doc.prepStatus && (
+                        <div className={`mt-1 inline-block px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                          doc.prepStatus === "LIVRE" ? "bg-emerald-100 text-emerald-800"
+                          : doc.prepStatus === "NON_LIVRE" ? "bg-red-100 text-red-800"
+                          : "bg-indigo-100 text-indigo-800"}`}>
+                          {PREP_STATUS_LABELS[doc.prepStatus] ?? doc.prepStatus}
+                        </div>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-4">
@@ -315,6 +337,29 @@ export default function VentesListPage() {
                             >
                               <Printer size={14} className="text-[#F7162D]" />
                             </button>
+
+                            {["BC", "BL", "DEVIS"].includes(doc.docType) && doc.status !== "ANNULE" && !doc.prepStatus && (
+                              <button
+                                onClick={() => handleCreateBp(doc)}
+                                title="Créer un bon de préparation"
+                                className="p-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition-colors"
+                              >
+                                <Package size={14} />
+                              </button>
+                            )}
+                            {doc.prepStatus && PREP_TRANSITIONS[doc.prepStatus]?.length > 0 && (
+                              <select
+                                value=""
+                                onChange={(e) => e.target.value && handlePrepStatus(doc, e.target.value)}
+                                className="px-1.5 py-1.5 text-[10px] font-bold border border-indigo-200 rounded-lg bg-indigo-50 text-indigo-700 outline-none"
+                                title="État préparation"
+                              >
+                                <option value="">{PREP_STATUS_LABELS[doc.prepStatus]}</option>
+                                {PREP_TRANSITIONS[doc.prepStatus].map((s) => (
+                                  <option key={s} value={s}>{PREP_STATUS_LABELS[s]}</option>
+                                ))}
+                              </select>
+                            )}
 
                             {doc.docType === "BL" && doc.status !== "ANNULE" && (
                               <button

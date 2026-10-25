@@ -40,6 +40,9 @@ export interface SalesDocumentItem {
   businessLineId?: number;
   commercialName?: string | null;
   livreurName?: string | null;
+  prepStatus?: string | null;
+  preparedAt?: string | null;
+  deliveredAt?: string | null;
   lines: Array<{
     id: number;
     productId: number | null;
@@ -134,6 +137,9 @@ export function mapDoc(doc: DocRow, lines: LineRow[]): SalesDocumentItem {
     businessLineId: doc.businessLineId,
     commercialName: doc.commercialName,
     livreurName: doc.livreurName,
+    prepStatus: doc.prepStatus,
+    preparedAt: doc.preparedAt ? doc.preparedAt.toISOString() : null,
+    deliveredAt: doc.deliveredAt ? doc.deliveredAt.toISOString() : null,
     lines: lines.map((l) => ({
       id: l.id,
       productId: l.productId,
