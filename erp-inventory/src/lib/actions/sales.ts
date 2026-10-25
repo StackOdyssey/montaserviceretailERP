@@ -11,6 +11,7 @@ import {
   salesDocuments,
   salesLines,
   settings,
+  staff,
   stockMovements,
   vatRates,
 } from "@/db";
@@ -186,6 +187,8 @@ export async function createSalesDocument(data: {
   overrideReason?: string;
   /** Clé de déduplication caisse : un retry/double-clic renvoie le doc existant. */
   idempotencyKey?: string;
+  commercialId?: number | null;
+  livreurId?: number | null;
 }): Promise<SalesDocResult> {
   await assertAuthenticated();
   try {
@@ -371,6 +374,16 @@ export async function createSalesDocument(data: {
     const isFullyPaid =
       data.paymentMethod !== "A_CREDIT" && (data.paidAmountCents ?? totals.totalTTC) >= totals.totalTTC;
 
+    // Attribution : snapshot des noms (le doc garde le nom même si le staff change).
+    const [commercial, livreur] = await Promise.all([
+      data.commercialId
+        ? tx.select({ name: staff.name }).from(staff).where(eq(staff.id, data.commercialId)).limit(1)
+        : Promise.resolve([]),
+      data.livreurId
+        ? tx.select({ name: staff.name }).from(staff).where(eq(staff.id, data.livreurId)).limit(1)
+        : Promise.resolve([]),
+    ]);
+
     docId = (
       await tx
         .insert(salesDocuments)
@@ -402,6 +415,10 @@ export async function createSalesDocument(data: {
           vatDisplay,
           priceBasis,
           validatedAt: new Date(),
+          commercialId: commercial.length ? data.commercialId! : null,
+          commercialName: commercial[0]?.name ?? null,
+          livreurId: livreur.length ? data.livreurId! : null,
+          livreurName: livreur[0]?.name ?? null,
         })
         .returning({ id: salesDocuments.id })
     )[0].id;

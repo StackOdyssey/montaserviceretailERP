@@ -55,6 +55,8 @@ export const createSalesDocumentSchema = z.object({
   businessLineCode: optStr(30),
   overrideReason: optStr(500),
   idempotencyKey: z.string().trim().min(8).max(64).optional(),
+  commercialId: id.nullish(),
+  livreurId: id.nullish(),
 });
 
 export const createSupplierReceiptSchema = z.object({

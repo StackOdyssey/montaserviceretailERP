@@ -277,7 +277,12 @@ export default function VentesListPage() {
                       {new Date(doc.docDate).toLocaleDateString("fr-FR")}
                     </td>
 
-                    <td className="py-3.5 px-4 font-semibold text-[#111827]">{doc.customerName}</td>
+                    <td className="py-3.5 px-4 font-semibold text-[#111827]">
+                      {doc.customerName}
+                      {doc.commercialName && (
+                        <div className="text-[10px] font-normal text-[#6B7280]">Com: {doc.commercialName}</div>
+                      )}
+                    </td>
 
                     <td className="py-3.5 px-4 text-right font-mono font-bold text-[#111827]">
                       {formatMoney(doc.totalTtcCents)}

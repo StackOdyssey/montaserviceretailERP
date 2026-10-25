@@ -38,6 +38,8 @@ export interface SalesDocumentItem {
   notes?: string | null;
   avType?: string | null;
   businessLineId?: number;
+  commercialName?: string | null;
+  livreurName?: string | null;
   lines: Array<{
     id: number;
     productId: number | null;
@@ -130,6 +132,8 @@ export function mapDoc(doc: DocRow, lines: LineRow[]): SalesDocumentItem {
     notes: doc.notes,
     avType: doc.avType,
     businessLineId: doc.businessLineId,
+    commercialName: doc.commercialName,
+    livreurName: doc.livreurName,
     lines: lines.map((l) => ({
       id: l.id,
       productId: l.productId,

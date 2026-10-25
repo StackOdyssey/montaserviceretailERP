@@ -192,6 +192,7 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
                 <div className="border border-black mt-1 p-2 space-y-0.5">
                   <p>Code Clt : {doc.customerId ?? "—"}</p>
                   <p>Clt : {doc.customerName}</p>
+                  {doc.commercialName && <p>Com : {doc.commercialName}</p>}
                   <p>Adresse : {doc.customerCity || "—"}</p>
                   <p>ICE : {doc.customerIce || ""}</p>
                 </div>

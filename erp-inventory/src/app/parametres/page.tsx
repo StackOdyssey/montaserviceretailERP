@@ -22,6 +22,7 @@ import { OPEN_QUESTIONS } from "@/lib/open-questions";
 import { revokeAllSessions } from "@/lib/actions/auth";
 import { clearAppCaches } from "@/components/pwa/clear-app-caches";
 import { UsersSection } from "@/components/settings/UsersSection";
+import { StaffSection } from "@/components/settings/StaffSection";
 import { useToast } from "@/components/ui/ToastProvider";
 import { unwrap } from "@/lib/action-result";
 
@@ -618,6 +619,9 @@ export default function ParametresPage() {
 
             {/* Utilisateurs caisse (PIN individuels + rôles) */}
             <UsersSection />
+
+            {/* Commerciaux & livreurs (attribution documents) */}
+            <StaffSection />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Code PIN géré par l'environnement */}

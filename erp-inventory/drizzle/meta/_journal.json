@@ -169,6 +169,13 @@
       "when": 1792951085502,
       "tag": "0023_same_karma",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792952340396,
+      "tag": "0024_living_gambit",
+      "breakpoints": true
     }
   ]
 }

@@ -19,6 +19,7 @@ import {
 import { getProducts, ProductItem } from "@/lib/actions/products";
 import { getCustomers, saveCustomer } from "@/lib/actions/customers";
 import { unwrap } from "@/lib/action-result";
+import { getStaff, type StaffItem } from "@/lib/actions/staff";
 import { useCustomerSearch, type CustomerMatch } from "@/lib/hooks/useCustomerSearch";
 import { ProductGrid } from "@/components/pos/ProductGrid";
 import { createSalesDocument, SalesLineInput, SalesDocumentItem } from "@/lib/actions/sales";
@@ -98,6 +99,13 @@ export default function NouveauBonDeLivraisonPage() {
 
   // Notes
   const [notes] = useState("");
+  // Attribution document : commercial (vendeur) + livreur (chauffeur), staff sans login.
+  const [staffList, setStaffList] = useState<StaffItem[]>([]);
+  const [commercialId, setCommercialId] = useState<number | null>(null);
+  const [livreurId, setLivreurId] = useState<number | null>(null);
+  useEffect(() => {
+    getStaff().then((s) => setStaffList(s.filter((x) => x.isActive))).catch(() => {});
+  }, []);
 
   // État de validation
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -282,6 +290,8 @@ export default function NouveauBonDeLivraisonPage() {
         notes: notes.trim() || undefined,
         businessLineCode,
         idempotencyKey: idempotencyKeyRef.current ?? undefined,
+        commercialId,
+        livreurId,
       });
       if (!res.ok) {
         setErrorMessage(res.error);
@@ -807,6 +817,38 @@ export default function NouveauBonDeLivraisonPage() {
                 ))}
               </div>
             </div>
+
+            {/* ATTRIBUTION : COMMERCIAL + LIVREUR (optionnel) */}
+            {staffList.length > 0 && (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-bold text-[#374151] block mb-1">Commercial</label>
+                  <select
+                    value={commercialId ?? ""}
+                    onChange={(e) => setCommercialId(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full px-2.5 py-2 text-xs bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl outline-none focus:border-[#F7162D]"
+                  >
+                    <option value="">—</option>
+                    {staffList.filter((s) => s.role === "COMMERCIAL").map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-[#374151] block mb-1">Livreur</label>
+                  <select
+                    value={livreurId ?? ""}
+                    onChange={(e) => setLivreurId(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full px-2.5 py-2 text-xs bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl outline-none focus:border-[#F7162D]"
+                  >
+                    <option value="">—</option>
+                    {staffList.filter((s) => s.role === "LIVREUR").map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
 
             {/* GRAND BOUTON DE VALIDATION (POUCE SUR IPHONE) */}
             <button

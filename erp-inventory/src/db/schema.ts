@@ -400,6 +400,12 @@ export const salesDocuments = pgTable("sales_documents", {
   notes: text("notes"),
   sourceBlId: integer("source_bl_id"), // Lien si facture ou avoir issu d'un BL
   avType: text("av_type"), // Avoir : RETOUR (marchandise reprise), COMMERCIAL (geste), CORRECTION
+  // Attribution personnel (legacy: commercial/livreur) — snapshot du nom pour
+  // l'historique même si le membre staff est renommé/supprimé.
+  commercialId: integer("commercial_id"),
+  commercialName: text("commercial_name"),
+  livreurId: integer("livreur_id"),
+  livreurName: text("livreur_name"),
   // Champs réservés DGI (Phase 9 — readiness, aucune intégration active)
   dgiValidationId: text("dgi_validation_id"),
   dgiStatus: text("dgi_status"),
@@ -562,6 +568,19 @@ export const users = pgTable("users", {
   // vérificateur : la base seule ne permet pas de retrouver le PIN.
   pinHmac: text("pin_hmac").notNull().unique(),
   role: text("role").notNull().default("CAISSIER"), // GERANT | CAISSIER
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+
+// ==========================================
+// 13c. STAFF — commerciaux / livreurs (attribution documents, pas de login)
+// ==========================================
+export const staff = pgTable("staff", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  role: text("role").notNull().default("COMMERCIAL"), // COMMERCIAL | LIVREUR
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
