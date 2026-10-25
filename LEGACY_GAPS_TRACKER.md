@@ -83,17 +83,20 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ skipped/de-sco
 
 ## Phase 3 — Delivery workflow (only if delivery round still runs)
 
-### ⬜ G2a — Bons de préparation (picking slips)
+### ✅ G2a — Bons de préparation (picking slips)
 **Legacy:** `bps`/`bpAdd` — Ref|Client|Commercial|Total|Accord|Etat livraison.
-- [ ] New doc: `PREPARATION` state on sales doc or separate `bons_preparation` table — design decision
-- [ ] Status flow: BROUILLON → A_PREPARER → PREPARE (accord) → LIVRE → facture/BL
-- [ ] UI: list + create from order + accord action + print (pick list)
+- [x] Design: `prep_status` ON `sales_documents` (migration 0026) — no separate table; NULL = counter sale
+- [x] Flow: A_PREPARER → EN_PREPARATION → PREPARE (accord) → LIVRE | NON_LIVRE (`src/lib/prep.ts` state machine)
+- [x] UI: Package button on /ventes rows (BC/BL/DEVIS) → chip + transition select; print = doc view
+- [x] **Verified dev:** BP on BL-2026-00008 → transitions to Livré
 - Effort: L · Deps: G3
 
-### ⬜ G2b — Feuille de route / expédition
+### ✅ G2b — Feuille de route / expédition
 **Legacy:** date-filtered route sheets assigning BLs to livreurs, printable.
-- [ ] Route sheet: group validated docs by livreur+date, printable per driver
-- [ ] Delivery status update (LIVRE/NON_LIVRE) writing back to docs
+- [x] `/livraisons`: docs with prep_status grouped by livreur + date range, printable, per-row transitions
+- [x] LIVRE/NON_LIVRE write back via `updatePrepStatus` (+ timestamps delivered_at)
+- [x] AppShell nav "Livraisons" (Package icon)
+- [ ] Assign livreur at doc creation (livreurId select exists on /ventes/nouveau — works via G3)
 - Effort: M · Deps: G3 (livreur entity), G2a helps
 
 ---
@@ -134,6 +137,7 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ skipped/de-sco
 | 2026-10-25 | G8 cheque deposit date | `f123b48` | `erp-system-00084-lfw` |
 | 2026-10-25 | G10 lock screen | `63d7808` | `erp-system-00084-lfw` |
 | 2026-10-25 | G9 client CSV import | `a156a62` | `erp-system-00084-lfw` |
+| 2026-10-25 | G2a+G2b bons de préparation + feuille de route | `fd0a81d` | `erp-system-00087-892` |
 
 ## Scope decision (2026-10-25)
 
