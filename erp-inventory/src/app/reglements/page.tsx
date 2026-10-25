@@ -406,6 +406,11 @@ export default function ReglementsPage() {
                             >
                               {paymentStatusLabel(item.status)}
                             </span>
+                            {item.depositDate && (
+                              <div className="text-[10px] text-gray-400 mt-0.5">
+                                Déposé le {new Date(item.depositDate).toLocaleDateString("fr-FR")}
+                              </div>
+                            )}
                           </td>
 
                           <td className="py-3 px-4 text-center">

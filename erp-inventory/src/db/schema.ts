@@ -479,6 +479,7 @@ export const customerPayments = pgTable("customer_payments", {
   paymentDate: timestamp("payment_date").defaultNow(),
   referenceNumber: text("reference_number"), // N° chèque / effet / virement
   chequeDueDate: timestamp("cheque_due_date"), // Date d'échéance chèque ou effet LCN
+  depositDate: timestamp("deposit_date"), // Date de dépôt en banque (chèque/effet déposé)
   bankName: text("bank_name"),
   status: text("status").notNull().default("ENCAISSE"), // ENCAISSE, EN_ATTENTE, REJETE
   notes: text("notes"),

@@ -79,6 +79,7 @@ export interface ChequeEffetAlert {
   status: string;
   urgency: "RETARD" | "AUJOURDHUI" | "PROCHE" | "FUTUR";
   daysRemaining: number;
+  depositDate?: string | null;
 }
 
 function requireDb() {
@@ -411,7 +412,17 @@ async function updatePaymentStatusImpl(paymentId: number, newStatus: string): Pr
   }
 
   const updated = (
-    await d.update(customerPayments).set({ status: newStatus }).where(eq(customerPayments.id, paymentId)).returning()
+    await d
+      .update(customerPayments)
+      .set({
+        status: newStatus,
+        // Date de dépôt bancaire (chèque remis / effet remis à l'encaissement).
+        depositDate: ["REMIS_BANQUE", "REMIS_ENCAISSEMENT"].includes(newStatus)
+          ? new Date()
+          : existing.depositDate,
+      })
+      .where(eq(customerPayments.id, paymentId))
+      .returning()
   )[0];
   if (!updated) throw new Error("Règlement introuvable");
 
@@ -473,6 +484,7 @@ export async function getChequesEffetsSchedule(): Promise<ChequeEffetAlert[]> {
         status: p.status as ChequeEffetAlert["status"],
         urgency,
         daysRemaining: diffDays,
+        depositDate: p.depositDate ? p.depositDate.toISOString() : null,
       };
     })
     .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());

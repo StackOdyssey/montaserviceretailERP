@@ -176,6 +176,13 @@
       "when": 1792952340396,
       "tag": "0024_living_gambit",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792953891668,
+      "tag": "0025_worried_shaman",
+      "breakpoints": true
     }
   ]
 }
