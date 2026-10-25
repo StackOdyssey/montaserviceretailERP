@@ -12,6 +12,7 @@ import {
 import { assertAuthenticated, currentActor } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
 import { lockProducts } from "@/lib/stock-lock";
+import { bumpWarehouseStock } from "@/lib/warehouse";
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { requireDb } from "@/lib/sales/shared";
 import { actionResult, type ActionResult } from "@/lib/action-result";
@@ -67,6 +68,7 @@ async function writeOffStockImpl(data: {
       .update(products)
       .set({ currentStock: next.quantity, cmupCents: next.cmupCents, updatedAt: new Date() })
       .where(eq(products.id, p.id));
+    await bumpWarehouseStock(tx, p.id, -data.quantity);
     await tx.insert(auditLogs).values({
       action: "REBUT_STOCK",
       entityType: "PRODUCT",
@@ -137,6 +139,7 @@ async function createSupplierReturnImpl(data: {
         .update(products)
         .set({ currentStock: next.quantity, cmupCents: next.cmupCents, updatedAt: new Date() })
         .where(eq(products.id, p.id));
+        await bumpWarehouseStock(tx, p.id, -qty);
       await tx
         .update(supplierReceiptLines)
         .set({ returnedQuantity: line.returnedQuantity + qty })

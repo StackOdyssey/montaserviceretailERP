@@ -287,6 +287,7 @@ export const stockMovements = pgTable("stock_movements", {
   movementType: text("movement_type").notNull(), // ACHAT_RECEPTION, VENTE_BL, AVOIR_RETOUR, AJUSTEMENT_INVENTAIRE, STOCK_INITIAL
   quantity: integer("quantity").notNull(), // Signé : positif pour entrées, négatif pour sorties
   unitCostCents: integer("unit_cost_cents"), // Coût unitaire d'achat
+  warehouseId: integer("warehouse_id"), // entrepôt concerné (NULL = principal/legacy)
   sourceDocumentId: integer("source_document_id"),
   sourceDocumentType: text("source_document_type"), // BL, FACTURE, AVOIR, RECEPTION
   reason: text("reason"),
@@ -579,6 +580,41 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+
+
+// ==========================================
+// 13d. MULTI-ENTREPÔTS (G1) — stock par entrepôt + transferts
+// products.current_stock reste le total global ; product_stock détaille la
+// répartition. Toute mutation de stock met à jour les deux en transaction.
+// ==========================================
+export const productStock = pgTable(
+  "product_stock",
+  {
+    id: serial("id").primaryKey(),
+    productId: integer("product_id").notNull().references(() => products.id),
+    warehouseId: integer("warehouse_id").notNull().references(() => warehouses.id),
+    quantity: integer("quantity").notNull().default(0),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => [unique("product_stock_product_warehouse_idx").on(t.productId, t.warehouseId)]
+);
+
+export const stockTransfers = pgTable("stock_transfers", {
+  id: serial("id").primaryKey(),
+  transferNumber: text("transfer_number").notNull().unique(), // TR-2026-0001
+  fromWarehouseId: integer("from_warehouse_id").notNull().references(() => warehouses.id),
+  toWarehouseId: integer("to_warehouse_id").notNull().references(() => warehouses.id),
+  status: text("status").notNull().default("VALIDE"), // VALIDE | ANNULE
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const stockTransferLines = pgTable("stock_transfer_lines", {
+  id: serial("id").primaryKey(),
+  transferId: integer("transfer_id").notNull().references(() => stockTransfers.id),
+  productId: integer("product_id").notNull().references(() => products.id),
+  quantity: integer("quantity").notNull(),
+});
 
 // ==========================================
 // 13c. STAFF — commerciaux / livreurs (attribution documents, pas de login)

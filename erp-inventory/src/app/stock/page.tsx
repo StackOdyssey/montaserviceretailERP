@@ -16,6 +16,7 @@ import {
   History,
   Package,
   ClipboardList,
+  ArrowRightLeft,
 } from "lucide-react";
 import {
   getProducts,
@@ -28,6 +29,8 @@ import {
 import { formatMoney } from "@/lib/money";
 import { ProductModal } from "@/components/stock/ProductModal";
 import { StockAdjustmentModal } from "@/components/stock/StockAdjustmentModal";
+import { TransferModal } from "@/components/stock/TransferModal";
+import { getWarehouses, getWarehouseStockMap, type WarehouseItem } from "@/lib/actions/warehouses";
 import { ProductHistoryModal } from "@/components/stock/ProductHistoryModal";
 import { CsvModal } from "@/components/stock/CsvModal";
 import { useBusinessLine } from "@/components/layout/BusinessLineProvider";
@@ -45,6 +48,7 @@ export default function StockCataloguePage() {
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "negative">("all");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [, startTransition] = useTransition();
+
   const filtersKeyRef = useRef("");
 
   // Modals state
@@ -58,6 +62,18 @@ export default function StockCataloguePage() {
 
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [productToTrace, setProductToTrace] = useState<ProductItem | null>(null);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [warehousesList, setWarehousesList] = useState<WarehouseItem[]>([]);
+  const [warehouseFilter, setWarehouseFilter] = useState<number | null>(null); // null = vue globale
+  const [whStock, setWhStock] = useState<Record<number, number>>({});
+  useEffect(() => {
+    getWarehouses().then(setWarehousesList).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (warehouseFilter == null) { setWhStock({}); return; }
+    getWarehouseStockMap(warehouseFilter).then(setWhStock).catch(() => setWhStock({}));
+  }, [warehouseFilter]);
 
   const { activeCode, activeLine } = useBusinessLine();
   const company = useSettings();
@@ -166,6 +182,14 @@ export default function StockCataloguePage() {
           </Link>
 
           <button
+            onClick={() => setIsTransferOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
+          >
+            <ArrowRightLeft size={16} className="text-[#7C3AED]" />
+            <span>Transfert</span>
+          </button>
+
+          <button
             onClick={() => setIsCsvModalOpen(true)}
             className="flex items-center gap-2 px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
           >
@@ -228,6 +252,17 @@ export default function StockCataloguePage() {
               <option value="Transmission & Câblage">Transmission & Câblage</option>
               <option value="Électricité & Allumage">Électricité & Allumage</option>
               <option value="Carrosserie & Cadre">Carrosserie & Cadre</option>
+            </select>
+            <select
+              value={warehouseFilter ?? ""}
+              onChange={(e) => setWarehouseFilter(e.target.value ? Number(e.target.value) : null)}
+              className="px-3 py-2.5 text-xs font-semibold bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl focus:border-[#7C3AED] outline-none cursor-pointer"
+              title="Filtrer le stock par entrepôt"
+            >
+              <option value="">Tous entrepôts</option>
+              {warehousesList.map((w) => (
+                <option key={w.id} value={w.id}>{w.name}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -309,8 +344,9 @@ export default function StockCataloguePage() {
               </thead>
               <tbody className="divide-y divide-[#E5E7EB] text-xs">
                 {productsList.map((p) => {
-                  const isNegative = p.currentStock < 0;
-                  const isLow = p.currentStock <= p.minStockAlert && !isNegative;
+                  const shownStock = warehouseFilter == null ? p.currentStock : (whStock[p.id] ?? 0);
+                  const isNegative = shownStock < 0;
+                  const isLow = shownStock <= p.minStockAlert && !isNegative;
 
                   return (
                     <tr
@@ -393,7 +429,7 @@ export default function StockCataloguePage() {
                                 : "bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]"
                             }`}
                           >
-                            {p.currentStock}
+                            {shownStock}
                           </span>
                         </div>
                         {isNegative && (
@@ -499,6 +535,11 @@ export default function StockCataloguePage() {
         onImport={handleImportCsv}
       />
 
+      <TransferModal
+        isOpen={isTransferOpen}
+        onClose={() => setIsTransferOpen(false)}
+        onDone={() => warehouseFilter != null ? getWarehouseStockMap(warehouseFilter).then(setWhStock) : null}
+      />
       <ProductHistoryModal
         isOpen={isHistoryModalOpen}
         onClose={() => setIsHistoryModalOpen(false)}

@@ -21,6 +21,7 @@ import { nextDocumentNumber } from "@/lib/numbering";
 import { assertAuthenticated, currentActor } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
 import { lockProducts } from "@/lib/stock-lock";
+import { bumpWarehouseStock } from "@/lib/warehouse";
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { validateInput, createSalesDocumentSchema } from "@/lib/action-validation";
 import {
@@ -464,6 +465,7 @@ export async function createSalesDocument(data: {
           .update(products)
           .set({ currentStock: e.nextStock, cmupCents: e.nextCmup, updatedAt: new Date() })
           .where(eq(products.id, e.productId));
+        await bumpWarehouseStock(tx, e.productId, e.quantity);
       }
     }
 

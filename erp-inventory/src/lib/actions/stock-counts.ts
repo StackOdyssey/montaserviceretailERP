@@ -14,6 +14,7 @@ import {
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { assertAuthenticated, assertOwner } from "@/lib/action-guard";
 import { lockProducts } from "@/lib/stock-lock";
+import { bumpWarehouseStock } from "@/lib/warehouse";
 import { actionResult, type ActionResult } from "@/lib/action-result";
 
 export interface StockCountSummary {
@@ -264,6 +265,7 @@ async function validateStockCountImpl(id: number): Promise<{ adjusted: number }>
         .update(products)
         .set({ currentStock: next.quantity, cmupCents: next.cmupCents, updatedAt: new Date() })
         .where(eq(products.id, ln.productId));
+        await bumpWarehouseStock(tx, ln.productId, delta);
       await tx
         .update(stockCountLines)
         .set({ varianceQty: delta, unitCostCents: ln.productCmup })

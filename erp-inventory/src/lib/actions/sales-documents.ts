@@ -17,6 +17,7 @@ import { nextDocumentNumber } from "@/lib/numbering";
 import { assertAuthenticated, assertOwner, currentActor } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
 import { lockProducts } from "@/lib/stock-lock";
+import { bumpWarehouseStock } from "@/lib/warehouse";
 import { applyMovement, type CmupState } from "@/lib/stock";
 import {
   loadDocumentById,
@@ -462,6 +463,7 @@ async function createAvoirImpl(data: {
           .update(products)
           .set({ currentStock: next.quantity, cmupCents: next.cmupCents, updatedAt: new Date() })
           .where(eq(products.id, p.id));
+        await bumpWarehouseStock(tx, p.id, x.qty);
       }
     }
   });
@@ -518,6 +520,7 @@ async function cancelDocumentImpl(documentId: number, reason?: string): Promise<
         .update(products)
         .set({ currentStock: next.quantity, cmupCents: next.cmupCents, updatedAt: new Date() })
         .where(eq(products.id, p.id));
+        await bumpWarehouseStock(tx, p.id, -m.quantity);
     }
 
     await tx

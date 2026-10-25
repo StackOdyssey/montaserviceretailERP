@@ -18,6 +18,7 @@ import { assertPeriodOpen } from "@/lib/accounting-period";
 import type { AgingBuckets, PartyAgingRow } from "./customers";
 import { nextDocumentNumber } from "@/lib/numbering";
 import { lockProducts } from "@/lib/stock-lock";
+import { bumpWarehouseStock } from "@/lib/warehouse";
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { matchTokens } from "@/lib/search";
 import { effectiveVatRate } from "@/lib/vat-regime";
@@ -416,6 +417,7 @@ async function createSupplierReceiptImpl(data: {
           updatedAt: new Date(),
         })
         .where(eq(products.id, p.id));
+      await bumpWarehouseStock(tx, p.id, l.quantity);
     }
   });
 

@@ -12,6 +12,7 @@ export interface CategoryItem {
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { assertAuthenticated, currentActor } from "@/lib/action-guard";
 import { lockProducts } from "@/lib/stock-lock";
+import { bumpWarehouseStock } from "@/lib/warehouse";
 import { validateInput, saveProductSchema, recordStockMovementSchema } from "@/lib/action-validation";
 import { actionResult, type ActionResult } from "@/lib/action-result";
 
@@ -434,6 +435,7 @@ async function recordStockMovementImpl(data: {
       updates.lastPurchasePriceCents = data.unitCostCents;
     }
     await tx.update(products).set(updates).where(eq(products.id, p.id));
+    await bumpWarehouseStock(tx, p.id, data.quantity);
 
     await tx.insert(auditLogs).values({
       action: "MOUVEMENT_STOCK_MANUEL",
@@ -495,12 +497,14 @@ async function importProductsBatchImpl(
       shelfLocation: item.shelfLocation ?? null,
       updatedAt: new Date(),
     };
+    const prev = (await d.select({ cs: products.currentStock }).from(products).where(eq(products.sku, values.sku)).limit(1))[0];
     const saved = await d
       .insert(products)
       .values(values)
       .onConflictDoUpdate({ target: products.sku, set: values })
       .returning({ id: products.id });
     const productId = saved[0].id;
+    await bumpWarehouseStock(d as never, productId, item.stock - (prev?.cs ?? 0));
 
     await d
       .delete(stockMovements)
