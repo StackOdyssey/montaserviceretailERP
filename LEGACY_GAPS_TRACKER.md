@@ -103,15 +103,18 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ skipped/de-sco
 
 ## Phase 4 — Multi-warehouse (largest lift)
 
-### ⬜ G1 — Entrepôts (Principal + Mobile)
+### ✅ G1 — Entrepôts (Principal + Mobile)
 **Legacy:** `entrepots`, `transfert`, per-warehouse `inventaires`, `stockMagasin`, entrepôt on movements.
 **Ours:** `warehouses` table + `products.warehouseId` exist but unused — single global stock.
 - [x] **DECISION:** in scope — product completeness for resale (multi-tenant prospects may use van/shop stock) even if current owner doesn't
-- [ ] Schema: `product_stock` (product_id, warehouse_id, qty) replacing global `currentStock` semantics; default warehouse migration
-- [ ] Transfers: `stock_transfers` doc + action (out of source, into dest, locked)
-- [ ] Sales/receipts specify warehouse (default = Principal; POS = Principal, route sales = Mobile?)
-- [ ] Inventaire per warehouse (scope existing stock-counts)
-- [ ] `stockMagasin` equivalent = /stock filtered by warehouse
+- [x] `product_stock` (product_id+warehouse_id unique) over global `currentStock` (unchanged total semantics) — migration 0027
+- [x] `stock_transfers`+lines, `stock_movements.warehouse_id`; `createStockTransfer` (lockProducts, source-qty check, dual movement rows, audit, TR-####)
+- [x] `bumpWarehouseStock` wired into ALL mutation paths (sale/receipt/rebut/FRS-return/avoir/cancel/inventory/manual/import), default = Principal
+- [x] /stock: warehouse filter (per-warehouse qty) + TransferModal; `getWarehouseStockMap`
+- [x] Dev+prod warehouses: ENTREPOT_PRINCIPAL (default) + MOBILE_01 (van)
+- [ ] Per-warehouse inventaire (scope stock-counts) — follow-up
+- [ ] Warehouse picker on sales/receipts (route sales → Mobile) — follow-up
+- [x] **Verified dev:** TR-2026-0001 Principal→Mobile ×5 sku1072, global stock 418 unchanged, dual movements
 - Effort: XL · Deps: decision + touches every stock path — do last
 
 ---
@@ -138,6 +141,7 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ skipped/de-sco
 | 2026-10-25 | G10 lock screen | `63d7808` | `erp-system-00084-lfw` |
 | 2026-10-25 | G9 client CSV import | `a156a62` | `erp-system-00084-lfw` |
 | 2026-10-25 | G2a+G2b bons de préparation + feuille de route | `fd0a81d` | `erp-system-00087-892` |
+| 2026-10-25 | G1 multi-entrepôts + transferts | `0b819a2` | `erp-system-00090-h44` |
 
 ## Scope decision (2026-10-25)
 
