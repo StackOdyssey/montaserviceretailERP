@@ -21,7 +21,7 @@ export default function LivraisonsPage() {
   const load = async () => {
     setLoading(true);
     try {
-      setDocs(await getDeliveryRouteSheet(from, to));
+      setDocs(unwrap(await getDeliveryRouteSheet(from, to)));
     } catch (e) {
       toast.error((e as Error).message);
     } finally {

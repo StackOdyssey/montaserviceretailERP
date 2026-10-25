@@ -21,11 +21,13 @@ function requireDb() {
 }
 
 /** Entrepôts actifs (lisible par tout utilisateur connecté). */
-export async function getWarehouses(): Promise<WarehouseItem[]> {
+export async function getWarehouses(): Promise<ActionResult<WarehouseItem[]>> {
+  return actionResult(async () => {
   await assertAuthenticated();
   const d = requireDb();
   const rows = await d.select().from(warehouses).orderBy(asc(warehouses.id));
   return rows.map((w) => ({ id: w.id, code: w.code, name: w.name, isDefault: w.isDefault }));
+  });
 }
 
 
@@ -37,7 +39,8 @@ export interface WarehouseStockRow {
 }
 
 /** Répartition d'un produit par entrepôt. */
-export async function getProductWarehouseStock(productId: number): Promise<WarehouseStockRow[]> {
+export async function getProductWarehouseStock(productId: number): Promise<ActionResult<WarehouseStockRow[]>> {
+  return actionResult(async () => {
   await assertAuthenticated();
   const d = requireDb();
   const rows = await d
@@ -47,16 +50,19 @@ export async function getProductWarehouseStock(productId: number): Promise<Wareh
     .where(eq(productStock.productId, productId))
     .orderBy(asc(warehouses.id));
   return rows;
+  });
 }
 
 /** Toutes les quantités d'un entrepôt (pour le filtre /stock). */
-export async function getWarehouseStockMap(warehouseId: number): Promise<Record<number, number>> {
+export async function getWarehouseStockMap(warehouseId: number): Promise<ActionResult<Record<number, number>>> {
+  return actionResult(async () => {
   await assertAuthenticated();
   const d = requireDb();
   const rows = await d.select({ productId: productStock.productId, quantity: productStock.quantity })
     .from(productStock)
     .where(eq(productStock.warehouseId, warehouseId));
   return Object.fromEntries(rows.map((r) => [r.productId, r.quantity]));
+  });
 }
 
 export interface StockTransferItem {
@@ -70,7 +76,8 @@ export interface StockTransferItem {
   lines: Array<{ productId: number; productName: string; sku: string; quantity: number }>;
 }
 
-export async function getStockTransfers(): Promise<StockTransferItem[]> {
+export async function getStockTransfers(): Promise<ActionResult<StockTransferItem[]>> {
+  return actionResult(async () => {
   await assertAuthenticated();
   const d = requireDb();
   const rows = await d
@@ -103,6 +110,7 @@ export async function getStockTransfers(): Promise<StockTransferItem[]> {
     createdAt: (r.createdAt ?? new Date()).toISOString(),
     lines: byTransfer.get(r.id) ?? [],
   }));
+  });
 }
 
 /**

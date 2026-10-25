@@ -632,7 +632,8 @@ export interface RouteSheetDoc {
 }
 
 /** Feuille de route : documents avec préparation, regroupables par livreur/date. */
-export async function getDeliveryRouteSheet(from: string, to: string): Promise<RouteSheetDoc[]> {
+export async function getDeliveryRouteSheet(from: string, to: string): Promise<ActionResult<RouteSheetDoc[]>> {
+  return actionResult(async () => {
   await assertAuthenticated();
   const d = requireDb();
   const fromDate = new Date(`${from}T00:00:00`);
@@ -662,4 +663,5 @@ export async function getDeliveryRouteSheet(from: string, to: string): Promise<R
     livreurId: r.livreurId,
     livreurName: r.livreurName,
   }));
+  });
 }

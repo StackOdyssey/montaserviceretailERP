@@ -104,7 +104,7 @@ export default function NouveauBonDeLivraisonPage() {
   const [commercialId, setCommercialId] = useState<number | null>(null);
   const [livreurId, setLivreurId] = useState<number | null>(null);
   useEffect(() => {
-    getStaff().then((s) => setStaffList(s.filter((x) => x.isActive))).catch(() => {});
+    getStaff().then((r) => setStaffList(unwrap(r).filter((x) => x.isActive))).catch(() => {});
   }, []);
 
   // État de validation

@@ -21,7 +21,8 @@ function requireDb() {
 }
 
 /** Liste des utilisateurs (gérant uniquement). Jamais de pin_hmac exposé. */
-export async function getUsers(): Promise<UserItem[]> {
+export async function getUsers(): Promise<ActionResult<UserItem[]>> {
+  return actionResult(async () => {
   await assertOwner();
   const d = requireDb();
   const rows = await d
@@ -41,6 +42,7 @@ export async function getUsers(): Promise<UserItem[]> {
     isActive: u.isActive,
     createdAt: (u.createdAt ?? new Date()).toISOString(),
   }));
+  });
 }
 
 function assertPinNotMaster(pin: string) {

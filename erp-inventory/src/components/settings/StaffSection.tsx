@@ -16,7 +16,7 @@ export function StaffSection() {
 
   const load = async () => {
     try {
-      setStaff(await getStaff());
+      setStaff(unwrap(await getStaff()));
     } catch {
       /* non-owner: section stays empty */
     }

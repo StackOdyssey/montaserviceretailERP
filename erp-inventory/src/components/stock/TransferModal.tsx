@@ -29,7 +29,7 @@ export function TransferModal({ isOpen, onClose, onDone }: { isOpen: boolean; on
   useEffect(() => {
     if (!isOpen) return;
     let active = true;
-    getWarehouses().then((ws) => {
+    getWarehouses().then((r) => { const ws = unwrap(r);
       if (!active) return;
       setWarehouses(ws);
       const def = ws.find((w) => w.isDefault) ?? ws[0];

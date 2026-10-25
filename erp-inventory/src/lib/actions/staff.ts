@@ -18,7 +18,8 @@ function requireDb() {
 }
 
 /** Staff actif (commerciaux / livreurs) — lisible par tout utilisateur connecté (formulaires de vente). */
-export async function getStaff(role?: "COMMERCIAL" | "LIVREUR"): Promise<StaffItem[]> {
+export async function getStaff(role?: "COMMERCIAL" | "LIVREUR"): Promise<ActionResult<StaffItem[]>> {
+  return actionResult(async () => {
   await assertAuthenticated();
   const d = requireDb();
   const rows = await d
@@ -32,6 +33,7 @@ export async function getStaff(role?: "COMMERCIAL" | "LIVREUR"): Promise<StaffIt
     role: s.role === "LIVREUR" ? "LIVREUR" : "COMMERCIAL",
     isActive: s.isActive,
   }));
+  });
 }
 
 export async function saveStaff(data: {

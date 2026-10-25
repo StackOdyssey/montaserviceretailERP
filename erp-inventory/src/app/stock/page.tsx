@@ -67,12 +67,12 @@ export default function StockCataloguePage() {
   const [warehouseFilter, setWarehouseFilter] = useState<number | null>(null); // null = vue globale
   const [whStock, setWhStock] = useState<Record<number, number>>({});
   useEffect(() => {
-    getWarehouses().then(setWarehousesList).catch(() => {});
+    getWarehouses().then((r) => setWarehousesList(unwrap(r))).catch(() => {});
   }, []);
 
   useEffect(() => {
     if (warehouseFilter == null) { setWhStock({}); return; }
-    getWarehouseStockMap(warehouseFilter).then(setWhStock).catch(() => setWhStock({}));
+    getWarehouseStockMap(warehouseFilter).then((r) => setWhStock(unwrap(r))).catch(() => setWhStock({}));
   }, [warehouseFilter]);
 
   const { activeCode, activeLine } = useBusinessLine();
@@ -538,7 +538,7 @@ export default function StockCataloguePage() {
       <TransferModal
         isOpen={isTransferOpen}
         onClose={() => setIsTransferOpen(false)}
-        onDone={() => warehouseFilter != null ? getWarehouseStockMap(warehouseFilter).then(setWhStock) : null}
+        onDone={() => warehouseFilter != null ? getWarehouseStockMap(warehouseFilter).then((r) => setWhStock(unwrap(r))) : null}
       />
       <ProductHistoryModal
         isOpen={isHistoryModalOpen}

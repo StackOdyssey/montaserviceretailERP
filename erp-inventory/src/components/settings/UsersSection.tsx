@@ -25,7 +25,7 @@ export function UsersSection() {
 
   const load = async () => {
     try {
-      setUsers(await getUsers());
+      setUsers(unwrap(await getUsers()));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Chargement impossible");
