@@ -726,3 +726,68 @@ export async function getCustomerAging(): Promise<{ rows: PartyAgingRow[]; total
 
   return { rows, totals };
 }
+
+/**
+ * Import CSV de clients en masse (G9) : dédoublonnage par nom normalisé +
+ * findCustomerDuplicates (nom/tél/ICE). Les doublons sont ignorés, pas bloquants.
+ */
+export async function importCustomersBatch(
+  items: Array<{
+    name: string;
+    phone?: string;
+    email?: string;
+    city?: string;
+    address?: string;
+    ice?: string;
+    creditLimitDh?: number;
+  }>
+): Promise<ActionResult<{ created: number; skipped: number; errors: string[] }>> {
+  return actionResult(async () => {
+    await assertAuthenticated();
+    const d = requireDb();
+    let created = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+
+    for (const item of items) {
+      const cleanName = item.name.trim().replace(/\s+/g, " ");
+      if (!cleanName) { skipped++; continue; }
+      const iceValue = item.ice?.trim().replace(/\s+/g, "") || null;
+      try {
+        const dups = await findCustomerDuplicates(
+          { name: cleanName, phone: item.phone?.trim(), ice: iceValue ?? undefined },
+          undefined
+        );
+        if (dups.length > 0) { skipped++; continue; }
+
+        const isPro = !!iceValue && /^\d{15}$/.test(iceValue);
+        await d.insert(customers).values({
+          name: cleanName,
+          phone: item.phone?.trim() || null,
+          email: item.email?.trim() || null,
+          city: item.city?.trim() || null,
+          address: item.address?.trim() || null,
+          ice: isPro ? iceValue : null,
+          identityNumber: null,
+          isWholesale: false,
+          isProfessional: isPro,
+          creditLimitCents: item.creditLimitDh != null ? Math.round(item.creditLimitDh * 100) : null,
+        });
+        created++;
+      } catch (e) {
+        errors.push(`${cleanName}: ${(e as Error).message}`);
+      }
+    }
+
+    try {
+      await d.insert(auditLogs).values({
+        action: "IMPORT_CLIENTS",
+        entityType: "CUSTOMER",
+        actorName: await currentActor(),
+        details: `Import clients — ${created} créés, ${skipped} ignorés (doublons), ${errors.length} erreurs.`,
+      });
+    } catch { /* journal non bloquant */ }
+
+    return { created, skipped, errors };
+  });
+}

@@ -5,6 +5,7 @@ import {
   Receipt,
   Search,
   Plus,
+  FileSpreadsheet,
   Clock,
   AlertTriangle,
   Building,
@@ -23,6 +24,7 @@ import { formatMoney } from "@/lib/money";
 import { nextStatuses, paymentStatusLabel, isTerminalStatus } from "@/lib/payments";
 import { PaymentModal } from "@/components/customers/PaymentModal";
 import { CustomerModal } from "@/components/customers/CustomerModal";
+import { ClientImportModal } from "@/components/customers/ClientImportModal";
 import { CustomerStatementModal } from "@/components/customers/CustomerStatementModal";
 import { useToast } from "@/components/ui/ToastProvider";
 import { unwrap } from "@/lib/action-result";
@@ -39,6 +41,7 @@ export default function ReglementsPage() {
   // Modals state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [statementCustomerId, setStatementCustomerId] = useState<number | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<CustomerItem | null>(null);
   const [preselectedCustomerId, setPreselectedCustomerId] = useState<number | undefined>(undefined);
@@ -110,6 +113,14 @@ export default function ReglementsPage() {
           >
             <Plus className="w-4 h-4" />
             Nouveau Client
+          </button>
+          <button
+            onClick={() => setIsImportOpen(true)}
+            className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 text-xs font-bold rounded-xl transition flex items-center gap-2"
+            title="Importer une liste de clients depuis un fichier CSV"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Import CSV
           </button>
           <button
             onClick={() => handleOpenPayment()}
@@ -454,6 +465,11 @@ export default function ReglementsPage() {
         preselectedCustomerId={preselectedCustomerId}
       />
 
+      <ClientImportModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImported={loadData}
+      />
       <CustomerModal
         isOpen={isCustomerModalOpen}
         onClose={() => {
