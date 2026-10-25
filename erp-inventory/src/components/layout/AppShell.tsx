@@ -16,6 +16,7 @@ import {
   Settings,
   Mail,
   LogOut,
+  Lock,
   ChevronLeft,
   ChevronRight,
   Menu,
@@ -39,6 +40,7 @@ import {
   type Parameters,
 } from "@/components/layout/SettingsProvider";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import { LockScreen } from "@/components/layout/LockScreen";
 
 interface NavItem {
   label: string;
@@ -110,6 +112,7 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
 
   // Mémoriser l'état plié/déplié de la sidebar
   useEffect(() => {
@@ -261,18 +264,28 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
           ) : (
             <div className="text-center font-bold text-[#F7162D]">{vatShort}</div>
           )}
-          <button
-            onClick={async () => {
-              await logout();
-              await clearAppCaches();
-              window.location.href = "/login";
-            }}
-            className="mt-2 w-full flex items-center justify-center gap-1.5 py-1.5 px-2 text-xs font-semibold text-gray-500 hover:text-[#F7162D] hover:bg-red-50 rounded-lg transition"
-            title="Se déconnecter"
-          >
-            <LogOut size={14} />
-            {!isCollapsed && <span>Déconnexion</span>}
-          </button>
+          <div className="mt-2 flex gap-1.5">
+            <button
+              onClick={() => setIsLocked(true)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 text-xs font-semibold text-gray-500 hover:text-[#111827] hover:bg-gray-100 rounded-lg transition"
+              title="Verrouiller l'écran (le code PIN déverrouille)"
+            >
+              <Lock size={14} />
+              {!isCollapsed && <span>Verrouiller</span>}
+            </button>
+            <button
+              onClick={async () => {
+                await logout();
+                await clearAppCaches();
+                window.location.href = "/login";
+              }}
+              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 text-xs font-semibold text-gray-500 hover:text-[#F7162D] hover:bg-red-50 rounded-lg transition"
+              title="Se déconnecter"
+            >
+              <LogOut size={14} />
+              {!isCollapsed && <span>Déconnexion</span>}
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -380,12 +393,19 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
               <p className="font-semibold text-[#111827]">BM Motors ERP v2.0</p>
               <p>{vatLabel} • {settings?.currency ?? "MAD"}</p>
               <button
+                onClick={() => { setIsMobileMenuOpen(false); setIsLocked(true); }}
+                className="mt-3 w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-bold text-[#111827] bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition"
+              >
+                <Lock size={14} />
+                <span>Verrouiller</span>
+              </button>
+              <button
                 onClick={async () => {
                   await logout();
                   await clearAppCaches();
                   window.location.href = "/login";
                 }}
-                className="mt-3 w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-bold text-white bg-[#F7162D] hover:bg-[#d81023] rounded-xl shadow-xs transition"
+                className="mt-2 w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-bold text-white bg-[#F7162D] hover:bg-[#d81023] rounded-xl shadow-xs transition"
               >
                 <LogOut size={14} />
                 <span>Déconnexion Gérant</span>
@@ -492,6 +512,7 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
         </Link>
       </nav>
     </div>
+    {isLocked && <LockScreen onUnlock={() => setIsLocked(false)} />}
     </ToastProvider>
     </BusinessLineProvider>
     </ParametersProvider>
