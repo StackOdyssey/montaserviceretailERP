@@ -59,12 +59,13 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ skipped/de-sco
 - [x] **Verified dev:** staff seeded (BRAHIM BELLA + Youssef Transport) render in selects
 - Effort: M · Deps: model decision
 
-### ⬜ G8 — Cheque "date de dépôt" (deposit tracking)
+### ✅ G8 — Cheque "date de dépôt" (deposit tracking)
 **Legacy:** ListeChequesClts has Date Dépôt + Etat (reçu→déposé→encaissé).
 **Ours:** échéancier tracks due date + status only.
-- [ ] Schema: `payments.deposit_date` (nullable) — migration
-- [ ] UI: deposit date column + "marquer déposé" on `/reglements` échéancier row
-- [ ] Status flow: EN_ATTENTE → DEPOSE → ENCAISSE/REJETE
+- [x] `customer_payments.deposit_date` (migration 0025)
+- [x] Status flow already existed: RECU → REMIS_BANQUE → ENCAISSE (LCN: CREE → ACCEPTE → REMIS_ENCAISSEMENT → ESCOMPTE → PAYE)
+- [x] `updatePaymentStatus` stamps `deposit_date` on REMIS_BANQUE / REMIS_ENCAISSEMENT; échéancier shows "Déposé le ..."
+- [x] `ChequeEffetAlert.depositDate` exposed
 - Effort: S · Deps: none
 
 ### ⬜ G9 — Client CSV import
@@ -129,7 +130,10 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ skipped/de-sco
 | Date | Item | Commit | Prod revision |
 |---|---|---|---|
 | 2026-10-25 | G5+G6+G7 (+G4 already-covered, modal preselect fix) | `ef43306` | `erp-system-00076-zxq` |
-| 2026-10-25 | G3 commercial/livreur + staff table | `27761f8` | _deploying_ |
+| 2026-10-25 | G3 commercial/livreur + staff table | `27761f8` | `erp-system-00079-8xk` |
+| 2026-10-25 | G8 cheque deposit date | `f123b48` | `erp-system-00084-lfw` |
+| 2026-10-25 | G10 lock screen | `63d7808` | `erp-system-00084-lfw` |
+| 2026-10-25 | G9 client CSV import | `a156a62` | `erp-system-00084-lfw` |
 
 ## Scope decision (2026-10-25)
 
