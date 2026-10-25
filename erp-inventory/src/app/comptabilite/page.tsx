@@ -27,20 +27,23 @@ import {
   getAccountingPeriods,
   setPeriodStatus as setPeriodStatusAction,
   getAccountingCsv,
+  getDailySheet,
   getValidationIssues,
+  type DailySheetData,
   type ValidationIssue,
   type PeriodStatus,
 } from "@/lib/actions/accounting";
 import { getCustomerAging, type PartyAgingRow, type AgingBuckets } from "@/lib/actions/customers";
 import { getSupplierAging } from "@/lib/actions/suppliers";
 import { formatMoney } from "@/lib/money";
+import { unwrap } from "@/lib/action-result";
 import { useSettings } from "@/components/layout/SettingsProvider";
 import { useToast } from "@/components/ui/ToastProvider";
 
 export default function ComptabilitePage() {
   const company = useSettings();
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<"TVA" | "STOCK" | "MARGES" | "AGING" | "VALIDATION">("TVA");
+  const [activeTab, setActiveTab] = useState<"TVA" | "STOCK" | "MARGES" | "AGING" | "VALIDATION" | "JOURNEE">("TVA");
   const [tvaData, setTvaData] = useState<TvaAccountingExport | null>(null);
   const [stockData, setStockData] = useState<StockValuation | null>(null);
   const [marginsData, setMarginsData] = useState<ProfitMarginsReport | null>(null);
@@ -54,6 +57,22 @@ export default function ComptabilitePage() {
   const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
   const [customerAging, setCustomerAging] = useState<{ rows: PartyAgingRow[]; totals: AgingBuckets } | null>(null);
   const [supplierAging, setSupplierAging] = useState<{ rows: PartyAgingRow[]; totals: AgingBuckets } | null>(null);
+  // Feuille de journée — plage de dates (par défaut : aujourd'hui).
+  const [sheetFrom, setSheetFrom] = useState(() => now.toISOString().slice(0, 10));
+  const [sheetTo, setSheetTo] = useState(() => now.toISOString().slice(0, 10));
+  const [dailySheet, setDailySheet] = useState<DailySheetData | null>(null);
+  const [sheetLoading, setSheetLoading] = useState(false);
+
+  const loadDailySheet = async () => {
+    setSheetLoading(true);
+    try {
+      setDailySheet(await getDailySheet(sheetFrom, sheetTo));
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSheetLoading(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -88,7 +107,7 @@ export default function ComptabilitePage() {
   const changeStatus = async (status: PeriodStatus) => {
     setIsLocking(true);
     try {
-      await setPeriodStatusAction(periodYear, periodMonth, status);
+      unwrap(await setPeriodStatusAction(periodYear, periodMonth, status));
       setPeriodStatusState(status);
     } catch (e) {
       toast.error((e as Error).message);
@@ -279,6 +298,21 @@ export default function ComptabilitePage() {
               {validationIssues.filter((i) => i.severity === "ERROR").reduce((s, i) => s + i.count, 0)}
             </span>
           )}
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab("JOURNEE");
+            if (!dailySheet) loadDailySheet();
+          }}
+          className={`pb-3 text-sm font-bold flex items-center gap-2 border-b-2 transition ${
+            activeTab === "JOURNEE"
+              ? "border-[#F7162D] text-[#F7162D]"
+              : "border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white"
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          Feuille de journée
         </button>
       </div>
 
@@ -846,6 +880,159 @@ export default function ComptabilitePage() {
                 )}
               </div>
             ))
+          )}
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* ONGLET 6 : FEUILLE DE JOURNÉE                            */}
+      {/* ======================================================== */}
+      {activeTab === "JOURNEE" && (
+        <div className="space-y-5">
+          {/* Sélecteur de plage */}
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 flex flex-wrap items-end gap-3 print:hidden">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Depuis</label>
+              <input
+                type="date"
+                value={sheetFrom}
+                onChange={(e) => setSheetFrom(e.target.value)}
+                className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Jusqu&apos;à</label>
+              <input
+                type="date"
+                value={sheetTo}
+                onChange={(e) => setSheetTo(e.target.value)}
+                className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm"
+              />
+            </div>
+            <button
+              onClick={loadDailySheet}
+              disabled={sheetLoading}
+              className="px-5 py-2 bg-[#F7162D] hover:bg-[#D90E23] text-white text-sm font-bold rounded-xl transition disabled:opacity-50"
+            >
+              {sheetLoading ? "Chargement…" : "Afficher"}
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-bold rounded-xl transition flex items-center gap-2"
+            >
+              <Printer className="w-4 h-4" /> Imprimer
+            </button>
+          </div>
+
+          {dailySheet && (
+            <>
+              {/* Cartes synthèse */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Ventes (TTC)</p>
+                  <p className="text-xl font-black text-gray-900 dark:text-white">
+                    {formatMoney(dailySheet.sales.reduce((s, x) => s + x.totalTtcCents, 0))}
+                  </p>
+                  <p className="text-[11px] text-gray-400">{dailySheet.sales.reduce((s, x) => s + x.count, 0)} documents</p>
+                </div>
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Encaissé clients</p>
+                  <p className="text-xl font-black text-emerald-600">
+                    {formatMoney(dailySheet.encaissements.reduce((s, x) => s + x.amountCents, 0))}
+                  </p>
+                  <p className="text-[11px] text-gray-400">{dailySheet.encaissements.reduce((s, x) => s + x.count, 0)} règlements</p>
+                </div>
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Décaissé (FRS + dépenses)</p>
+                  <p className="text-xl font-black text-red-600">
+                    {formatMoney(dailySheet.decaissements.reduce((s, x) => s + x.amountCents, 0) + dailySheet.expensesCents)}
+                  </p>
+                  <p className="text-[11px] text-gray-400">{dailySheet.expenseCount} dépense(s)</p>
+                </div>
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Caisse espèces nette</p>
+                  <p className={`text-xl font-black ${dailySheet.cashEspeceNetCents >= 0 ? "text-[#2563EB]" : "text-[#F7162D]"}`}>
+                    {formatMoney(dailySheet.cashEspeceNetCents)}
+                  </p>
+                  <p className="text-[11px] text-gray-400">espèces in − FRS espèces − dépenses</p>
+                </div>
+              </div>
+
+              {/* Détail ventes par type */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+                  <h4 className="px-4 py-3 text-xs font-black uppercase text-gray-500 bg-gray-50 dark:bg-gray-800/60 border-b border-gray-100 dark:border-gray-800">
+                    Ventes par type de document
+                  </h4>
+                  <table className="w-full text-xs">
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {dailySheet.sales.length === 0 && (
+                        <tr><td className="py-4 px-4 text-center text-gray-400">Aucune vente sur la période</td></tr>
+                      )}
+                      {dailySheet.sales.map((s) => (
+                        <tr key={s.docType}>
+                          <td className="py-2.5 px-4 font-bold text-gray-800 dark:text-gray-200">{s.docType}</td>
+                          <td className="py-2.5 px-4 text-right text-gray-500">{s.count} doc(s)</td>
+                          <td className="py-2.5 px-4 text-right text-gray-500">HT {formatMoney(s.totalHtCents)}</td>
+                          <td className="py-2.5 px-4 text-right font-bold">{formatMoney(s.totalTtcCents)}</td>
+                        </tr>
+                      ))}
+                      {dailySheet.cancelledDocs > 0 && (
+                        <tr>
+                          <td colSpan={4} className="py-2 px-4 text-[11px] text-amber-600">
+                            ⚠ {dailySheet.cancelledDocs} document(s) annulé(s) sur la période
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+                    <h4 className="px-4 py-3 text-xs font-black uppercase text-gray-500 bg-gray-50 dark:bg-gray-800/60 border-b border-gray-100 dark:border-gray-800">
+                      Encaissements clients par mode
+                    </h4>
+                    <table className="w-full text-xs">
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {dailySheet.encaissements.length === 0 && (
+                          <tr><td className="py-4 px-4 text-center text-gray-400">Aucun encaissement</td></tr>
+                        )}
+                        {dailySheet.encaissements.map((e) => (
+                          <tr key={e.method}>
+                            <td className="py-2.5 px-4 font-bold text-gray-800 dark:text-gray-200">{e.method}</td>
+                            <td className="py-2.5 px-4 text-right text-gray-500">{e.count}</td>
+                            <td className="py-2.5 px-4 text-right font-bold text-emerald-600">{formatMoney(e.amountCents)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+                    <h4 className="px-4 py-3 text-xs font-black uppercase text-gray-500 bg-gray-50 dark:bg-gray-800/60 border-b border-gray-100 dark:border-gray-800">
+                      Décaissements fournisseurs & dépenses
+                    </h4>
+                    <table className="w-full text-xs">
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {dailySheet.decaissements.map((e) => (
+                          <tr key={e.method}>
+                            <td className="py-2.5 px-4 font-bold text-gray-800 dark:text-gray-200">FRS {e.method}</td>
+                            <td className="py-2.5 px-4 text-right text-gray-500">{e.count}</td>
+                            <td className="py-2.5 px-4 text-right font-bold text-red-600">{formatMoney(e.amountCents)}</td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td className="py-2.5 px-4 font-bold text-gray-800 dark:text-gray-200">Dépenses caisse</td>
+                          <td className="py-2.5 px-4 text-right text-gray-500">{dailySheet.expenseCount}</td>
+                          <td className="py-2.5 px-4 text-right font-bold text-red-600">{formatMoney(dailySheet.expensesCents)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </>
           )}
         </div>
       )}

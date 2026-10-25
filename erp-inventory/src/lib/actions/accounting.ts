@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, eq, gt, gte, isNull, lt, lte, ne, or } from "drizzle-orm";
+import { and, asc, eq, gt, gte, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import {
   accountingPeriods,
   customers,
@@ -404,4 +404,110 @@ export async function getAccountingCsv(options?: {
   const csv = "\uFEFF" + out.join("\r\n");
   const filename = `TVA_${tva.periodLabel.replace(/\s+/g, "-")}.csv`;
   return { filename, csv };
+}
+
+export interface DailySheetData {
+  from: string;
+  to: string;
+  sales: Array<{ docType: string; count: number; totalTtcCents: number; totalHtCents: number; tvaCents: number }>;
+  encaissements: Array<{ method: string; count: number; amountCents: number }>;
+  decaissements: Array<{ method: string; count: number; amountCents: number }>;
+  expensesCents: number;
+  expenseCount: number;
+  cashEspeceNetCents: number;
+  cancelledDocs: number;
+}
+
+/**
+ * Feuille de journée (legacy feuilleJournee) : synthèse d'activité sur une plage
+ * de dates — ventes par type de doc, encaissements par mode, décaissements FRS,
+ * dépenses caisse, et position espèces nette.
+ */
+export async function getDailySheet(from: string, to: string): Promise<DailySheetData> {
+  await assertAuthenticated();
+  const d = requireDb();
+  const fromDate = new Date(`${from}T00:00:00`);
+  const toDate = new Date(`${to}T23:59:59.999`);
+
+  const sales = await d
+    .select({
+      docType: salesDocuments.docType,
+      count: sql<number>`count(*)`,
+      totalTtcCents: sql<number>`coalesce(sum(${salesDocuments.totalTtcCents}),0)::bigint`,
+      totalHtCents: sql<number>`coalesce(sum(${salesDocuments.totalNetHtCents}),0)::bigint`,
+      tvaCents: sql<number>`coalesce(sum(${salesDocuments.tvaAmountCents}),0)::bigint`,
+    })
+    .from(salesDocuments)
+    .where(and(
+      gte(salesDocuments.docDate, fromDate),
+      lte(salesDocuments.docDate, toDate),
+      or(eq(salesDocuments.status, "VALIDE"), eq(salesDocuments.status, "PAYE"))
+    ))
+    .groupBy(salesDocuments.docType);
+
+  const encaissements = await d
+    .select({
+      method: customerPayments.paymentMethod,
+      count: sql<number>`count(*)`,
+      amountCents: sql<number>`coalesce(sum(${customerPayments.amountCents}),0)::bigint`,
+    })
+    .from(customerPayments)
+    .where(and(
+      gte(customerPayments.paymentDate, fromDate),
+      lte(customerPayments.paymentDate, toDate),
+      ne(customerPayments.status, "REJETE")
+    ))
+    .groupBy(customerPayments.paymentMethod);
+
+  const decaissements = await d
+    .select({
+      method: supplierPayments.paymentMethod,
+      count: sql<number>`count(*)`,
+      amountCents: sql<number>`coalesce(sum(${supplierPayments.amountCents}),0)::bigint`,
+    })
+    .from(supplierPayments)
+    .where(and(
+      gte(supplierPayments.paymentDate, fromDate),
+      lte(supplierPayments.paymentDate, toDate),
+      ne(supplierPayments.status, "REJETE")
+    ))
+    .groupBy(supplierPayments.paymentMethod);
+
+  const [exp] = await d
+    .select({
+      total: sql<number>`coalesce(sum(${expenses.amountCents}),0)::bigint`,
+      count: sql<number>`count(*)`,
+    })
+    .from(expenses)
+    .where(and(gte(expenses.expenseDate, fromDate), lte(expenses.expenseDate, toDate)));
+
+  const [cancelled] = await d
+    .select({ n: sql<number>`count(*)` })
+    .from(salesDocuments)
+    .where(and(
+      gte(salesDocuments.docDate, fromDate),
+      lte(salesDocuments.docDate, toDate),
+      eq(salesDocuments.status, "ANNULE")
+    ));
+
+  const especesIn = encaissements.find((e) => e.method === "ESPECES")?.amountCents ?? 0;
+  const especesOut = decaissements.find((e) => e.method === "ESPECES")?.amountCents ?? 0;
+
+  return {
+    from,
+    to,
+    sales: sales.map((s) => ({
+      docType: s.docType,
+      count: Number(s.count),
+      totalTtcCents: Number(s.totalTtcCents),
+      totalHtCents: Number(s.totalHtCents),
+      tvaCents: Number(s.tvaCents),
+    })),
+    encaissements: encaissements.map((e) => ({ method: e.method, count: Number(e.count), amountCents: Number(e.amountCents) })),
+    decaissements: decaissements.map((e) => ({ method: e.method, count: Number(e.count), amountCents: Number(e.amountCents) })),
+    expensesCents: Number(exp?.total ?? 0),
+    expenseCount: Number(exp?.count ?? 0),
+    cashEspeceNetCents: Number(especesIn) - Number(especesOut) - Number(exp?.total ?? 0),
+    cancelledDocs: Number(cancelled?.n ?? 0),
+  };
 }

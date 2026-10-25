@@ -1,0 +1,1 @@
+ALTER TABLE "supplier_receipt_lines" ADD COLUMN "returned_quantity" integer DEFAULT 0 NOT NULL;

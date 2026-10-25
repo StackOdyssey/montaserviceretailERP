@@ -509,6 +509,7 @@ export const supplierReceiptLines = pgTable("supplier_receipt_lines", {
   productName: text("product_name").notNull(),
   sku: text("sku").notNull(),
   quantity: integer("quantity").notNull(),
+  returnedQuantity: integer("returned_quantity").notNull().default(0), // qté déjà retournée au FRS
   unitCostCents: integer("unit_cost_cents").notNull(),
   totalCostCents: integer("total_cost_cents").notNull(),
 });

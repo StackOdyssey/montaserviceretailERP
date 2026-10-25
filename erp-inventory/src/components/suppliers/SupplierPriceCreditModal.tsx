@@ -27,6 +27,12 @@ export function SupplierPriceCreditModal({
   preselectedSupplierId,
 }: SupplierPriceCreditModalProps) {
   const [supplierId, setSupplierId] = useState<number>(preselectedSupplierId || (suppliers[0]?.id ?? 1));
+  // Ré-applique la présélection à chaque ouverture (useState ne capture que le 1er render).
+  const [prevIsOpen, setPrevIsOpen] = useState(false);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
+    if (isOpen) setSupplierId(preselectedSupplierId || (suppliers[0]?.id ?? 1));
+  }
   const [receipts, setReceipts] = useState<SupplierReceiptItem[]>([]);
   const [receiptId, setReceiptId] = useState<number | null>(null);
   const [credits, setCredits] = useState<Record<number, string>>({});

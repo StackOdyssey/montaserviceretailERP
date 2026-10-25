@@ -43,6 +43,12 @@ export function SupplierPaymentModal({
   const [selectedSupplierId, setSelectedSupplierId] = useState<number>(
     preselectedSupplierId || (suppliers[0]?.id ?? 1)
   );
+  // Ré-applique la présélection à chaque ouverture (useState ne capture que le 1er render).
+  const [prevIsOpen, setPrevIsOpen] = useState(false);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
+    if (isOpen) setSelectedSupplierId(preselectedSupplierId || (suppliers[0]?.id ?? 1));
+  }
   const [amountDh, setAmountDh] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<"CHEQUE" | "EFFET_LCN" | "VIREMENT" | "ESPECES">("CHEQUE");
   const { paymentMethods } = useParameters();

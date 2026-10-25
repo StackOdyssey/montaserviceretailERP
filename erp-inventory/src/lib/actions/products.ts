@@ -518,3 +518,81 @@ async function importProductsBatchImpl(
   }
   return { count };
 }
+
+export interface ProductMovementItem {
+  id: number;
+  movementType: string;
+  quantity: number;
+  unitCostCents: number | null;
+  sourceDocumentType: string | null;
+  sourceDocumentId: number | null;
+  reason: string | null;
+  createdAt: string;
+  stockBefore: number | null;
+  stockAfter: number | null;
+}
+
+/**
+ * Traçabilité d'une pièce : historique des mouvements (réceptions, ventes,
+ * ajustements, retours) avec stock avant/après recalculé depuis le stock courant.
+ * Retourne null pour stockBefore/After si des écritures hors ledger existent.
+ */
+export async function getProductMovements(
+  productId: number,
+  options?: { limit?: number; offset?: number }
+): Promise<{ product: { id: number; sku: string; name: string; currentStock: number } | null; movements: ProductMovementItem[]; total: number }> {
+  await assertAuthenticated();
+  const d = requireDb();
+  const p = (await d.select().from(products).where(eq(products.id, productId)).limit(1))[0];
+  if (!p) return { product: null, movements: [], total: 0 };
+
+  const limit = Math.min(Math.max(1, options?.limit ?? 50), 200);
+  const offset = Math.max(0, options?.offset ?? 0);
+  const [{ n: totalRaw }] = await d
+    .select({ n: sql<number>`count(*)` })
+    .from(stockMovements)
+    .where(eq(stockMovements.productId, productId));
+  const total = Number(totalRaw ?? 0);
+
+  const rows = await d
+    .select()
+    .from(stockMovements)
+    .where(eq(stockMovements.productId, productId))
+    .orderBy(sql`${stockMovements.id} desc`)
+    .limit(limit)
+    .offset(offset);
+
+  // Stock après chaque mouvement : on remonte depuis le stock courant en
+  // défaisant les mouvements postérieurs à la fenêtre paginée.
+  const later = offset > 0
+    ? await d
+        .select({ q: sql<number>`coalesce(sum(${stockMovements.quantity}),0)` })
+        .from(stockMovements)
+        .where(and(eq(stockMovements.productId, productId), sql`${stockMovements.id} > ${rows[rows.length - 1]?.id ?? 0}`))
+    : [];
+  let after = p.currentStock - Number(later[0]?.q ?? 0);
+
+  const movements = rows.map((r) => {
+    const stockAfter = after;
+    const stockBefore = after - r.quantity;
+    after = stockBefore;
+    return {
+      id: r.id,
+      movementType: r.movementType,
+      quantity: r.quantity,
+      unitCostCents: r.unitCostCents,
+      sourceDocumentType: r.sourceDocumentType,
+      sourceDocumentId: r.sourceDocumentId,
+      reason: r.reason,
+      createdAt: (r.createdAt ?? new Date()).toISOString(),
+      stockBefore,
+      stockAfter,
+    };
+  });
+
+  return {
+    product: { id: p.id, sku: p.sku, name: p.name, currentStock: p.currentStock },
+    movements,
+    total,
+  };
+}

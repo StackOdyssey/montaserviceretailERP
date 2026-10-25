@@ -61,6 +61,7 @@ export interface SupplierReceiptItem {
     productName: string;
     sku: string;
     quantity: number;
+    returnedQuantity: number;
     unitCostCents: number;
     totalCostCents: number;
   }>;
@@ -130,6 +131,7 @@ function mapReceipt(r: ReceiptRow, supplierName: string, lines: ReceiptLineRow[]
       productName: l.productName,
       sku: l.sku,
       quantity: l.quantity,
+      returnedQuantity: l.returnedQuantity,
       unitCostCents: l.unitCostCents,
       totalCostCents: l.totalCostCents,
     })),

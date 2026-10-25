@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Edit2,
   Filter,
+  History,
   Package,
   ClipboardList,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import {
 import { formatMoney } from "@/lib/money";
 import { ProductModal } from "@/components/stock/ProductModal";
 import { StockAdjustmentModal } from "@/components/stock/StockAdjustmentModal";
+import { ProductHistoryModal } from "@/components/stock/ProductHistoryModal";
 import { CsvModal } from "@/components/stock/CsvModal";
 import { useBusinessLine } from "@/components/layout/BusinessLineProvider";
 import { useSettings } from "@/components/layout/SettingsProvider";
@@ -53,6 +55,9 @@ export default function StockCataloguePage() {
   const [productToAdjust, setProductToAdjust] = useState<ProductItem | null>(null);
 
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
+
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [productToTrace, setProductToTrace] = useState<ProductItem | null>(null);
 
   const { activeCode, activeLine } = useBusinessLine();
   const company = useSettings();
@@ -414,6 +419,17 @@ export default function StockCataloguePage() {
 
                           <button
                             onClick={() => {
+                              setProductToTrace(p);
+                              setIsHistoryModalOpen(true);
+                            }}
+                            title="Traçabilité / historique des mouvements"
+                            className="p-1.5 text-[#374151] hover:text-[#111827] hover:bg-[#E5E7EB] rounded-lg transition-colors"
+                          >
+                            <History size={15} />
+                          </button>
+
+                          <button
+                            onClick={() => {
                               setProductToEdit(p);
                               setIsProductModalOpen(true);
                             }}
@@ -481,6 +497,12 @@ export default function StockCataloguePage() {
         onClose={() => setIsCsvModalOpen(false)}
         businessLineCode={activeCode}
         onImport={handleImportCsv}
+      />
+
+      <ProductHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        product={productToTrace}
       />
     </div>
   );
