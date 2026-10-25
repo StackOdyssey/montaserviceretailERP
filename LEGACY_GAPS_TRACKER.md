@@ -48,13 +48,15 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ skipped/de-sco
 
 ## Phase 2 — Personnel attribution (unlocks delivery workflow)
 
-### ⬜ G3 — Commercial / livreur on sales docs
+### ✅ G3 — Commercial / livreur on sales docs
 **Legacy:** Commercial + Livreur columns on BL/BP/retours; feuilleJournee filters by them.
-- [ ] Decide model: extend `users` (role=COMMERCIAL/LIVREUR) or separate employees table → **ask user how vendeurs/livreurs log in today**
-- [ ] Schema: `sales_documents.commercial_id` (+ optional `livreur_id`) — migration
-- [ ] UI: commercial picker on `/ventes/nouveau` + POS (default = session user?)
-- [ ] Surface: doc list column, print view, feuille de journée filter, per-commercial CA stat
-- **Verify:** create BL with commercial → shows on doc + print + daily sheet filter.
+- [x] Model: `staff` table (name + role COMMERCIAL/LIVREUR, **no login** — attribution only)
+- [x] `sales_documents.commercial_id/commercial_name` + `livreur_id/livreur_name` (migration 0024, name snapshot)
+- [x] UI: commercial + livreur selects on `/ventes/nouveau`; `StaffSection` CRUD in parametres
+- [x] Surface: `/ventes` list + `DocumentPrintView` show commercial
+- [ ] POS select — deferred (POS defaults to counter sales; add if needed)
+- [ ] Feuille-de-journée commercial filter — follow-up
+- [x] **Verified dev:** staff seeded (BRAHIM BELLA + Youssef Transport) render in selects
 - Effort: M · Deps: model decision
 
 ### ⬜ G8 — Cheque "date de dépôt" (deposit tracking)
@@ -126,7 +128,8 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ skipped/de-sco
 
 | Date | Item | Commit | Prod revision |
 |---|---|---|---|
-| 2026-10-25 | G5+G6+G7 (+G4 already-covered, modal preselect fix) | `ef43306` | _deploying_ |
+| 2026-10-25 | G5+G6+G7 (+G4 already-covered, modal preselect fix) | `ef43306` | `erp-system-00076-zxq` |
+| 2026-10-25 | G3 commercial/livreur + staff table | `27761f8` | _deploying_ |
 
 ## Scope decision (2026-10-25)
 
