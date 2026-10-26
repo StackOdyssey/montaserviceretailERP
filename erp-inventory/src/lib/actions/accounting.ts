@@ -459,6 +459,35 @@ export async function getDailySheet(from: string, to: string): Promise<DailyShee
     ))
     .groupBy(customerPayments.paymentMethod);
 
+  // Paiement immédiat à la vente : les docs soldés à la validation n'écrivent
+  // pas de ligne customer_payments — le résiduel (paid - paiements liés)
+  // représente l'encaissement au comptoir de ce jour.
+  const docPaidRows = await d
+    .select({ paymentMethod: salesDocuments.paymentMethod, paid: salesDocuments.paidAmountCents, id: salesDocuments.id })
+    .from(salesDocuments)
+    .where(and(
+      gte(salesDocuments.docDate, fromDate),
+      lte(salesDocuments.docDate, toDate),
+      sql`${salesDocuments.paidAmountCents} > 0`,
+      or(eq(salesDocuments.docType, "BL"), eq(salesDocuments.docType, "FACTURE")),
+      or(eq(salesDocuments.status, "VALIDE"), eq(salesDocuments.status, "PAYE"))
+    ));
+  const paidByDoc = new Map<string, { count: number; amountCents: number }>();
+  const addPaid = (method: string, amount: number, count: number) => {
+    const e = paidByDoc.get(method) ?? { count: 0, amountCents: 0 };
+    e.count += count; e.amountCents += amount;
+    paidByDoc.set(method, e);
+  };
+  for (const e of encaissements) addPaid(e.method, Number(e.amountCents), Number(e.count));
+  for (const doc of docPaidRows) {
+    const linked = (await d
+      .select({ s: sql<number>`coalesce(sum(${customerPayments.amountCents}),0)::bigint` })
+      .from(customerPayments)
+      .where(and(eq(customerPayments.documentId, doc.id), ne(customerPayments.status, "REJETE"))))[0];
+    const residual = doc.paid - Number(linked.s);
+    if (residual > 0) addPaid(doc.paymentMethod, residual, 1);
+  }
+
   const decaissements = await d
     .select({
       method: supplierPayments.paymentMethod,
@@ -490,7 +519,7 @@ export async function getDailySheet(from: string, to: string): Promise<DailyShee
       eq(salesDocuments.status, "ANNULE")
     ));
 
-  const especesIn = encaissements.find((e) => e.method === "ESPECES")?.amountCents ?? 0;
+  const especesIn = paidByDoc.get("ESPECES")?.amountCents ?? 0;
   const especesOut = decaissements.find((e) => e.method === "ESPECES")?.amountCents ?? 0;
 
   return {
@@ -503,7 +532,7 @@ export async function getDailySheet(from: string, to: string): Promise<DailyShee
       totalHtCents: Number(s.totalHtCents),
       tvaCents: Number(s.tvaCents),
     })),
-    encaissements: encaissements.map((e) => ({ method: e.method, count: Number(e.count), amountCents: Number(e.amountCents) })),
+    encaissements: [...paidByDoc.entries()].map(([method, e]) => ({ method, count: e.count, amountCents: e.amountCents })),
     decaissements: decaissements.map((e) => ({ method: e.method, count: Number(e.count), amountCents: Number(e.amountCents) })),
     expensesCents: Number(exp?.total ?? 0),
     expenseCount: Number(exp?.count ?? 0),
