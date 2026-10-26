@@ -485,7 +485,7 @@ export async function getDailySheet(from: string, to: string): Promise<DailyShee
       .from(customerPayments)
       .where(and(eq(customerPayments.documentId, doc.id), ne(customerPayments.status, "REJETE"))))[0];
     const residual = doc.paid - Number(linked.s);
-    if (residual > 0) addPaid(doc.paymentMethod, residual, 1);
+    if (residual > 0) addPaid(doc.paymentMethod ?? "ESPECES", residual, 1);
   }
 
   const decaissements = await d
