@@ -32,7 +32,9 @@ export function ClientImportModal({ isOpen, onClose, onImported }: { isOpen: boo
     const lines = text.split(/\r?\n/).filter((l) => l.trim());
     if (lines.length < 2) { setError("Fichier vide ou sans lignes de données"); return; }
     const sep = lines[0].includes(";") ? ";" : ",";
-    const heads = lines[0].toLowerCase().split(sep).map((h) => h.trim().replace(/\s+/g, "_"));
+    const heads = lines[0].toLowerCase().split(sep).map((h) =>
+      h.trim().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, "_")
+    );
     const mapping = heads.map((h) => HEADERS[h] ?? null);
     setUnmapped(heads.filter((_, i) => !mapping[i] && i > 0));
     if (!mapping.includes("name")) { setError("Colonne 'nom' introuvable — en-têtes attendus : nom;téléphone;ville;ice"); return; }
