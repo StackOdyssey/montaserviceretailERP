@@ -10,7 +10,7 @@ export interface CategoryItem {
   sortOrder: number;
 }
 import { applyMovement, type CmupState } from "@/lib/stock";
-import { assertAuthenticated, currentActor } from "@/lib/action-guard";
+import { assertAuthenticated, assertOwner, currentActor } from "@/lib/action-guard";
 import { lockProducts } from "@/lib/stock-lock";
 import { bumpWarehouseStock } from "@/lib/warehouse";
 import { validateInput, saveProductSchema, recordStockMovementSchema } from "@/lib/action-validation";
@@ -264,6 +264,29 @@ export async function saveProduct(data: {
   businessLineCode?: string;
 }): Promise<ActionResult<ProductItem>> {
   return actionResult(() => saveProductImpl(data));
+}
+
+/**
+ * Retire une pièce du catalogue (archivage : is_active=false). Pas de suppression
+ * physique : BL/factures/mouvements historiques gardent leur référence.
+ */
+export async function archiveProduct(productId: number): Promise<ActionResult<{ id: number }>> {
+  return actionResult(async () => {
+    await assertOwner();
+    if (!db) throw new Error("BASE_INDISPONIBLE");
+    const p = (await db.select({ id: products.id, sku: products.sku, name: products.name, stock: products.currentStock })
+      .from(products).where(eq(products.id, productId)).limit(1))[0];
+    if (!p) throw new Error("Pièce introuvable");
+    await db.update(products).set({ isActive: false, updatedAt: new Date() }).where(eq(products.id, productId));
+    await db.insert(auditLogs).values({
+      action: "ARCHIVAGE_PRODUIT",
+      entityType: "PRODUCT",
+      entityId: p.id,
+      actorName: await currentActor(),
+      details: `${p.sku} — ${p.name} retiré du catalogue (stock au retrait : ${p.stock})`,
+    });
+    return { id: p.id };
+  });
 }
 
 export async function recordStockMovement(data: {

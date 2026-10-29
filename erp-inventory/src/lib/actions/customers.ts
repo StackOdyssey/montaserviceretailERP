@@ -1,9 +1,10 @@
 "use server";
 
-import { and, asc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import { auditLogs, customerPayments, customers, db, salesDocuments } from "@/db";
 import { assertAuthenticated, currentActor } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
+import { convertedBlIds, receivableSign } from "@/lib/sales/receivables";
 import { initialStatusFor, statusesForMethod } from "@/lib/payments";
 import { matchTokens } from "@/lib/search";
 import { getSalesDocuments, type SalesDocumentItem } from "./sales";
@@ -151,15 +152,26 @@ export async function getCustomers(searchQuery?: string) {
     .orderBy(asc(customers.name))
     .limit(500);
 
-  const billedRows = await d
+  const docRows = await d
     .select({
+      id: salesDocuments.id,
       customerId: salesDocuments.customerId,
-      billed: sql<string>`coalesce(sum(${salesDocuments.totalTtcCents}),0)::bigint`,
-      unpaid: sql<number>`count(*) filter (where ${salesDocuments.status} <> 'PAYE')::int`,
+      docType: salesDocuments.docType,
+      status: salesDocuments.status,
+      ttc: salesDocuments.totalTtcCents,
     })
     .from(salesDocuments)
-    .where(and(isNull(salesDocuments.deletedAt), ne(salesDocuments.status, "ANNULE")))
-    .groupBy(salesDocuments.customerId);
+    .where(and(isNull(salesDocuments.deletedAt), ne(salesDocuments.status, "ANNULE"), isNotNull(salesDocuments.customerId)));
+  const converted = await convertedBlIds();
+  const billedMap = new Map<number | null, { billed: number; unpaid: number }>();
+  for (const r of docRows) {
+    const sign = receivableSign(r.docType, r.id, converted);
+    if (sign === 0) continue;
+    const e = billedMap.get(r.customerId) ?? { billed: 0, unpaid: 0 };
+    e.billed += sign * r.ttc;
+    if (sign === 1 && r.status !== "PAYE") e.unpaid += 1;
+    billedMap.set(r.customerId, e);
+  }
 
   const paidRows = await d
     .select({
@@ -170,7 +182,6 @@ export async function getCustomers(searchQuery?: string) {
     .where(ne(customerPayments.status, "REJETE"))
     .groupBy(customerPayments.customerId);
 
-  const billedMap = new Map(billedRows.map((r) => [r.customerId, { billed: Number(r.billed), unpaid: r.unpaid }]));
   const paidMap = new Map(paidRows.map((r) => [r.customerId, Number(r.paid)]));
 
   return rows.map((r) => {
@@ -199,10 +210,14 @@ export async function getCustomerStatement(customerId: number): Promise<Customer
   if (!row) return null;
   const customer = mapCustomer(row);
 
-  const allDocs = await getSalesDocuments();
+  const allDocs = await getSalesDocuments({ customerId, limit: 500 });
+  const converted = await convertedBlIds();
   const documents = allDocs
-    .filter((doc) => doc.customerId === customerId && doc.status !== "ANNULE")
-    .map((doc) => ({ ...doc, remainingDueCents: Math.max(0, doc.totalTtcCents - doc.paidAmountCents) }));
+    .filter((doc) => doc.status !== "ANNULE")
+    .map((doc) => {
+      const sign = receivableSign(doc.docType, doc.id, converted);
+      return { ...doc, remainingDueCents: sign === 1 ? Math.max(0, doc.totalTtcCents - doc.paidAmountCents) : 0 };
+    });
 
   const paymentRows = await d
     .select()
@@ -213,16 +228,21 @@ export async function getCustomerStatement(customerId: number): Promise<Customer
   const docNumbers = new Map(allDocs.map((doc) => [doc.id, doc.docNumber]));
   const payments = paymentRows.map((p) => mapPayment(p, customer.name, p.documentId ? docNumbers.get(p.documentId) ?? null : null));
 
-  const totalBilledTtcCents = documents.reduce((s, doc) => s + doc.totalTtcCents, 0);
+  const totalBilledTtcCents = documents.reduce(
+    (s, doc) => s + receivableSign(doc.docType, doc.id, converted) * doc.totalTtcCents,
+    0
+  );
   const totalPaidCents = payments.filter((p) => p.status !== "REJETE").reduce((s, p) => s + p.amountCents, 0);
-  const unpaidDocumentsCount = documents.filter((doc) => doc.status !== "PAYE").length;
+  const unpaidDocumentsCount = documents.filter((doc) => doc.remainingDueCents > 0).length;
 
   // Relevé de compte (débit/crédit/solde) : factures = débit, avoirs + règlements = crédit.
   const entries: Array<{ date: string; label: string; debit: number; credit: number }> = [];
   for (const doc of documents) {
-    if (doc.docType === "FACTURE") {
-      entries.push({ date: doc.docDate, label: `Facture ${doc.docNumber}`, debit: doc.totalTtcCents, credit: 0 });
-    } else if (doc.docType === "AVOIR") {
+    const sign = receivableSign(doc.docType, doc.id, converted);
+    if (sign === 1) {
+      const label = doc.docType === "FACTURE" ? "Facture" : "BL";
+      entries.push({ date: doc.docDate, label: `${label} ${doc.docNumber}`, debit: doc.totalTtcCents, credit: 0 });
+    } else if (sign === -1) {
       entries.push({ date: doc.docDate, label: `Avoir ${doc.docNumber}`, debit: 0, credit: doc.totalTtcCents });
     }
   }
@@ -344,9 +364,12 @@ async function recordCustomerPaymentImpl(data: {
           )
           .orderBy(asc(salesDocuments.docDate));
 
+    const convertedPay = await convertedBlIds();
     let remaining = data.amountCents;
     for (const doc of targetDocs) {
       if (remaining <= 0) break;
+      // Seules les créances (BL non facturé / FACTURE) se lettrent : pas de DEVIS/BC/AVOIR.
+      if (receivableSign(doc.docType, doc.id, convertedPay) !== 1) continue;
       const unpaidOnDoc = Math.max(0, doc.totalTtcCents - doc.paidAmountCents);
       const allocated = Math.min(unpaidOnDoc, remaining);
       if (allocated <= 0) continue;
@@ -689,8 +712,10 @@ export async function getCustomerAging(): Promise<{ rows: PartyAgingRow[]; total
   const now = Date.now();
 
   const map = new Map<number, { name: string; buckets: AgingBuckets; count: number; oldest: Date | null }>();
+  const convertedAging = await convertedBlIds();
   for (const doc of docs) {
     if (!doc.customerId) continue;
+    if (receivableSign(doc.docType, doc.id, convertedAging) !== 1) continue;
     const remaining = Math.max(0, doc.totalTtcCents - doc.paidAmountCents);
     if (remaining <= 0) continue;
     const date = new Date(doc.docDate ?? doc.createdAt ?? new Date());

@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Camera, Check, AlertCircle } from "lucide-react";
-import { ProductItem, saveProduct } from "@/lib/actions/products";
+import { X, Camera, Check, AlertCircle, Archive } from "lucide-react";
+import { ProductItem, saveProduct, archiveProduct } from "@/lib/actions/products";
+import { unwrap } from "@/lib/action-result";
 import { compressImageToWebP } from "@/lib/image-compressor";
 import { getPhotoUploadUrl } from "@/lib/actions/media";
 import { toCentimes, toDirhams } from "@/lib/money";
@@ -13,6 +14,7 @@ interface ProductModalProps {
   onClose: () => void;
   onSave: (product: Parameters<typeof saveProduct>[0]) => Promise<void>;
   productToEdit?: ProductItem | null;
+  onArchived?: () => void;
 }
 
 export function ProductModal({
@@ -20,6 +22,7 @@ export function ProductModal({
   onClose,
   onSave,
   productToEdit,
+  onArchived,
 }: ProductModalProps) {
   const company = useSettings();
   const [sku, setSku] = useState("");
@@ -446,6 +449,24 @@ export function ProductModal({
 
           {/* Pied du formulaire */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E5E7EB]">
+            {productToEdit && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!confirm(`Retirer « ${productToEdit.name} » du catalogue ? L'historique est conservé.`)) return;
+                  try {
+                    unwrap(await archiveProduct(productToEdit.id));
+                    onClose();
+                    onArchived?.();
+                  } catch (err) {
+                    setErrorMessage((err as Error).message);
+                  }
+                }}
+                className="mr-auto flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+              >
+                <Archive size={14} /> Retirer du catalogue
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}

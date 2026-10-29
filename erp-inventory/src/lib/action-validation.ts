@@ -57,6 +57,9 @@ export const createSalesDocumentSchema = z.object({
   idempotencyKey: z.string().trim().min(8).max(64).optional(),
   commercialId: id.nullish(),
   livreurId: id.nullish(),
+  paymentReference: z.string().max(80).optional(),
+  paymentDueDate: z.string().max(30).optional(),
+  paymentBankName: z.string().max(80).optional(),
 });
 
 export const createSupplierReceiptSchema = z.object({

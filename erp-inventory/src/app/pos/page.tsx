@@ -222,6 +222,9 @@ export default function POSPage() {
         notes,
         businessLineCode,
         idempotencyKey: idempotencyKeyRef.current ?? undefined,
+        paymentReference: paymentData.chequeDetails?.chequeNumber,
+        paymentDueDate: paymentData.chequeDetails?.encaissementDate || undefined,
+        paymentBankName: paymentData.chequeDetails?.bankName,
       });
       if (!res.ok) {
         setErrorMessage(res.error);

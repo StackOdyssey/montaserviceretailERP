@@ -441,7 +441,11 @@ export async function getDailySheet(from: string, to: string): Promise<DailyShee
     .where(and(
       gte(salesDocuments.docDate, fromDate),
       lte(salesDocuments.docDate, toDate),
-      or(eq(salesDocuments.status, "VALIDE"), eq(salesDocuments.status, "PAYE"))
+      or(eq(salesDocuments.status, "VALIDE"), eq(salesDocuments.status, "PAYE")),
+      // Chiffre d'affaires : BL/FACTURE (− AVOIR). DEVIS/BC ne sont pas des ventes ;
+      // une facture issue de BL ne recompte pas une vente déjà comptée au BL.
+      or(eq(salesDocuments.docType, "BL"), eq(salesDocuments.docType, "FACTURE"), eq(salesDocuments.docType, "AVOIR")),
+      sql`not exists (select 1 from document_links dl where dl.target_document_id = ${salesDocuments.id} and dl.link_type = 'BL_TO_FAC')`
     ))
     .groupBy(salesDocuments.docType);
 
@@ -469,7 +473,12 @@ export async function getDailySheet(from: string, to: string): Promise<DailyShee
       gte(salesDocuments.docDate, fromDate),
       lte(salesDocuments.docDate, toDate),
       sql`${salesDocuments.paidAmountCents} > 0`,
+      // Seules les ventes comptoir anonymes n'ont pas de ligne customer_payments
+      // (client identifié ⇒ règlement enregistré à la vente) ; un BL soldé par lettrage
+      // FIFO ne doit pas être recompté.
+      isNull(salesDocuments.customerId),
       or(eq(salesDocuments.docType, "BL"), eq(salesDocuments.docType, "FACTURE")),
+      sql`not exists (select 1 from document_links dl where dl.target_document_id = ${salesDocuments.id} and dl.link_type = 'BL_TO_FAC')`,
       or(eq(salesDocuments.status, "VALIDE"), eq(salesDocuments.status, "PAYE"))
     ));
   const paidByDoc = new Map<string, { count: number; amountCents: number }>();
@@ -525,13 +534,16 @@ export async function getDailySheet(from: string, to: string): Promise<DailyShee
   return {
     from,
     to,
-    sales: sales.map((s) => ({
-      docType: s.docType,
-      count: Number(s.count),
-      totalTtcCents: Number(s.totalTtcCents),
-      totalHtCents: Number(s.totalHtCents),
-      tvaCents: Number(s.tvaCents),
-    })),
+    sales: sales.map((s) => {
+      const sign = s.docType === "AVOIR" ? -1 : 1;
+      return {
+        docType: s.docType,
+        count: Number(s.count),
+        totalTtcCents: sign * Number(s.totalTtcCents),
+        totalHtCents: sign * Number(s.totalHtCents),
+        tvaCents: sign * Number(s.tvaCents),
+      };
+    }),
     encaissements: [...paidByDoc.entries()].map(([method, e]) => ({ method, count: e.count, amountCents: e.amountCents })),
     decaissements: decaissements.map((e) => ({ method: e.method, count: Number(e.count), amountCents: Number(e.amountCents) })),
     expensesCents: Number(exp?.total ?? 0),

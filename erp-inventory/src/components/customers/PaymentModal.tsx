@@ -56,6 +56,20 @@ export function PaymentModal({
   const [customerDocs, setCustomerDocs] = useState<Array<{ id: number; docNumber: string; remainingDueCents: number }>>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Le modal reste monté : resynchroniser client/document ciblés à chaque ouverture
+  // (sinon l'état initial du 1er rendu est conservé → encaissement sur le mauvais client).
+  const [prevOpenKey, setPrevOpenKey] = useState<string | null>(null);
+  const openKey = isOpen ? `${preselectedCustomerId ?? ""}:${preselectedDocId ?? ""}` : null;
+  if (openKey !== prevOpenKey) {
+    setPrevOpenKey(openKey);
+    if (isOpen) {
+      const fallback = customers[0]?.id;
+      const target = preselectedCustomerId ?? fallback;
+      if (target) setSelectedCustomerId(target);
+      setTargetDocId(preselectedDocId ? preselectedDocId.toString() : "AUTO");
+      setError(null);
+    }
+  }
 
   // Charger les documents impayés du client sélectionné pour lettrage direct
   useEffect(() => {

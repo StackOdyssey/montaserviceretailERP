@@ -27,7 +27,7 @@ export function StaffSection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleAdd = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     setSaving(true);
@@ -69,7 +69,12 @@ export function StaffSection() {
         </div>
       </div>
 
-      <form onSubmit={handleAdd} className="px-5 py-4 flex flex-wrap items-end gap-3 border-b border-gray-100">
+      <div
+        // Pas de <form> : la section est rendue DANS le formulaire Paramètres (formulaires imbriqués
+        // = HTML invalide → « Ajouter » soumettait le formulaire parent au lieu d'ajouter le staff).
+        onKeyDown={(e) => { if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") { e.preventDefault(); handleAdd(e); } }}
+        className="px-5 py-4 flex flex-wrap items-end gap-3 border-b border-gray-100"
+      >
         <div className="flex-1 min-w-[160px]">
           <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Nom</label>
           <input
@@ -92,14 +97,15 @@ export function StaffSection() {
           </select>
         </div>
         <button
-          type="submit"
+          type="button"
+          onClick={handleAdd}
           disabled={saving || !name.trim()}
           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition disabled:opacity-50 flex items-center gap-1.5"
         >
           <UserPlus className="w-3.5 h-3.5" />
           {saving ? "Ajout…" : "Ajouter"}
         </button>
-      </form>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2">
         {[
@@ -118,6 +124,7 @@ export function StaffSection() {
                     {s.name}
                   </span>
                   <button
+                    type="button"
                     onClick={() => toggle(s)}
                     className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                       s.isActive

@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, desc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import {
   auditLogs,
   businessLineDocumentSettings,
@@ -27,7 +27,7 @@ import {
   type DocumentPrintContext,
   type CompanyPrintInfo,
 } from "@/lib/sales/shared";
-import { actionResult, type ActionResult } from "@/lib/action-result";
+import { actionResult, BusinessError, type ActionResult } from "@/lib/action-result";
 import { PREP_TRANSITIONS } from "@/lib/prep";
 import { Resend } from "resend";
 
@@ -210,8 +210,24 @@ async function convertBlToFactureImpl(
   const sameCustomer = active.every((b) => b.customerId === head.customerId);
   if (!sameCustomer) throw new Error("Les BL doivent concerner le même client");
 
-  const totalBrutHt = srcLines.reduce((s, l) => s + l.totalHtCents, 0);
-  const tvaAmount = srcLines.reduce((s, l) => s + Math.round((l.totalHtCents * l.tvaRate) / 100), 0);
+  // Un BL ne se facture qu'une fois (sinon facture en double + créance doublée).
+  const already = await d
+    .select({ id: documentLinks.sourceDocumentId })
+    .from(documentLinks)
+    .where(and(inArray(documentLinks.sourceDocumentId, active.map((b) => b.id)), eq(documentLinks.linkType, "BL_TO_FAC")));
+  if (already.length > 0) {
+    const nums = active.filter((b) => already.some((a) => a.id === b.id)).map((b) => b.docNumber).join(", ");
+    throw new BusinessError(`BL_DEJA_FACTURE: ${nums} déjà converti(s) en facture.`);
+  }
+
+  // Totaux repris des BL (remise pied de document + règlements inclus) : la facture
+  // doit reproduire exactement ce qui a été livré/encaissé.
+  const totalBrutHt = active.reduce((s, b) => s + b.totalBrutHtCents, 0);
+  const discountAmount = active.reduce((s, b) => s + b.discountAmountCents, 0);
+  const totalNetHt = active.reduce((s, b) => s + b.totalNetHtCents, 0);
+  const tvaAmount = active.reduce((s, b) => s + b.tvaAmountCents, 0);
+  const totalTtc = active.reduce((s, b) => s + b.totalTtcCents, 0);
+  const paidAmount = Math.min(totalTtc, active.reduce((s, b) => s + b.paidAmountCents, 0));
 
   // Régime au moment de la conversion : non-assujetti ⇒ facture masquée + mention.
   const liableRow = (
@@ -244,15 +260,15 @@ async function convertBlToFactureImpl(
           customerCity: head.customerCity,
           customerIce: head.customerIce,
           docDate: new Date(),
-          status: "VALIDE",
+          status: paidAmount >= totalTtc ? "PAYE" : "VALIDE",
           totalBrutHtCents: totalBrutHt,
-          discountPercent: 0,
-          discountAmountCents: 0,
-          totalNetHtCents: totalBrutHt,
+          discountPercent: active.length === 1 ? head.discountPercent : 0,
+          discountAmountCents: discountAmount,
+          totalNetHtCents: totalNetHt,
           tvaRate: head.tvaRate ?? 20,
           tvaAmountCents: tvaAmount,
-          totalTtcCents: totalBrutHt + tvaAmount,
-          paidAmountCents: 0,
+          totalTtcCents: totalTtc,
+          paidAmountCents: paidAmount,
           paymentMethod: head.paymentMethod,
           notes: convNotes,
           vatDisplay: convVatLiable ? "SHOWN" : "HIDDEN",
@@ -289,7 +305,7 @@ async function convertBlToFactureImpl(
       entityType: "FACTURE",
       actorName: await currentActor(),
       entityId: docId,
-      details: `Facture ${docNumber} issue des BL : ${active.map((b) => b.docNumber).join(", ")} — ${((totalBrutHt + tvaAmount) / 100).toFixed(2)} DH TTC`,
+      details: `Facture ${docNumber} issue des BL : ${active.map((b) => b.docNumber).join(", ")} — ${(totalTtc / 100).toFixed(2)} DH TTC`,
     });
   });
 

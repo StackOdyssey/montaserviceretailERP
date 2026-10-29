@@ -203,7 +203,7 @@ export default function ReglementsPage() {
           }`}
         >
           <Clock className="w-4 h-4" />
-          Échéancier Chèques & Effets ({chequesSchedule.filter((c) => c.status === "EN_ATTENTE").length})
+          Échéancier Chèques & Effets ({chequesSchedule.filter((c) => !isTerminalStatus(c.status)).length})
         </button>
       </div>
 

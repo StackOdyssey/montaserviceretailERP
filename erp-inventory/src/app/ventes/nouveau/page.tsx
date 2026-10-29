@@ -89,6 +89,9 @@ export default function NouveauBonDeLivraisonPage() {
   const [paymentMethod, setPaymentMethod] = useState<
     "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT" | "A_CREDIT"
   >("ESPECES");
+  const [payRef, setPayRef] = useState("");
+  const [payDueDate, setPayDueDate] = useState("");
+  const [payBank, setPayBank] = useState("");
 
   // Clé d'idempotence par panier : un retry/double-clic renvoie le doc créé
   // au lieu d'un doublon. Régénérée après chaque validation réussie.
@@ -290,6 +293,9 @@ export default function NouveauBonDeLivraisonPage() {
         notes: notes.trim() || undefined,
         businessLineCode,
         idempotencyKey: idempotencyKeyRef.current ?? undefined,
+        paymentReference: payRef.trim() || undefined,
+        paymentDueDate: payDueDate || undefined,
+        paymentBankName: payBank.trim() || undefined,
         commercialId,
         livreurId,
       });
@@ -816,6 +822,16 @@ export default function NouveauBonDeLivraisonPage() {
                   </button>
                 ))}
               </div>
+              {(paymentMethod === "CHEQUE" || paymentMethod === "EFFET_LCN") && (
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  <input value={payRef} onChange={(e) => setPayRef(e.target.value)} placeholder="N° chèque / effet"
+                    className="px-2.5 py-2 bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl text-xs" />
+                  <input type="date" value={payDueDate} onChange={(e) => setPayDueDate(e.target.value)} title="Date d'échéance"
+                    className="px-2.5 py-2 bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl text-xs" />
+                  <input value={payBank} onChange={(e) => setPayBank(e.target.value)} placeholder="Banque"
+                    className="px-2.5 py-2 bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl text-xs" />
+                </div>
+              )}
             </div>
 
             {/* ATTRIBUTION : COMMERCIAL + LIVREUR (optionnel) */}

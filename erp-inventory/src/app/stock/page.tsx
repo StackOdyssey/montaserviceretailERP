@@ -71,7 +71,7 @@ export default function StockCataloguePage() {
   }, []);
 
   useEffect(() => {
-    if (warehouseFilter == null) { setWhStock({}); return; }
+    if (warehouseFilter == null) return; // vue globale : whStock n'est pas lu
     getWarehouseStockMap(warehouseFilter).then((r) => setWhStock(unwrap(r))).catch(() => setWhStock({}));
   }, [warehouseFilter]);
 
@@ -519,6 +519,7 @@ export default function StockCataloguePage() {
         onClose={() => setIsProductModalOpen(false)}
         onSave={handleSaveProduct}
         productToEdit={productToEdit}
+        onArchived={() => fetchProducts(page)}
       />
 
       <StockAdjustmentModal

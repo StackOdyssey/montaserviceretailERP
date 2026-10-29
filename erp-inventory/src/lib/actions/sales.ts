@@ -22,6 +22,7 @@ import { assertAuthenticated, currentActor } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
 import { lockProducts } from "@/lib/stock-lock";
 import { bumpWarehouseStock } from "@/lib/warehouse";
+import { initialStatusFor } from "@/lib/payments";
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { validateInput, createSalesDocumentSchema } from "@/lib/action-validation";
 import {
@@ -48,12 +49,14 @@ type SalesDocFilters = {
   docType?: "BL" | "FACTURE" | "AVOIR" | "BC" | "DEVIS";
   search?: string;
   status?: string;
+  customerId?: number;
 };
 
 function salesDocConds(options?: SalesDocFilters) {
   const conds = [isNull(salesDocuments.deletedAt)];
   if (options?.docType) conds.push(eq(salesDocuments.docType, options.docType));
   if (options?.status && options.status !== "ALL") conds.push(eq(salesDocuments.status, options.status));
+  if (options?.customerId) conds.push(eq(salesDocuments.customerId, options.customerId));
   const search = options?.search?.trim();
   if (search) {
     const like = `%${search}%`;
@@ -190,6 +193,10 @@ export async function createSalesDocument(data: {
   idempotencyKey?: string;
   commercialId?: number | null;
   livreurId?: number | null;
+  /** Chèque / effet remis à la vente : alimente l'échéancier (customer_payments). */
+  paymentReference?: string;
+  paymentDueDate?: string;
+  paymentBankName?: string;
 }): Promise<SalesDocResult> {
   await assertAuthenticated();
   try {
@@ -467,6 +474,25 @@ export async function createSalesDocument(data: {
           .where(eq(products.id, e.productId));
         await bumpWarehouseStock(tx, e.productId, e.quantity);
       }
+    }
+
+    // Règlement à la vente (client identifié) : une ligne customer_payments liée au
+    // document — sinon soldes clients, relevés et échéancier ignorent le paiement
+    // (doc PAYE mais client « débiteur », chèque absent de l'échéancier).
+    const paidAtSale = isFullyPaid ? totals.totalTTC : data.paidAmountCents ?? 0;
+    if (data.customerId && affectsStock && paidAtSale > 0 && data.paymentMethod !== "A_CREDIT") {
+      const deferred = data.paymentMethod === "CHEQUE" || data.paymentMethod === "EFFET_LCN";
+      await tx.insert(customerPayments).values({
+        customerId: data.customerId,
+        documentId: docId,
+        amountCents: paidAtSale,
+        paymentMethod: data.paymentMethod,
+        referenceNumber: data.paymentReference?.trim() || null,
+        chequeDueDate: deferred ? new Date(data.paymentDueDate || Date.now()) : null,
+        bankName: data.paymentBankName?.trim() || null,
+        status: initialStatusFor(data.paymentMethod),
+        notes: `Règlement à la vente ${docNumber}`,
+      });
     }
 
     // Acomptes clients (question ouverte Acomptes-Q19, réponse : oui) : impute les
