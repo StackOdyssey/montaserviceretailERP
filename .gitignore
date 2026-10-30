@@ -29,3 +29,11 @@ node_modules/
 
 # Agent tooling config (Devin CLI MCP servers, local-only)
 .devin/
+
+# Personal data + audit reports (never commit)
+legacy_clients_fournisseurs.txt
+clients_import.csv
+CODEBASE_AUDIT_*.md
+TEST_AUDIT_*.md
+AUDIT_BUGS_AND_FIXES_INSTRUCTIONS.md
+erp-inventory/AUDIT_BUGS_AND_FIXES_INSTRUCTIONS.md

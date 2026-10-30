@@ -33,6 +33,8 @@ import { PREP_STATUS_LABELS, PREP_TRANSITIONS } from "@/lib/prep";
 import { unwrap } from "@/lib/action-result";
 import { formatMoney } from "@/lib/money";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
+import { AvoirTypeModal, type AvoirType } from "@/components/sales/AvoirTypeModal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useSettings } from "@/components/layout/SettingsProvider";
 import { useToast } from "@/components/ui/ToastProvider";
 
@@ -64,6 +66,9 @@ export default function VentesListPage() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [selectedDoc, setSelectedDoc] = useState<SalesDocumentItem | null>(null);
+  const [avoirTargetDoc, setAvoirTargetDoc] = useState<SalesDocumentItem | null>(null);
+  const [convertTargetDoc, setConvertTargetDoc] = useState<SalesDocumentItem | null>(null);
+  const [cancelTargetDoc, setCancelTargetDoc] = useState<SalesDocumentItem | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [isLoading, startTransition] = useTransition();
   const filtersKeyRef = useRef("");
@@ -123,35 +128,11 @@ export default function VentesListPage() {
     });
   };
 
-  const handleConvert = (doc: SalesDocumentItem) => {
-    if (!confirm(`Convertir le ${doc.docNumber} en facture ?`)) return;
-    runAction(doc, async () => unwrap(await convertBlToFacture([doc.id])));
-  };
+  const handleConvert = (doc: SalesDocumentItem) => setConvertTargetDoc(doc);
 
-  const handleAvoir = (doc: SalesDocumentItem) => {
-    const choice = window.prompt(
-      `Type d'avoir pour ${doc.docNumber} :\n1 = Retour (marchandise reprise en stock)\n2 = Commercial (geste, sans reprise)\n3 = Correction (erreur de facturation)`,
-      "1"
-    );
-    if (choice === null) return;
-    const avType: "RETOUR" | "COMMERCIAL" | "CORRECTION" =
-      choice.trim() === "2" ? "COMMERCIAL" : choice.trim() === "3" ? "CORRECTION" : "RETOUR";
-    const label =
-      avType === "RETOUR" ? "retour, stock réintégré" : avType === "COMMERCIAL" ? "geste commercial" : "correction";
-    if (!confirm(`Créer un avoir total (${label}) sur ${doc.docNumber} ?`)) return;
-    runAction(doc, async () =>
-      unwrap(await createAvoir({
-        sourceDocumentId: doc.id,
-        returns: doc.lines.map((l) => ({ lineId: l.id, quantity: l.quantity })),
-        avType,
-      }))
-    );
-  };
+  const handleAvoir = (doc: SalesDocumentItem) => setAvoirTargetDoc(doc);
 
-  const handleCancel = (doc: SalesDocumentItem) => {
-    if (!confirm(`Annuler le ${doc.docNumber} ? L'opération est irréversible.`)) return;
-    runAction(doc, async () => unwrap(await cancelDocument(doc.id, "Annulation manuelle")));
-  };
+  const handleCancel = (doc: SalesDocumentItem) => setCancelTargetDoc(doc);
 
   const handleCreateBp = (doc: SalesDocumentItem) => {
     runAction(doc, async () => unwrap(await createBonPreparation(doc.id)));
@@ -439,6 +420,53 @@ export default function VentesListPage() {
       </div>
 
       {selectedDoc && <DocumentPrintView document={selectedDoc} onClose={() => setSelectedDoc(null)} />}
+
+      {avoirTargetDoc && (
+        <AvoirTypeModal
+          docNumber={avoirTargetDoc.docNumber}
+          onCancel={() => setAvoirTargetDoc(null)}
+          onConfirm={(avType: AvoirType) => {
+            const doc = avoirTargetDoc;
+            setAvoirTargetDoc(null);
+            runAction(doc, async () =>
+              unwrap(await createAvoir({
+                sourceDocumentId: doc.id,
+                returns: doc.lines.map((l) => ({ lineId: l.id, quantity: l.quantity })),
+                avType,
+              }))
+            );
+          }}
+        />
+      )}
+
+      {convertTargetDoc && (
+        <ConfirmDialog
+          title="Convertir en facture"
+          message={`Convertir le ${convertTargetDoc.docNumber} en facture ?`}
+          confirmLabel="Convertir"
+          onCancel={() => setConvertTargetDoc(null)}
+          onConfirm={() => {
+            const doc = convertTargetDoc;
+            setConvertTargetDoc(null);
+            runAction(doc, async () => unwrap(await convertBlToFacture([doc.id])));
+          }}
+        />
+      )}
+
+      {cancelTargetDoc && (
+        <ConfirmDialog
+          title="Annuler le document"
+          message={`Annuler le ${cancelTargetDoc.docNumber} ? L'opération est irréversible.`}
+          confirmLabel="Annuler le document"
+          danger
+          onCancel={() => setCancelTargetDoc(null)}
+          onConfirm={() => {
+            const doc = cancelTargetDoc;
+            setCancelTargetDoc(null);
+            runAction(doc, async () => unwrap(await cancelDocument(doc.id, "Annulation manuelle")));
+          }}
+        />
+      )}
     </div>
   );
 }

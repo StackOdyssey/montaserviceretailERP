@@ -205,7 +205,7 @@ export function PaymentModal({
 
               <div>
                 <label className="text-xs text-gray-600 mb-1 block">Nom de la banque *</label>
-                <input
+                <input id="bankName" name="bankName" aria-label="Nom de la banque"
                   type="text"
                   value={chequeDetails.bankName}
                   onChange={(e) =>
@@ -218,7 +218,7 @@ export function PaymentModal({
 
               <div>
                 <label className="text-xs text-gray-600 mb-1 block">Numéro de chèque *</label>
-                <input
+                <input id="chequeNumber" name="chequeNumber" aria-label="Numéro de chèque"
                   type="text"
                   value={chequeDetails.chequeNumber}
                   onChange={(e) =>
@@ -232,7 +232,7 @@ export function PaymentModal({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-gray-600 mb-1 block">Date d&apos;émission</label>
-                  <input
+                  <input id="issueDate" name="issueDate" aria-label="Date d’émission"
                     type="date"
                     value={chequeDetails.issueDate}
                     onChange={(e) =>
@@ -243,7 +243,7 @@ export function PaymentModal({
                 </div>
                 <div>
                   <label className="text-xs text-gray-600 mb-1 block">Date encaissement</label>
-                  <input
+                  <input id="encaissementDate" name="encaissementDate" aria-label="Date d’encaissement"
                     type="date"
                     value={chequeDetails.encaissementDate}
                     onChange={(e) =>

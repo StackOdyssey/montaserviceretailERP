@@ -165,7 +165,7 @@ export function SupplierPaymentModal({
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
               Bénéficiaire (Fournisseur) <span className="text-[#F7162D]">*</span>
             </label>
-            <select
+            <select id="selectedSupplierId" name="selectedSupplierId" aria-label="Fournisseur"
               value={selectedSupplierId}
               onChange={(e) => setSelectedSupplierId(Number(e.target.value))}
               className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-[#F7162D]"
@@ -183,7 +183,7 @@ export function SupplierPaymentModal({
               Montant à décaisser (DH) <span className="text-[#F7162D]">*</span>
             </label>
             <div className="relative">
-              <input
+              <input id="amountDh" name="amountDh" aria-label="Montant en dirhams"
                 type="number"
                 step="0.01"
                 min="0.10"
@@ -227,7 +227,7 @@ export function SupplierPaymentModal({
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                     N° Pièce / Réf Chèque / LCN
                   </label>
-                  <input
+                  <input id="referenceNumber" name="referenceNumber" aria-label="Référence du règlement"
                     type="text"
                     value={referenceNumber}
                     onChange={(e) => setReferenceNumber(e.target.value)}
@@ -241,7 +241,7 @@ export function SupplierPaymentModal({
                     <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                       Date d&apos;échéance émise
                     </label>
-                    <input
+                    <input id="dueDate" name="dueDate" aria-label="Date d’échéance"
                       type="date"
                       value={dueDate}
                       onChange={(e) => setDueDate(e.target.value)}
@@ -255,7 +255,7 @@ export function SupplierPaymentModal({
                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                   Banque de tirage (BM Motors)
                 </label>
-                <select
+                <select id="bankName" name="bankName" aria-label="Banque de tirage"
                   value={bankName}
                   onChange={(e) => setBankName(e.target.value)}
                   className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-[#F7162D]"
@@ -274,7 +274,7 @@ export function SupplierPaymentModal({
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
               Remarques
             </label>
-            <input
+            <input id="notes" name="notes" aria-label="Notes"
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}

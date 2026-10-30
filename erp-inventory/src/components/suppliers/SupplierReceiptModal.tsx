@@ -374,7 +374,7 @@ export function SupplierReceiptModal({
                 <>
                   <div className="relative">
                     <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                    <input
+                    <input id="supplierSearch" name="supplierSearch" aria-label="Rechercher nom, contact, tél, ville…"
                       type="text"
                       value={supplierSearch}
                       onChange={(e) => handleSupplierSearchChange(e.target.value)}
@@ -414,7 +414,7 @@ export function SupplierReceiptModal({
                   )}
                   {/* Repli liste initiale */}
                   {!supplierSearch.trim() && (
-                    <select
+                    <select id="selectedSupplierId" name="selectedSupplierId" aria-label="Choisir un fournisseur"
                       value={selectedSupplierId ?? ""}
                       onChange={(e) =>
                         setSelectedSupplierId(e.target.value ? Number(e.target.value) : null)
@@ -443,7 +443,7 @@ export function SupplierReceiptModal({
 
               {showQuickCreate && (
                 <div className="mt-2 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 space-y-2">
-                  <input
+                  <input id="qcName" name="qcName" aria-label="Nom du fournisseur"
                     type="text"
                     value={qcName}
                     onChange={(e) => setQcName(e.target.value)}
@@ -451,14 +451,14 @@ export function SupplierReceiptModal({
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-semibold"
                   />
                   <div className="grid grid-cols-2 gap-2">
-                    <input
+                    <input id="qcContact" name="qcContact" aria-label="Contact commercial"
                       type="text"
                       value={qcContact}
                       onChange={(e) => setQcContact(e.target.value)}
                       placeholder="Contact commercial"
                       className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs"
                     />
-                    <input
+                    <input id="qcPhone" name="qcPhone" aria-label="Téléphone du fournisseur"
                       type="tel"
                       value={qcPhone}
                       onChange={(e) => setQcPhone(e.target.value)}
@@ -467,14 +467,14 @@ export function SupplierReceiptModal({
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <input
+                    <input id="qcCity" name="qcCity" aria-label="Ville du fournisseur"
                       type="text"
                       value={qcCity}
                       onChange={(e) => setQcCity(e.target.value)}
                       placeholder="Ville"
                       className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs"
                     />
-                    <input
+                    <input id="qcIce" name="qcIce" aria-label="ICE du fournisseur"
                       type="text"
                       value={qcIce}
                       onChange={(e) => setQcIce(e.target.value)}
@@ -517,7 +517,7 @@ export function SupplierReceiptModal({
               <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
                 N° Facture / BL Fournisseur
               </label>
-              <input
+              <input id="supplierInvoiceNumber" name="supplierInvoiceNumber" aria-label="Numéro de facture fournisseur"
                 type="text"
                 value={supplierInvoiceNumber}
                 onChange={(e) => setSupplierInvoiceNumber(e.target.value)}
@@ -553,7 +553,7 @@ export function SupplierReceiptModal({
                     className="p-3 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row items-start sm:items-center gap-3"
                   >
                     <div className="flex-1 w-full">
-                      <select
+                      <select id="productId" name="productId" aria-label="Produit"
                         value={line.productId}
                         onChange={(e) => handleProductChange(index, Number(e.target.value))}
                         className="w-full px-2.5 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-semibold"
@@ -571,7 +571,7 @@ export function SupplierReceiptModal({
                         <label className="block text-[10px] text-gray-400 font-semibold mb-0.5">
                           Qté Reçue
                         </label>
-                        <input
+                        <input id="quantity" name="quantity" aria-label="Quantité reçue"
                           type="number"
                           min="1"
                           value={line.quantity}
@@ -585,7 +585,7 @@ export function SupplierReceiptModal({
                           P.U. Achat HT
                         </label>
                         <div className="relative">
-                          <input
+                          <input id="unitCostDh" name="unitCostDh" aria-label="Coût unitaire en dirhams"
                             type="text"
                             value={line.unitCostDh}
                             onChange={(e) => handleCostChange(index, e.target.value)}
@@ -642,7 +642,7 @@ export function SupplierReceiptModal({
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
               Notes de réception
             </label>
-            <input
+            <input id="notes" name="notes" aria-label="Notes"
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}

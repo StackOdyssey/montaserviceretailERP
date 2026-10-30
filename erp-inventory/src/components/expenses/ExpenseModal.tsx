@@ -35,6 +35,7 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
   const [error, setError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const receiptSectionRef = useRef<HTMLDivElement>(null);
 
   if (!isOpen) return null;
 
@@ -88,6 +89,7 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
     }
     if (activeCategory?.receiptRequired && !photoPreview) {
       setError("Un justificatif (photo du reçu) est obligatoire pour cette catégorie.");
+      receiptSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
@@ -151,7 +153,7 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
               Catégorie de la dépense <span className="text-[#F7162D]">*</span>
             </label>
-            <select
+            <select id="categoryId" name="categoryId" aria-label="Catégorie de la dépense"
               value={activeCategory?.id ?? ""}
               onChange={(e) => setCategoryId(Number(e.target.value))}
               className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-[#F7162D]"
@@ -174,7 +176,7 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
               Intitulé / Motif de la dépense <span className="text-[#F7162D]">*</span>
             </label>
-            <input
+            <input id="title" name="title" aria-label="Intitulé de la dépense"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -190,7 +192,7 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
                 Montant décaissé (DH) <span className="text-[#F7162D]">*</span>
               </label>
               <div className="relative">
-                <input
+                <input id="amountDh" name="amountDh" aria-label="Montant décaissé en dirhams"
                   type="number"
                   step="0.01"
                   min="0.10"
@@ -208,7 +210,7 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
               <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
                 Date de la dépense
               </label>
-              <input
+              <input id="expenseDate" name="expenseDate" aria-label="Date de la dépense"
                 type="date"
                 value={expenseDate}
                 onChange={(e) => setExpenseDate(e.target.value)}
@@ -218,10 +220,17 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
           </div>
 
           {/* Photo du reçu ou ticket de caisse */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
-              Justificatif / Reçu (Photo Smartphone)
-            </label>
+          <div ref={receiptSectionRef}>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                Justificatif / Reçu (Photo Smartphone)
+              </label>
+              {activeCategory?.receiptRequired && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700">
+                  Obligatoire
+                </span>
+              )}
+            </div>
             <input
               type="file"
               ref={fileInputRef}
@@ -257,7 +266,11 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isCompressing || isUploading}
-                className="w-full py-4 border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-[#F7162D] rounded-xl flex flex-col items-center justify-center gap-1.5 text-gray-500 hover:text-[#F7162D] transition bg-gray-50/50 dark:bg-gray-800/30"
+                className={`w-full py-4 border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-1.5 text-gray-500 hover:text-[#F7162D] transition ${
+                  activeCategory?.receiptRequired && !photoPreview
+                    ? "border-amber-400 bg-amber-50/40 hover:border-[#F7162D]"
+                    : "border-gray-200 dark:border-gray-700 hover:border-[#F7162D] bg-gray-50/50 dark:bg-gray-800/30"
+                }`}
               >
                 <Camera className="w-5 h-5" />
                 <span className="text-xs font-bold">
@@ -274,7 +287,7 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
               Remarques
             </label>
-            <input
+            <input id="notes" name="notes" aria-label="Remarques"
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Search, ArrowLeft } from "lucide-react";
 import { getProducts, getCategories, ProductItem, CategoryItem } from "@/lib/actions/products";
@@ -57,6 +57,10 @@ export default function POSPage() {
   // Payment and checkout state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Vrai quand la modale client a été ouverte DEPUIS la modale de paiement :
+  // à la confirmation du client on rouvre le paiement au lieu de renvoyer
+  // le caissier sur le catalogue.
+  const returnToPaymentRef = useRef(false);
 
   // Clé d'idempotence par panier : un retry/double-clic renvoie le doc créé
   // au lieu d'un doublon. Régénérée après chaque encaissement réussi.
@@ -313,7 +317,7 @@ export default function POSPage() {
                 size={18}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
               />
-              <input
+              <input id="searchTerm" name="searchTerm" aria-label="Rechercher un produit"
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -426,7 +430,10 @@ export default function POSPage() {
           customerCity={customerCity}
           customerIce={customerIce}
           customerIsProfessional={customerIsProfessional}
-          onClose={() => setIsCustomerModalOpen(false)}
+          onClose={() => {
+            returnToPaymentRef.current = false;
+            setIsCustomerModalOpen(false);
+          }}
           onSave={async (data) => {
             setCustomerId(data.id);
             setCustomerName(data.name);
@@ -436,6 +443,10 @@ export default function POSPage() {
             setCustomerIsProfessional(data.isProfessional ?? false);
             setCustomerCreditLimitCents(data.creditLimitCents);
             setIsCustomerModalOpen(false);
+            if (returnToPaymentRef.current) {
+              returnToPaymentRef.current = false;
+              setIsPaymentModalOpen(true);
+            }
             if (data.id) {
               try {
                 const stmt = await getCustomerStatement(data.id);
@@ -459,6 +470,7 @@ export default function POSPage() {
           docType={docType}
           onClose={() => setIsPaymentModalOpen(false)}
           onRequireCustomer={() => {
+            returnToPaymentRef.current = true;
             setIsPaymentModalOpen(false);
             setIsCustomerModalOpen(true);
           }}

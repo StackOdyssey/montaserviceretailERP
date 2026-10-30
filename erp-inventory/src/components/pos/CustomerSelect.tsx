@@ -90,6 +90,16 @@ export function CustomerSelect({
     setCreatedOk(null);
     setSearchTerm("");
     clearSearch();
+    // Sélection directe : pas besoin de redescendre sur « Confirmer le client ».
+    onSave({
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone || "",
+      city: customer.city || "Casablanca",
+      ice: customer.ice || "",
+      creditLimitCents: customer.creditLimitCents ?? null,
+      isProfessional: customer.isProfessional ?? false,
+    });
   };
 
   const handleQuickCreate = async () => {
@@ -210,7 +220,7 @@ export function CustomerSelect({
                 size={16}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
               />
-              <input
+              <input id="searchTerm" name="searchTerm" aria-label="Rechercher un client existant"
                 type="text"
                 value={searchTerm}
                 onChange={(e) => handleSearchChange(e.target.value)}
@@ -268,7 +278,7 @@ export function CustomerSelect({
                 Fiche client (sélectionnée ou à créer)
               </label>
               <label className="flex items-center gap-1.5 text-xs text-gray-600">
-                <input
+                <input id="isProfessional" name="isProfessional" aria-label="Client professionnel"
                   type="checkbox"
                   checked={isProfessional}
                   onChange={(e) => setIsProfessional(e.target.checked)}
@@ -280,7 +290,7 @@ export function CustomerSelect({
 
             <div>
               <label className="text-xs text-gray-600 mb-1 block">Nom du client *</label>
-              <input
+              <input id="name" name="name" aria-label="Nom du client"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -292,7 +302,7 @@ export function CustomerSelect({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-gray-600 mb-1 block">Téléphone * (création)</label>
-                <input
+                <input id="phone" name="phone" aria-label="Téléphone"
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
@@ -302,7 +312,7 @@ export function CustomerSelect({
               </div>
               <div>
                 <label className="text-xs text-gray-600 mb-1 block">Ville</label>
-                <input
+                <input id="city" name="city" aria-label="Ville"
                   type="text"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
@@ -316,7 +326,7 @@ export function CustomerSelect({
               <label className="text-xs text-gray-600 mb-1 block">
                 ICE {isProfessional ? "*" : "(si professionnel)"}
               </label>
-              <input
+              <input id="ice" name="ice" aria-label="ICE (15 chiffres)"
                 type="text"
                 value={ice}
                 onChange={(e) => setIce(e.target.value)}

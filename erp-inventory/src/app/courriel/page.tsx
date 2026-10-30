@@ -264,7 +264,7 @@ Comptabilité - ${company.raisonSociale}`);
 
         {/* Filtre par Fournisseur & Recherche */}
         <div className="flex flex-col sm:flex-row items-center gap-2">
-          <select
+          <select id="selectedSupplierFilter" name="selectedSupplierFilter" aria-label="Filtrer par fournisseur"
             value={selectedSupplierFilter}
             onChange={(e) => setSelectedSupplierFilter(e.target.value)}
             className="w-full sm:w-auto px-3 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-semibold focus:ring-2 focus:ring-[#F7162D]"
@@ -279,7 +279,7 @@ Comptabilité - ${company.raisonSociale}`);
 
           <div className="relative w-full sm:w-60">
             <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
+            <input id="searchQuery" name="searchQuery" aria-label="Rechercher par objet, texte..."
               type="text"
               placeholder="Rechercher par objet, texte..."
               value={searchQuery}
@@ -572,7 +572,7 @@ Comptabilité - ${company.raisonSociale}`);
                   <label className="block text-[11px] font-bold uppercase text-gray-500 mb-1">
                     Fournisseur Destinataire *
                   </label>
-                  <select
+                  <select id="composeSupplierId" name="composeSupplierId" aria-label="Fournisseur"
                     value={composeSupplierId}
                     onChange={(e) => {
                       const id = Number(e.target.value);
@@ -594,7 +594,7 @@ Comptabilité - ${company.raisonSociale}`);
                   <label className="block text-[11px] font-bold uppercase text-gray-500 mb-1">
                     Adresse Email (To) *
                   </label>
-                  <input
+                  <input id="composeTo" name="composeTo" aria-label="Destinataire"
                     type="email"
                     value={composeTo}
                     onChange={(e) => setComposeTo(e.target.value)}
@@ -639,7 +639,7 @@ Comptabilité - ${company.raisonSociale}`);
                 <label className="block text-[11px] font-bold uppercase text-gray-500 mb-1">
                   Objet du Courriel *
                 </label>
-                <input
+                <input id="composeSubject" name="composeSubject" aria-label="Objet"
                   type="text"
                   placeholder="Ex : Commande de pièces Bashan 250cc - Réf BC-2026-089"
                   value={composeSubject}
@@ -654,7 +654,7 @@ Comptabilité - ${company.raisonSociale}`);
                 <label className="block text-[11px] font-bold uppercase text-gray-500 mb-1">
                   Message *
                 </label>
-                <textarea
+                <textarea id="composeBody" name="composeBody" aria-label="Rédigez votre message ici..."
                   rows={8}
                   placeholder="Rédigez votre message ici..."
                   value={composeBody}

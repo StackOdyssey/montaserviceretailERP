@@ -16,18 +16,26 @@ interface ProductQuickAddModalProps {
  * (photo, prix catalogue, stock), le caissier saisit la quantité puis Valide.
  * Plus besoin de descendre au panier pour ajuster chaque ligne.
  */
+const MAX_QTY = 1_000_000; // aligné sur la validation serveur (action-validation qty)
+
 export function ProductQuickAddModal({ product, onClose, onConfirm }: ProductQuickAddModalProps) {
-  const [quantity, setQuantity] = useState(1);
+  // Saisie brute : on ne borne que quand le caissier quitte le champ ou valide,
+  // sinon vider le champ retombe instantanément sur 1 pendant la frappe.
+  const [rawQty, setRawQty] = useState("1");
 
   // Remise à 1 quand le produit affiché change (ajustement pendant le rendu,
   // pattern officiel React — pas d'effet pour resynchroniser un état sur une prop).
   const [prevProductId, setPrevProductId] = useState(product.id);
   if (prevProductId !== product.id) {
     setPrevProductId(product.id);
-    setQuantity(1);
+    setRawQty("1");
   }
 
-  const clamp = (n: number) => (Number.isNaN(n) ? 1 : Math.min(999, Math.max(1, Math.floor(n))));
+  const parsed = parseInt(rawQty, 10);
+  const quantity = Number.isNaN(parsed) ? 0 : Math.floor(parsed);
+  const clamp = (n: number) => (Number.isNaN(n) ? 1 : Math.min(MAX_QTY, Math.max(1, Math.floor(n))));
+  const commitQty = () => setRawQty(String(clamp(parsed || 1)));
+  const overStock = product.currentStock >= 0 && quantity > product.currentStock;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
@@ -68,7 +76,7 @@ export function ProductQuickAddModal({ product, onClose, onConfirm }: ProductQui
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setQuantity((q) => clamp(q - 1))}
+                onClick={() => setRawQty(String(clamp(quantity - 1)))}
                 className="w-12 h-12 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 flex items-center justify-center active:scale-95"
               >
                 <Minus size={18} />
@@ -76,20 +84,27 @@ export function ProductQuickAddModal({ product, onClose, onConfirm }: ProductQui
               <input
                 type="number"
                 min={1}
-                max={999}
+                max={MAX_QTY}
                 inputMode="numeric"
-                value={quantity}
-                onChange={(e) => setQuantity(clamp(parseInt(e.target.value, 10)))}
+                value={rawQty}
+                onChange={(e) => setRawQty(e.target.value)}
+                onBlur={commitQty}
+                aria-label="Quantité"
                 className="flex-1 h-12 text-center text-xl font-black border border-gray-200 rounded-xl outline-none focus:border-[#F7162D]"
               />
               <button
                 type="button"
-                onClick={() => setQuantity((q) => clamp(q + 1))}
+                onClick={() => setRawQty(String(clamp(quantity + 1)))}
                 className="w-12 h-12 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 flex items-center justify-center active:scale-95"
               >
                 <Plus size={18} />
               </button>
             </div>
+            {overStock && (
+              <p className="mt-1.5 text-[11px] font-semibold text-amber-600">
+                Quantité supérieure au stock disponible ({product.currentStock})
+              </p>
+            )}
           </div>
 
           <div className="flex justify-between items-center text-sm bg-gray-50 rounded-xl px-3 py-2.5">
@@ -108,11 +123,11 @@ export function ProductQuickAddModal({ product, onClose, onConfirm }: ProductQui
             Annuler
           </button>
           <button
-            onClick={() => onConfirm(product, quantity)}
+            onClick={() => onConfirm(product, clamp(parsed || 1))}
             className="flex-[2] px-4 py-3 bg-[#F7162D] hover:bg-[#D90E23] text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-98"
           >
             <Check size={18} />
-            <span>Valider × {quantity}</span>
+            <span>Valider × {quantity || 1}</span>
           </button>
         </div>
       </div>

@@ -229,7 +229,7 @@ export default function InventoryPage() {
                           <td className="py-2 px-3 text-[#374151] line-clamp-1">{l.name}</td>
                           <td className="py-2 px-3 text-center font-mono text-[#6B7280]">{l.expectedQty}</td>
                           <td className="py-2 px-3 text-center">
-                            <input
+                            <input id="countedQty" name="countedQty" aria-label="Quantité comptée"
                               type="number"
                               value={l.countedQty}
                               disabled={!isDraft}
