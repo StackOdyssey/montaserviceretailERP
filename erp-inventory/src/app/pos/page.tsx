@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Search, ArrowLeft } from "lucide-react";
+import { Search, ArrowLeft, ReceiptText, FileText, ClipboardList } from "lucide-react";
 import { getProducts, getCategories, ProductItem, CategoryItem } from "@/lib/actions/products";
 import { createSalesDocument, SalesLineInput, SalesDocumentItem } from "@/lib/actions/sales";
 import { getCustomerStatement } from "@/lib/actions/customers";
@@ -20,6 +20,12 @@ import { ProductQuickAddModal } from "@/components/pos/ProductQuickAddModal";
 interface CartLine extends SalesLineInput {
   currentStock: number;
 }
+
+const DOC_TYPE_ICONS = {
+  BL: ReceiptText,
+  FACTURE: FileText,
+  BC: ClipboardList,
+} as const;
 
 export default function POSPage() {
   const company = useSettings();
@@ -259,39 +265,46 @@ export default function POSPage() {
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="bg-white border-b border-gray-200 px-3 py-2 sm:px-4 flex flex-wrap items-center gap-x-3 gap-y-2 justify-between">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Link
             href="/"
-            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
+            aria-label="Retour au tableau de bord"
           >
             <ArrowLeft size={20} />
           </Link>
-          <div>
-            <h1 className="text-lg font-bold text-gray-900">Point de Vente</h1>
-            <p className="text-xs text-gray-500">{company.raisonSociale}</p>
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-lg font-bold text-gray-900 leading-tight whitespace-nowrap">Point de Vente</h1>
+            <p className="text-[11px] text-gray-500 truncate">{company.raisonSociale}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {POS_DOC_TYPES.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setDocType(t.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                docType === t.id
-                  ? "bg-[#F7162D] text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {POS_DOC_TYPES.map((t) => {
+            const Icon = DOC_TYPE_ICONS[t.id];
+            return (
+              <button
+                key={t.id}
+                onClick={() => setDocType(t.id)}
+                title={t.label}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                  docType === t.id
+                    ? "bg-[#F7162D] text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                <Icon size={15} />
+                <span className="sm:hidden">{t.shortLabel}</span>
+                <span className="hidden sm:inline">{t.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {errorMessage && (
-        <div className="mx-4 mt-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm flex items-center gap-2">
+        <div className="mx-3 mt-3 p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm flex items-center gap-2">
           <span>{errorMessage}</span>
           <button
             onClick={() => setErrorMessage(null)}
@@ -311,7 +324,7 @@ export default function POSPage() {
           }`}
         >
           {/* Search and Category Bar */}
-          <div className="bg-white border-b border-gray-200 p-4 space-y-3">
+          <div className="bg-white border-b border-gray-200 p-3 space-y-2">
             <div className="relative">
               <Search
                 size={18}
@@ -355,7 +368,7 @@ export default function POSPage() {
           </div>
 
           {/* Product Grid */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-3">
             {isLoadingProducts ? (
               <div className="text-center text-gray-500 text-sm py-8">
                 Chargement...

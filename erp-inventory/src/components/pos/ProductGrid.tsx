@@ -13,20 +13,20 @@ interface ProductGridProps {
 export function ProductGrid({ products, onAddToCart, disableOutOfStock = true }: ProductGridProps) {
   const isOut = (p: ProductItem) => disableOutOfStock && p.currentStock <= 0;
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
       {products.map((product) => (
         <button
           key={product.id}
           onClick={() => onAddToCart(product)}
           disabled={isOut(product)}
-          className={`bg-white rounded-xl border-2 p-3 text-left transition-all hover:shadow-md active:scale-95 ${
+          className={`bg-white rounded-xl border-2 p-2 sm:p-3 text-left transition-all hover:shadow-md active:scale-95 ${
             isOut(product)
               ? "border-gray-200 opacity-50 cursor-not-allowed"
               : "border-gray-200 hover:border-[#F7162D] cursor-pointer"
           }`}
         >
           {/* Product Image */}
-          <div className="aspect-square bg-gray-100 rounded-lg mb-2 flex items-center justify-center overflow-hidden">
+          <div className="aspect-square bg-gray-100 rounded-lg mb-1.5 flex items-center justify-center overflow-hidden">
             {product.photoUrl ? (
               <img
                 src={product.photoUrl}
