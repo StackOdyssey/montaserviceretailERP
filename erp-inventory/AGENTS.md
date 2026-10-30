@@ -87,3 +87,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   - Claimed user "Amine Caissier" NOT present on prod — only "Karim" CAISSIER active (confirm if real employee).
   - Cleanup plan: reverse/cancel docs via actions where possible (audit trail), delete fixture rows, restore MONTASSIR balance — verify invariants after.
 - **Suggested order:** prod cleanup first (corrupts client-facing financials) → BUG-01+02 → BUG-03+05 → BUG-04.
+
+## Resume point — external audit remediation DONE (2026-10-30)
+
+- **Prod test-data cleanup DONE**: Neon backup branch `backup-pre-cleanup-2026-10-30` (br-restless-unit-b15ad56n, project twilight-pine-29350562, prod branch br-fancy-block-b13o37dw "production"). Full transaction reset: 12 docs, 4 customer payments, 1 BR+1 supplier payment, 1 expense, 12 test movements, products TEST-AUDIT-001+AUDIT-PROD-100, supplier 9, user Karim, 2 cancelled stock counts, all audit rows → 1 RESET_DONNEES_TEST row. Stock restored (+10 on 1008/1024/1006), 41 STOCK_INITIAL provenance rows recreated, numbering_sequences reset to 1, 295 clients + 8 suppliers + catalogue intact. BL-2026-00005 (AWZAL ABDLLA 2, 1591.25 DH) was confirmed TEST by user.
+- **Prod DB conn string via Neon MCP** `get_connection_string` (gcloud secret access lost — see below).
+- **All 6 bugs fixed + live-verified on dev** (commit `5cc478f`): BUG-06 POS qty cap 999→1M (raw input + over-stock warn, ProductQuickAddModal); BUG-02 PaymentModal reopens via returnToPaymentRef + 1-click client select; BUG-01 AvoirTypeModal+ConfirmDialog (no more prompt/confirm); BUG-05 Obligatoire badge+amber border+scrollTo; BUG-03 real icon-192/512 + `/icon-*` whitelist in proxy.ts (session-less PWA fetches were 307'd); BUG-04 id/name/aria-label on 41 fields.
+- **gcloud auth broken**: active accounts (davidsmithny01, atlasluxtravel) have NO rights on erp-syste. Deploy blocked — user must `gcloud auth login` with the ERP account then: `cd erp-inventory && gcloud run deploy erp-system --source . --region europe-west1 --project erp-syste`
+- Prod DB currently: 0 docs, 0 payments, 295 clients, 8 suppliers, 428 products, numbering at 00001 — ready for first real sale.
