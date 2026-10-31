@@ -151,14 +151,14 @@ export default function StockCataloguePage() {
       {/* ======================================================== */}
       {/* 1. EN-TÊTE DE PAGE ET BOUTONS D'ACTION                  */}
       {/* ======================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 md:p-6 rounded-2xl border border-[#E5E7EB] shadow-xs">
-        <div>
-          <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 md:p-6 rounded-2xl border border-[#E5E7EB] shadow-xs">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FEF2F2] text-[#F7162D] border border-[#FCA5A5]/40">
               <Boxes size={14} />
               Catalogue Pièces Moto Bashan
             </span>
-            <span className="text-xs text-[#6B7280]">{company.raisonSociale}</span>
+            <span className="text-xs text-[#6B7280] truncate">{company.raisonSociale}</span>
           </div>
           <h1 className="text-xl md:text-2xl font-bold text-[#111827] mt-1.5 tracking-tight">
             Gestion du Stock & Catalogue
@@ -172,10 +172,10 @@ export default function StockCataloguePage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-2.5">
           <Link
             href="/stock/inventaire"
-            className="flex items-center gap-2 px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
+            className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
           >
             <ClipboardList size={16} className="text-[#4338CA]" />
             <span>Inventaire</span>
@@ -183,7 +183,7 @@ export default function StockCataloguePage() {
 
           <button
             onClick={() => setIsTransferOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
+            className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
           >
             <ArrowRightLeft size={16} className="text-[#7C3AED]" />
             <span>Transfert</span>
@@ -191,7 +191,7 @@ export default function StockCataloguePage() {
 
           <button
             onClick={() => setIsCsvModalOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
+            className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
           >
             <FileSpreadsheet size={16} className="text-[#2563EB]" />
             <span>Import / Export CSV</span>
@@ -202,7 +202,7 @@ export default function StockCataloguePage() {
               setProductToEdit(null);
               setIsProductModalOpen(true);
             }}
-            className="flex items-center gap-2 bg-[#F7162D] hover:bg-[#D90E23] text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all active:scale-98"
+            className="flex items-center justify-center gap-2 bg-[#F7162D] hover:bg-[#D90E23] text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all active:scale-98"
           >
             <PlusCircle size={16} />
             <span>Ajouter une pièce</span>
@@ -239,12 +239,12 @@ export default function StockCataloguePage() {
           </div>
 
           {/* Sélecteur de catégorie */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:shrink-0">
             <Filter size={16} className="text-[#6B7280] hidden sm:block" />
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-3 py-2.5 text-xs font-semibold bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl focus:border-[#F7162D] outline-none"
+              className="min-w-0 px-3 py-2.5 text-xs font-semibold bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl focus:border-[#F7162D] outline-none"
             >
               <option value="">Toutes catégories</option>
               <option value="Freinage">Freinage</option>
@@ -256,7 +256,7 @@ export default function StockCataloguePage() {
             <select
               value={warehouseFilter ?? ""}
               onChange={(e) => setWarehouseFilter(e.target.value ? Number(e.target.value) : null)}
-              className="px-3 py-2.5 text-xs font-semibold bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl focus:border-[#7C3AED] outline-none cursor-pointer"
+              className="min-w-0 px-3 py-2.5 text-xs font-semibold bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl focus:border-[#7C3AED] outline-none cursor-pointer"
               title="Filtrer le stock par entrepôt"
             >
               <option value="">Tous entrepôts</option>
