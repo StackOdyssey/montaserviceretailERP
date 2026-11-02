@@ -397,7 +397,7 @@ export function ProductModal({
           {/* Ligne 6 : Photo avec compression WebP client */}
           <div>
             <label className="block text-xs font-bold text-[#374151] mb-1">
-              Photo de la pièce (WebP &lt; 80 Ko, stockée sur Cloudflare R2)
+              Photo de la pièce (WebP &lt; 80 Ko)
             </label>
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] cursor-pointer shadow-xs active:scale-98 transition-all">

@@ -277,7 +277,7 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
                   {isCompressing ? "Compression..." : isUploading ? "Téléversement..." : "Prendre en photo le ticket / reçu"}
                 </span>
                 <span className="text-[10px] text-gray-400">
-                  Optimisé automatiquement pour iPhone (&lt; 80 Ko)
+                  Optimisée automatiquement (&lt; 80 Ko)
                 </span>
               </button>
             )}

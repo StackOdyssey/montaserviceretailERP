@@ -191,7 +191,7 @@ export default function LoginPage() {
 
         {/* Note de bas de page */}
         <div className="pt-4 text-center text-[10px] text-gray-500">
-          Système certifié SARL BM Motors • Session sécurisée 30 jours
+          SARL BM Motors • Session sécurisée
         </div>
       </div>
     </div>

@@ -221,7 +221,7 @@ export default function ParametresPage() {
           { id: "BANQUE", label: "Banques & RIB", icon: CreditCard },
           { id: "SECURITE", label: "Code PIN & Accès", icon: Lock },
           { id: "NUMEROTATION", label: "Numérotation BL", icon: Hash },
-          { id: "CLOUD", label: "Infrastructure Cloud", icon: Server },
+          { id: "CLOUD", label: "Système", icon: Server },
           { id: "DECISIONS", label: "Décisions & Questions", icon: HelpCircle },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -613,7 +613,7 @@ export default function ParametresPage() {
                 Sécurité & Utilisateurs
               </h2>
               <p className="text-xs text-gray-500 mt-1">
-                PIN individuels par employé (attribution nominative des opérations). Le second facteur est assuré par Cloudflare Access devant l&apos;application.
+                PIN individuels par employé (attribution nominative des opérations).
               </p>
             </div>
 
@@ -630,19 +630,19 @@ export default function ParametresPage() {
                   Code PIN comptoir
                 </span>
                 <p className="text-xs text-gray-500 leading-relaxed">
-                  Le code PIN est défini par la variable d&apos;environnement <span className="font-mono font-bold">ADMIN_PIN</span> (Secret Manager en production).
-                  Aucun PIN n&apos;est affiché ni modifiable depuis cette page : toute rotation se fait côté hébergement, sans valeur codée en dur.
+                  Le code PIN comptoir est géré par l&apos;administrateur système.
+                  Aucun PIN n&apos;est affiché ni modifiable depuis cette page : toute modification se fait hors de l&apos;application.
                 </p>
               </div>
 
               {/* Second facteur */}
               <div className="p-5 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 space-y-3">
                 <span className="text-sm font-bold text-emerald-900 dark:text-emerald-200 block">
-                  Second facteur : Cloudflare Access
+                  Protection des accès
                 </span>
                 <p className="text-xs text-emerald-800 dark:text-emerald-300/80 leading-relaxed">
-                  L&apos;accès applicatif est filtré en amont par Cloudflare Access (Zero Trust). Il n&apos;y a pas de déverrouillage biométrique applicatif :
-                  la biométrie éventuelle de l&apos;appareil reste du ressort du système, pas d&apos;une session émise par l&apos;ERP.
+                  L&apos;accès à l&apos;application est protégé en amont par le fournisseur d&apos;hébergement.
+                  La biométrie éventuelle de l&apos;appareil reste du ressort du système, pas d&apos;une session émise par l&apos;ERP.
                 </p>
               </div>
             </div>
@@ -729,10 +729,10 @@ export default function ParametresPage() {
             <div className="border-b border-gray-100 dark:border-gray-800 pb-4">
               <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <Server className="w-5 h-5 text-[#F7162D]" />
-                Infrastructure & Sauvegardes Nocturnes (0,00 €/an)
+                Système & Sauvegardes
               </h2>
               <p className="text-xs text-gray-500 mt-1">
-                État de l&apos;hébergement serveur, de la base de données et des sauvegardes automatiques.
+                État de l&apos;application, de la base de données et des sauvegardes automatiques.
               </p>
             </div>
 
@@ -741,8 +741,8 @@ export default function ParametresPage() {
                 <div className="flex items-center gap-3">
                   <Cloud className="w-6 h-6 text-blue-500" />
                   <div>
-                    <h3 className="text-xs font-bold text-gray-900 dark:text-white">Google Cloud Run</h3>
-                    <p className="text-[11px] text-gray-500">Conteneur Docker Serverless (europe-west1)</p>
+                    <h3 className="text-xs font-bold text-gray-900 dark:text-white">Hébergement</h3>
+                    <p className="text-[11px] text-gray-500">Application web</p>
                   </div>
                 </div>
                 <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold">
@@ -754,8 +754,8 @@ export default function ParametresPage() {
                 <div className="flex items-center gap-3">
                   <Database className="w-6 h-6 text-emerald-500" />
                   <div>
-                    <h3 className="text-xs font-bold text-gray-900 dark:text-white">Neon PostgreSQL</h3>
-                    <p className="text-[11px] text-gray-500">Base relationnelle avec PITR & SSL</p>
+                    <h3 className="text-xs font-bold text-gray-900 dark:text-white">Base de données</h3>
+                    <p className="text-[11px] text-gray-500">Données sécurisées</p>
                   </div>
                 </div>
                 <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold">
@@ -767,8 +767,8 @@ export default function ParametresPage() {
                 <div className="flex items-center gap-3">
                   <RefreshCw className="w-6 h-6 text-purple-500" />
                   <div>
-                    <h3 className="text-xs font-bold text-gray-900 dark:text-white">Sauvegarde Quotidienne GitHub</h3>
-                    <p className="text-[11px] text-gray-500">Cron 02h00 UTC vers Cloudflare R2</p>
+                    <h3 className="text-xs font-bold text-gray-900 dark:text-white">Sauvegarde quotidienne</h3>
+                    <p className="text-[11px] text-gray-500">Copie automatique chaque nuit</p>
                   </div>
                 </div>
                 <span className="px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 text-xs font-bold">
@@ -780,8 +780,8 @@ export default function ParametresPage() {
                 <div className="flex items-center gap-3">
                   <Smartphone className="w-6 h-6 text-orange-500" />
                   <div>
-                    <h3 className="text-xs font-bold text-gray-900 dark:text-white">Application PWA / Offline</h3>
-                    <p className="text-[11px] text-gray-500">Service Worker pour iPhone & Comptoir</p>
+                    <h3 className="text-xs font-bold text-gray-900 dark:text-white">Application mobile</h3>
+                    <p className="text-[11px] text-gray-500">Installable sur téléphone et comptoir</p>
                   </div>
                 </div>
                 <span className="px-2.5 py-1 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 text-xs font-bold">
