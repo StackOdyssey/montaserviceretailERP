@@ -95,3 +95,28 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **All 6 bugs fixed + live-verified on dev** (commit `5cc478f`): BUG-06 POS qty cap 999→1M (raw input + over-stock warn, ProductQuickAddModal); BUG-02 PaymentModal reopens via returnToPaymentRef + 1-click client select; BUG-01 AvoirTypeModal+ConfirmDialog (no more prompt/confirm); BUG-05 Obligatoire badge+amber border+scrollTo; BUG-03 real icon-192/512 + `/icon-*` whitelist in proxy.ts (session-less PWA fetches were 307'd); BUG-04 id/name/aria-label on 41 fields.
 - **Deployed prod: `erp-system-00108-6x6`** (5cc478f) — smoke-tested: login + /pos /ventes /reglements /stock /parametres all ok, manifest+icons 200. gcloud note: CLI credential for davidsmithny01 lacks erp-syste rights but the machine ADC token works — deploy via `CLOUDSDK_AUTH_ACCESS_TOKEN=$(gcloud auth application-default print-access-token) gcloud run deploy ...`
 - Prod DB currently: 0 docs, 0 payments, 295 clients, 8 suppliers, 428 products, numbering at 00001 — ready for first real sale.
+
+## Resume point — LEGACY MEGAPLAN phase 2 (saved 2026-11-03)
+
+**Plan:** `~/.devin/plans/plan-f7d1272704d0c09d.md`. Tracker: `LEGACY_MEGAPLAN_TRACKER.md` (repo root, committed). Audit: `LEGACY_FEATURE_AUDIT.md`. Page dumps: `References_/legacy-pages/*.html|.txt` (untracked, regenerate via `MONTA_USER=Montassir MONTA_PASS=123456780 node scripts/fetch-legacy-pages.mjs <pages>`).
+
+**Committed:** `5d00226` audit+tracker+fetch script · `024a6b0` **G11+G20 /clients page** · `e087c49` tracker update.
+
+**G11+G20 shipped (dev-verified, NOT yet deployed):**
+- `/clients`: fuzzy search, 25/p pagination, commercial filter, "avec solde dû" toggle, aging J+ badges, summary cards; `ClientDrawer` (KPIs + Documents/Règlements/Relevé tabs + Encaisser/Relevé A4/Modifier); nav entry Clients.
+- Migration **0028 APPLIED TO DEV ONLY** — `customers.assigned_staff_id`, `risk_class`, `payment_term_days`. **Must run `db:migrate` on prod before/with deploy** (prod conn string via Neon MCP `get_connection_string`, project twilight-pine-29350562, branch br-fancy-block-b13o37dw).
+- Bug fixed: `CustomerModal` never repopulated on edit — `useState(customer?.x)` initializers ran once at mount while isOpen=false; added reset-on-open useEffect (latent bug also affected /reglements).
+- `ClientDrawer` takes `refreshKey` prop — bump to refetch statement after saves (stale-statement revert bug).
+
+**Next items, user's dependency-first order (G22→G21→G23, then phase C, D, E):**
+1. G22 `customer_payments.payee_name` (XS) — endorsed-cheque "Règlement au nom".
+2. G21 payment modes CARTE_BANCAIRE + VERSEMENT (payments.ts PaymentMethod + flows + journée totals); decide ACOMPTE/RISTOURNE/AVOIR-as-payment.
+3. G23 acomptes (check SoldesClient usage first).
+4. Phase C: G12 catalogue view, G14 brands table, G18 smalls (commercial filter /ventes, marge+Val_PA cols /stock, transfers list, per-warehouse inventaire, feuilleRoute abrégée), G17 quick-receive.
+5. Phase D: G15 CA mensuel, G16 profil employé, G19 print/CSV. Phase E: data pull (situationClients anchor: reste 697 910,50 Dh).
+
+**IronBee quirks learned:** combobox `nth` refs shift after selects — use scoped CSS `form select:has(option:text-is("X"))` or `:has(option[value="Y"])`; drawer's `form` scoping avoids hitting page filters.
+
+**Key legacy facts:** employees have 6 roles (administrateur/admin/commercial/Caissier/logisticiene); legacy categories≈marques are near-dup lists (G13 de-scoped); recepAdd has "En Compte" checkbox + Logisticien + Date.Rég.Prévu + entrepôt fields; payment modes union = acompte/carte/cheque/effet/espece/virement/versement/avoir/ristourne; dashboard "Ancien Solde" carryover 407 829,17 Dh.
+
+**Deploy pending:** prod migrate 0028 → `CLOUDSDK_AUTH_ACCESS_TOKEN=$(gcloud auth application-default print-access-token) gcloud run deploy erp-system --source . --region europe-west1 --project erp-syste` (run from erp-inventory/).
