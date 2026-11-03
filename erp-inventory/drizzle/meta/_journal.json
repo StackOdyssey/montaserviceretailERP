@@ -197,6 +197,13 @@
       "when": 1792958258227,
       "tag": "0027_futuristic_proteus",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1793715350598,
+      "tag": "0028_yellow_loki",
+      "breakpoints": true
     }
   ]
 }

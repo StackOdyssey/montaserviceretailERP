@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   ShoppingCart,
   Boxes,
+  Users,
   Truck,
   Receipt,
   FileText,
@@ -68,6 +69,11 @@ const navItems: NavItem[] = [
     label: "Catalogue & Stock",
     href: "/stock",
     icon: Boxes,
+  },
+  {
+    label: "Clients",
+    href: "/clients",
+    icon: Users,
   },
   {
     label: "Règlements Clients",

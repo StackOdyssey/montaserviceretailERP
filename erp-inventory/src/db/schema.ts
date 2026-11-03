@@ -343,6 +343,9 @@ export const customers = pgTable("customers", {
   defaultPriceLevelId: integer("default_price_level_id").references(() => priceLevels.id),
   creditLimitCents: integer("credit_limit_cents"), // plafond de crédit (nullable = pas de limite)
   paymentTerms: text("payment_terms"), // conditions de règlement (ex: "30 jours")
+  paymentTermDays: integer("payment_term_days"), // échéance en jours (legacy "Echance")
+  riskClass: text("risk_class").default("NORMAL"), // NORMAL | ROI | DOUTEUX | LITIGIEUX | ARNAQUEUR (legacy classification)
+  assignedStaffId: integer("assigned_staff_id").references(() => staff.id), // collaborateur / commercial attitré
   representative: text("representative"),
   externalRef: text("external_ref"),
   notes: text("notes"),

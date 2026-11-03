@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, UserPlus, Building, Phone, Mail, MapPin, FileText } from "lucide-react";
 import { CustomerItem, saveCustomer } from "@/lib/actions/customers";
+import { getStaff, type StaffItem } from "@/lib/actions/staff";
 import { useParameters } from "@/components/layout/SettingsProvider";
 import { toCentimes } from "@/lib/money";
 import { unwrap } from "@/lib/action-result";
@@ -31,11 +32,45 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
     customer?.creditLimitCents != null ? String(customer.creditLimitCents / 100) : ""
   );
   const [paymentTerms, setPaymentTerms] = useState(customer?.paymentTerms || "");
+  const [paymentTermDays, setPaymentTermDays] = useState(
+    customer?.paymentTermDays != null ? String(customer.paymentTermDays) : ""
+  );
+  const [riskClass, setRiskClass] = useState<string>(customer?.riskClass || "NORMAL");
+  const [assignedStaffId, setAssignedStaffId] = useState<number | null>(customer?.assignedStaffId ?? null);
+  const [commercials, setCommercials] = useState<StaffItem[]>([]);
   const [representative, setRepresentative] = useState(customer?.representative || "");
   const [externalRef] = useState(customer?.externalRef || "");
   const [force, setForce] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Ré-initialise les champs à chaque ouverture (le composant reste monté :
+  // sans reset, une édition après une création garde les valeurs précédentes).
+  useEffect(() => {
+    if (!isOpen) return;
+    setName(customer?.name || "");
+    setPhone(customer?.phone || "");
+    setEmail(customer?.email || "");
+    setCity(customer?.city || "Casablanca");
+    setAddress(customer?.address || "");
+    setIce(customer?.ice || "");
+    setIdentityNumber(customer?.identityNumber || "");
+    setIsWholesale(customer?.isWholesale ?? false);
+    setNotes(customer?.notes || "");
+    setIsProfessional(customer?.isProfessional ?? false);
+    setPriceLevelId(customer?.defaultPriceLevelId ?? null);
+    setCreditLimitDh(customer?.creditLimitCents != null ? String(customer.creditLimitCents / 100) : "");
+    setPaymentTerms(customer?.paymentTerms || "");
+    setPaymentTermDays(customer?.paymentTermDays != null ? String(customer.paymentTermDays) : "");
+    setRiskClass(customer?.riskClass || "NORMAL");
+    setAssignedStaffId(customer?.assignedStaffId ?? null);
+    setRepresentative(customer?.representative || "");
+    setForce(false);
+    setError(null);
+    getStaff("COMMERCIAL")
+      .then((res) => setCommercials(unwrap(res)))
+      .catch(() => setCommercials([]));
+  }, [isOpen, customer]);
 
   if (!isOpen) return null;
 
@@ -64,6 +99,9 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
         defaultPriceLevelId: priceLevelId,
         creditLimitCents: Number.isFinite(parsedLimit) ? toCentimes(parsedLimit) : null,
         paymentTerms,
+        paymentTermDays: paymentTermDays.trim() ? parseInt(paymentTermDays, 10) : null,
+        riskClass,
+        assignedStaffId,
         representative,
         externalRef,
         notes,
@@ -320,9 +358,59 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
                 type="text"
                 value={representative}
                 onChange={(e) => setRepresentative(e.target.value)}
-                placeholder="Commercial référent"
+                placeholder="Représentant du client"
                 className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-[#F7162D]"
               />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
+                Commercial attitré
+              </label>
+              <select
+                value={assignedStaffId ?? ""}
+                onChange={(e) => setAssignedStaffId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-[#F7162D]"
+              >
+                <option value="">Aucun</option>
+                {commercials.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
+                Échéance (jours)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={paymentTermDays}
+                onChange={(e) => setPaymentTermDays(e.target.value)}
+                placeholder="Ex: 30"
+                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-[#F7162D]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
+                Classification
+              </label>
+              <select
+                value={riskClass}
+                onChange={(e) => setRiskClass(e.target.value)}
+                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-[#F7162D]"
+              >
+                <option value="NORMAL">Normal</option>
+                <option value="ROI">Client roi</option>
+                <option value="DOUTEUX">Douteux</option>
+                <option value="LITIGIEUX">Litigieux</option>
+                <option value="ARNAQUEUR">Arnaqueur</option>
+              </select>
             </div>
           </div>
 

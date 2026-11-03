@@ -1,7 +1,7 @@
 "use server";
 
 import { and, asc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
-import { auditLogs, customerPayments, customers, db, salesDocuments } from "@/db";
+import { auditLogs, customerPayments, customers, db, salesDocuments, staff } from "@/db";
 import { assertAuthenticated, currentActor } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
 import { convertedBlIds, receivableSign } from "@/lib/sales/receivables";
@@ -25,6 +25,10 @@ export interface CustomerItem {
   defaultPriceLevelId: number | null;
   creditLimitCents: number | null;
   paymentTerms: string | null;
+  paymentTermDays: number | null;
+  riskClass: "NORMAL" | "ROI" | "DOUTEUX" | "LITIGIEUX" | "ARNAQUEUR";
+  assignedStaffId: number | null;
+  assignedStaffName: string | null;
   representative: string | null;
   externalRef: string | null;
   notes: string | null;
@@ -106,6 +110,10 @@ function mapCustomer(r: CustomerRow): CustomerItem {
     defaultPriceLevelId: r.defaultPriceLevelId ?? null,
     creditLimitCents: r.creditLimitCents ?? null,
     paymentTerms: r.paymentTerms,
+    paymentTermDays: r.paymentTermDays ?? null,
+    riskClass: (r.riskClass ?? "NORMAL") as CustomerItem["riskClass"],
+    assignedStaffId: r.assignedStaffId ?? null,
+    assignedStaffName: null,
     representative: r.representative,
     externalRef: r.externalRef,
     notes: r.notes,
@@ -135,7 +143,7 @@ function mapPayment(p: PaymentRow, customerName: string, documentNumber: string 
 /**
  * Clients avec solde calculé depuis la base (documents + règlements).
  */
-export async function getCustomers(searchQuery?: string) {
+export async function getCustomers(searchQuery?: string, options?: { staffId?: number }) {
   await assertAuthenticated();
   const d = requireDb();
 
@@ -144,10 +152,12 @@ export async function getCustomers(searchQuery?: string) {
   // (« ben », « bennani », « bennani el » retrouvent « EL BANNANI »).
   const match = matchTokens(searchQuery, [customers.name], [customers.phone, customers.city, customers.ice]);
   if (match) conds.push(match);
+  if (options?.staffId) conds.push(eq(customers.assignedStaffId, options.staffId));
 
   const rows = await d
-    .select()
+    .select({ customer: customers, staffName: staff.name })
     .from(customers)
+    .leftJoin(staff, eq(customers.assignedStaffId, staff.id))
     .where(and(...conds))
     .orderBy(asc(customers.name))
     .limit(500);
@@ -185,10 +195,10 @@ export async function getCustomers(searchQuery?: string) {
   const paidMap = new Map(paidRows.map((r) => [r.customerId, Number(r.paid)]));
 
   return rows.map((r) => {
-    const c = mapCustomer(r);
-    const totalBilledTtcCents = billedMap.get(r.id)?.billed ?? 0;
-    const unpaidDocumentsCount = billedMap.get(r.id)?.unpaid ?? 0;
-    const totalPaidCents = paidMap.get(r.id) ?? 0;
+    const c = { ...mapCustomer(r.customer), assignedStaffName: r.staffName ?? null };
+    const totalBilledTtcCents = billedMap.get(r.customer.id)?.billed ?? 0;
+    const unpaidDocumentsCount = billedMap.get(r.customer.id)?.unpaid ?? 0;
+    const totalPaidCents = paidMap.get(r.customer.id) ?? 0;
     return {
       ...c,
       totalBilledTtcCents,
@@ -206,9 +216,16 @@ export async function getCustomerStatement(customerId: number): Promise<Customer
   await assertAuthenticated();
   const d = requireDb();
 
-  const row = (await d.select().from(customers).where(eq(customers.id, customerId)).limit(1))[0];
+  const row = (
+    await d
+      .select({ customer: customers, staffName: staff.name })
+      .from(customers)
+      .leftJoin(staff, eq(customers.assignedStaffId, staff.id))
+      .where(eq(customers.id, customerId))
+      .limit(1)
+  )[0];
   if (!row) return null;
-  const customer = mapCustomer(row);
+  const customer = { ...mapCustomer(row.customer), assignedStaffName: row.staffName ?? null };
 
   const allDocs = await getSalesDocuments({ customerId, limit: 500 });
   const converted = await convertedBlIds();
@@ -308,6 +325,9 @@ export async function saveCustomer(data: {
   defaultPriceLevelId?: number | null;
   creditLimitCents?: number | null;
   paymentTerms?: string;
+  paymentTermDays?: number | null;
+  riskClass?: string;
+  assignedStaffId?: number | null;
   representative?: string;
   externalRef?: string;
   notes?: string;
@@ -553,6 +573,9 @@ async function saveCustomerImpl(data: {
   defaultPriceLevelId?: number | null;
   creditLimitCents?: number | null;
   paymentTerms?: string;
+  paymentTermDays?: number | null;
+  riskClass?: string;
+  assignedStaffId?: number | null;
   representative?: string;
   externalRef?: string;
   notes?: string;
@@ -604,6 +627,14 @@ async function saveCustomerImpl(data: {
     defaultPriceLevelId: data.defaultPriceLevelId ?? null,
     creditLimitCents: data.creditLimitCents ?? null,
     paymentTerms: data.paymentTerms?.trim() || null,
+    paymentTermDays:
+      data.paymentTermDays != null && Number.isInteger(data.paymentTermDays) && data.paymentTermDays >= 0
+        ? data.paymentTermDays
+        : null,
+    riskClass: ["NORMAL", "ROI", "DOUTEUX", "LITIGIEUX", "ARNAQUEUR"].includes(data.riskClass ?? "")
+      ? data.riskClass
+      : "NORMAL",
+    assignedStaffId: data.assignedStaffId ?? null,
     representative: data.representative?.trim() || null,
     externalRef: data.externalRef?.trim() || null,
     notes: data.notes?.trim() || null,
