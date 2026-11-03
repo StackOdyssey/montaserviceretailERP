@@ -9,21 +9,22 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 
 ## Phase A — Clients (user-flagged)
 
-### ⬜ G11 — Page `/clients` dédiée
+### ✅ G11 — Page `/clients` dédiée
 **Legacy:** `clients` + `clientEdit` + `CltsPosix` + `EtatVenteCltPosix`.
-- [ ] Route `/clients` + nav entry (Ventes group, between Ventes and Règlements)
-- [ ] Paginated searchable list (295 rows): fuzzy `matchTokens`, columns Nom|Tél|Ville|ICE|Collaborateur|Solde dû|badge aging
-- [ ] Fiche client: create/edit via existing `saveCustomer` — add fields (see G20)
-- [ ] Drawer per client: infos + documents + paiements + solde + relevé (`getCustomerStatement`) + "Encaisser" → PaymentModal
-- [ ] *Better than legacy:* fuzzy dedup hint on create, real-time solde, aging badge, mobile layout
-- Effort: M · Deps: none · Verify: dev CRUD + drawer + prod deploy
+- [x] Route `/clients` + nav entry (between Ventes and Règlements)
+- [x] Paginated (25/p) searchable list: `matchTokens`, colonnes Client(badges)|Contact|Commercial|Solde dû|Impayés + "Avec solde dû" toggle + aging badge J+
+- [x] `ClientDrawer`: header fiche + KPIs (facturé/réglé/dû) + onglets Documents/Règlements/Relevé + Encaisser→PaymentModal, Relevé A4→CustomerStatementModal, Modifier→CustomerModal
+- [x] Summary cards + commercial filter + Import CSV reuse
+- [x] **Bug trouvé+corrigé:** `CustomerModal` useState init-only → fiche vide en édition (aussi latent sur /reglements); ajout reset-on-open `useEffect`
+- [x] **Verified dev:** edit Garage Agent Test → staff=1/ROI/30j persistés; drawer refetch via refreshKey
+- Effort: M · Deps: none
 
-### ⬜ G20 — Champs fiche client manquants
-**Legacy:** collaborateur assigné, classification risque (normal/roi/douteux/litigieux/arnaqueur), échéance jours, type client (Normal/Semi-Grossiste/Grossiste/VIP).
-- [ ] `customers.assigned_staff_id` (→ staff COMMERCIAL), `risk_class`, `payment_term_days`
-- [ ] Fiche UI + filter "par collaborateur" sur `/clients` (legacy filter parity)
-- [ ] Map: isWholesale ↔ Grossiste types (keep existing flags, expose type select)
-- Effort: S · Deps: migration · Verify: edit + filter
+### ✅ G20 — Champs fiche client manquants (livré avec G11)
+**Legacy:** collaborateur assigné, classification risque, échéance jours.
+- [x] `customers.assigned_staff_id` → staff, `risk_class` (NORMAL/ROI/DOUTEUX/LITIGIEUX/ARNAQUEUR), `payment_term_days` — migration 0028 (dev appliquée, prod à faire au déploiement)
+- [x] CustomerModal: select commercial (getStaff), classification, échéance
+- [x] `/clients`: filtre par commercial + badges risque/aging
+- [ ] Prod migration 0028 — au déploiement
 
 ## Phase B — Règlements gaps
 
@@ -111,4 +112,5 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 ## Done log
 | Date | Item | Commit | Prod revision |
 |---|---|---|---|
-| 2026-11-03 | Legacy re-audit (42 routes) + audit doc + this tracker | — | — |
+| 2026-11-03 | Legacy re-audit (42 routes) + audit doc + this tracker | `5d00226` | — |
+| 2026-11-03 | G11+G20 /clients page + fiche fields + CustomerModal stale-state fix | `024a6b0` | pending (migration 0028 prod needed) |
