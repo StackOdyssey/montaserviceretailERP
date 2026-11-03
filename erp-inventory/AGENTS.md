@@ -120,3 +120,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 **Key legacy facts:** employees have 6 roles (administrateur/admin/commercial/Caissier/logisticiene); legacy categories≈marques are near-dup lists (G13 de-scoped); recepAdd has "En Compte" checkbox + Logisticien + Date.Rég.Prévu + entrepôt fields; payment modes union = acompte/carte/cheque/effet/espece/virement/versement/avoir/ristourne; dashboard "Ancien Solde" carryover 407 829,17 Dh.
 
 **Deploy pending:** prod migrate 0028 → `CLOUDSDK_AUTH_ACCESS_TOKEN=$(gcloud auth application-default print-access-token) gcloud run deploy erp-system --source . --region europe-west1 --project erp-syste` (run from erp-inventory/).
+
+## Git workflow — NON-NEGOTIABLE: one branch per feature
+
+- **Never commit a feature directly to `main`.** Every feature/tracker item gets its own branch (`feat/<item>-<slug>`, e.g. `feat/g11-clients-page`), committed there, then merged into `main` when verified.
+- **Why:** deploys must stay traceable — if a feature crashes prod, we can pinpoint the exact branch/commit and roll back to the last working one (`gcloud run deploy` of a prior commit or `git revert` the merge).
+- Small docs-only/typo commits may go straight to `main`; anything touching runtime code goes through a branch.
+- Deploy = merge of a verified branch; note branch + commit + prod revision in the tracker Done log.
