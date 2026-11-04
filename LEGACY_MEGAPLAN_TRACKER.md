@@ -77,7 +77,7 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 - [x] + Entrepôts CRUD → `WarehousesSection` in /parametres Catalogue (`saveWarehouse`, owner, audit)
 - [ ] inventaire par entrepôt + colonnes écart valeur
 - [ ] feuilleRoute "abrégée" = print variant on `/livraisons`
-- Effort: M (bundle of smalls) · Part 1 verified dev (200 mvt rows, 1 transfert, no migration)
+- Effort: M (bundle of smalls) · Part 1 deployed `erp-system-00132-l7m` (`v1.5.0`, prod-verified 41 mvt rows + transferts list)
 
 ### ⬜ G17 — Réception rapide (posixrecep/AchaPosix — 💀 upstream)
 - [ ] Quick-receive mode in SupplierReceiptModal: barcode/SKU-first entry, qty-only lines, no per-line price required, mobile-optimized
@@ -132,3 +132,5 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 | 2026-11-04 | G21 CARTE_BANCAIRE + VERSEMENT modes (`feature/g21-payment-modes`) | `63b33c8` | `erp-system-00121-f2r` `v1.2.0` (migration 0030 prod, live-verified 6 methods incl. TPE+Versement) |
 | 2026-11-04 | G23 de-scoped — 0/284 acomptes upstream | `d85c9b3` | — |
 | 2026-11-04 | G12 vue catalogue + marque filter + print (`feature/g12-catalogue-view`) | `a9ade51` | `erp-system-00125-8zw` `v1.3.0` (live-verified cards+filter+print btn) |
+| 2026-11-04 | G14 marques gérées (`feature/g14-brands`) | `310c4b9` | `erp-system-00128-9d7` `v1.4.0` (migration 0031, user-verified) |
+| 2026-11-04 | G18 p1 mouvements + transferts + entrepôts (`feature/g18-stock-parities`) | `d626dee` | `erp-system-00132-l7m` `v1.5.0` (live-verified) |

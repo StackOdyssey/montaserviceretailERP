@@ -137,4 +137,5 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **Workflow:** `Github_Branching_instructions.md` (repo root) — feature/* branches, approval checkpoint before merge+deploy, semver tag per deploy. Tags: v1.0.0=00116, v1.1.0=00118, v1.2.0=00121, v1.3.0=00125.
 - **G23 DE-SCOPED** (2026-11-04): `situationClients` pull — 0/284 clients with non-zero acompte. Never used upstream. 83 clients have non-zero Avoirs → credit notes are real usage, fold into Phase E.
 - **G14 DEPLOYED:** `erp-system-00128-9d7` `v1.4.0`. `brands` table (0031, backfilled), /parametres "Catalogue" tab → BrandsSection (add + toggle active), ProductModal datalist. User-verified on prod.
-- **Next:** G18 stock parities (bundle) → G17 quick-receive → Phase D (G15/G16/G19) → Phase E data pull. Dev server :3100.
+- **G18 p1 DEPLOYED:** `erp-system-00132-l7m` `v1.5.0` (`d626dee`). `/stock/mouvements` journal + `/stock/transferts` history + `WarehousesSection` (parametres Catalogue). Remaining G18: /ventes commercial filter, marge%/Val_PA cols, inventaire écart, feuilleRoute abrégée.
+- **Next:** G18 remainder → G17 quick-receive → Phase D (G15/G16/G19) → Phase E data pull. Dev server :3100.
