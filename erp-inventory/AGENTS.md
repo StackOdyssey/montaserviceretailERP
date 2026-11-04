@@ -138,4 +138,5 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **G23 DE-SCOPED** (2026-11-04): `situationClients` pull — 0/284 clients with non-zero acompte. Never used upstream. 83 clients have non-zero Avoirs → credit notes are real usage, fold into Phase E.
 - **G14 DEPLOYED:** `erp-system-00128-9d7` `v1.4.0`. `brands` table (0031, backfilled), /parametres "Catalogue" tab → BrandsSection (add + toggle active), ProductModal datalist. User-verified on prod.
 - **G18 p1 DEPLOYED:** `erp-system-00132-l7m` `v1.5.0` (`d626dee`). `/stock/mouvements` journal + `/stock/transferts` history + `WarehousesSection` (parametres Catalogue). Remaining G18: /ventes commercial filter, marge%/Val_PA cols, inventaire écart, feuilleRoute abrégée.
-- **Next:** G18 remainder → G17 quick-receive → Phase D (G15/G16/G19) → Phase E data pull. Dev server :3100.
+- **G18 p2 DEPLOYED:** `erp-system-00135-xgb` `v1.6.0`. marge%/Val_PA on /stock, inventaire DH écarts, /livraisons abrégée. /ventes commercial filter refed by `getDocumentCommercials` on main (`842a6ce`, undeployed — rides next release; prod staff table empty so staff-based select was hidden).
+- **Next:** G17 quick-receive → Phase D (G15/G16/G19) → Phase E data pull. Dev server :3100.

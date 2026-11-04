@@ -77,7 +77,7 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 - [x] + Entrepôts CRUD → `WarehousesSection` in /parametres Catalogue (`saveWarehouse`, owner, audit)
 - [x] Inventaire écart valeur → Val.Sélection/Inventaire/Écart (DH) on count list (legacy Valeur.Selection/Inventaire/Ecart) — par-entrepôt de-scoped (no warehouse_id on stock_counts)
 - [x] feuilleRoute "abrégée" → Complète/Abrégée toggle on `/livraisons` (signature column, drops commercial/statut/action)
-- Effort: M · Part 1 `erp-system-00132-l7m` `v1.5.0` · Part 2 on `feature/g18-parities-2` (no migration)
+- Effort: M · Deployed `erp-system-00135-xgb` `v1.6.0` (prod-verified marge/Val_PA + abrégée) — commercial select re-fed by `getDocumentCommercials` (`842a6ce`, deploys w/ next feature)
 
 ### ⬜ G17 — Réception rapide (posixrecep/AchaPosix — 💀 upstream)
 - [ ] Quick-receive mode in SupplierReceiptModal: barcode/SKU-first entry, qty-only lines, no per-line price required, mobile-optimized
