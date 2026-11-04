@@ -140,3 +140,4 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 | 2026-11-04 | G18 p2 marge/Val_PA + commercial filter + inventaire valeur + feuille abrégée | `c7646ce` | `erp-system-00135-xgb` `v1.6.0` (live-verified; commercial fix `842a6ce` w/ next) |
 | 2026-11-04 | G17 réception rapide (`feature/g17-quick-receive`) | `0a71e6f` | `erp-system-00139-gbf` `v1.7.0` (live-verified Rapide toggle) |
 | 2026-11-04 | Phase D: G15 CA mensuel + G16 profil + G19 print sweep | `53dd765` | `erp-system-00142-cpd` `v1.8.0` (live-verified all 3) |
+| 2026-11-04 | Phase E: opening positions — 99 BLs + 467 chèques + 2 crédits | `0049427` | prod DB direct (script `import-legacy-balances.mjs`) — net **697 910,50 ✓** |
