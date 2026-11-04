@@ -117,6 +117,7 @@ type ProductFilters = {
   search?: string;
   category?: string;
   categoryId?: number;
+  brand?: string;
   stockFilter?: "all" | "low" | "negative";
   businessLineCode?: string;
   /** Pagination : taille de page (défaut PRODUCTS_PAGE_SIZE) et décalage. */
@@ -153,6 +154,7 @@ async function productConds(options?: ProductFilters) {
   if (stockFilter === "negative") conds.push(sql`${products.currentStock} < 0`);
   if (categoryName) conds.push(eq(categories.name, categoryName));
   if (categoryId) conds.push(eq(products.categoryId, categoryId));
+  if (options?.brand) conds.push(eq(products.brand, options.brand));
   return { conds, lineCode };
 }
 
@@ -209,6 +211,22 @@ export async function getProducts(options?: ProductFilters): Promise<ProductItem
  * Total de pièces correspondant aux filtres de getProducts (sans la limite).
  * Sert à détecter « catalogue tronqué » côté UI.
  */
+/**
+ * Marques distinctes des pièces actives de la ligne métier (filtre vue catalogue G12).
+ */
+export async function getProductBrands(businessLineCode?: string): Promise<string[]> {
+  await assertAuthenticated();
+  const d = requireDb();
+  const lineId = await lineIdByCode(businessLineCode || "PIECES");
+  if (!lineId) return [];
+  const rows = await d
+    .selectDistinct({ brand: products.brand })
+    .from(products)
+    .where(and(eq(products.businessLineId, lineId), eq(products.isActive, true)))
+    .orderBy(asc(products.brand));
+  return rows.map((r) => r.brand).filter((b): b is string => !!b);
+}
+
 export async function getProductsCount(options?: ProductFilters): Promise<number> {
   await assertAuthenticated();
   const d = requireDb();

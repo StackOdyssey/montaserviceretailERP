@@ -17,10 +17,14 @@ import {
   Package,
   ClipboardList,
   ArrowRightLeft,
+  LayoutGrid,
+  List,
+  Printer,
 } from "lucide-react";
 import {
   getProducts,
   getProductsCount,
+  getProductBrands,
   saveProduct,
   recordStockMovement,
   importProductsBatch,
@@ -47,6 +51,10 @@ export default function StockCataloguePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "negative">("all");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
+  const [brands, setBrands] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<"table" | "catalogue">("table");
+  const [printedAt, setPrintedAt] = useState("");
   const [, startTransition] = useTransition();
 
   const filtersKeyRef = useRef("");
@@ -81,7 +89,7 @@ export default function StockCataloguePage() {
   // Charger une page du catalogue (pagination serveur) + compteurs par onglet.
   const fetchProducts = (targetPage: number) => {
     startTransition(async () => {
-      const base = { search: searchTerm, category: categoryFilter, businessLineCode: activeCode };
+      const base = { search: searchTerm, category: categoryFilter, brand: brandFilter || undefined, businessLineCode: activeCode };
       const [data, all, low, negative] = await Promise.all([
         getProducts({
           ...base,
@@ -108,7 +116,7 @@ export default function StockCataloguePage() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      const key = JSON.stringify([searchTerm, stockFilter, categoryFilter, activeCode]);
+      const key = JSON.stringify([searchTerm, stockFilter, categoryFilter, brandFilter, activeCode]);
       if (filtersKeyRef.current !== key) {
         filtersKeyRef.current = key;
         // Filtres modifiés : repartir en page 1 (re-déclenche l'effet via `page`).
@@ -122,7 +130,11 @@ export default function StockCataloguePage() {
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, stockFilter, categoryFilter, activeCode, page]);
+  }, [searchTerm, stockFilter, categoryFilter, brandFilter, activeCode, page]);
+
+  useEffect(() => {
+    getProductBrands(activeCode).then(setBrands).catch(() => {});
+  }, [activeCode]);
 
   const filteredTotal =
     stockFilter === "all" ? counts.all : stockFilter === "low" ? counts.low : counts.negative;
@@ -172,7 +184,7 @@ export default function StockCataloguePage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-2.5">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-2.5 print:hidden">
           <Link
             href="/stock/inventaire"
             className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
@@ -213,7 +225,7 @@ export default function StockCataloguePage() {
       {/* ======================================================== */}
       {/* 2. BARRE DE RECHERCHE RAPIDE & FILTRES                  */}
       {/* ======================================================== */}
-      <div className="bg-white p-4 rounded-2xl border border-[#E5E7EB] shadow-xs space-y-3">
+      <div className="bg-white p-4 rounded-2xl border border-[#E5E7EB] shadow-xs space-y-3 print:hidden">
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           {/* Champ de recherche instantanée */}
           <div className="relative flex-1">
@@ -252,6 +264,16 @@ export default function StockCataloguePage() {
               <option value="Transmission & Câblage">Transmission & Câblage</option>
               <option value="Électricité & Allumage">Électricité & Allumage</option>
               <option value="Carrosserie & Cadre">Carrosserie & Cadre</option>
+            </select>
+            <select
+              value={brandFilter}
+              onChange={(e) => setBrandFilter(e.target.value)}
+              className="min-w-0 px-3 py-2.5 text-xs font-semibold bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl focus:border-[#F7162D] outline-none"
+            >
+              <option value="">Toutes marques</option>
+              {brands.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
             </select>
             <select
               value={warehouseFilter ?? ""}
@@ -303,13 +325,99 @@ export default function StockCataloguePage() {
             <span className="w-2 h-2 rounded-full bg-[#F7162D] animate-ping" />
             <span>Stock négatif toléré ({counts.negative})</span>
           </button>
+
+          <div className="ml-auto flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => setViewMode("table")}
+              title="Vue tableau"
+              aria-label="Vue tableau"
+              className={`p-2 rounded-lg transition-all ${viewMode === "table" ? "bg-[#111827] text-white" : "bg-[#F8F9FA] text-[#4B5563] hover:bg-[#E5E7EB]"}`}
+            >
+              <List size={15} />
+            </button>
+            <button
+              onClick={() => setViewMode("catalogue")}
+              title="Vue catalogue"
+              aria-label="Vue catalogue"
+              className={`p-2 rounded-lg transition-all ${viewMode === "catalogue" ? "bg-[#111827] text-white" : "bg-[#F8F9FA] text-[#4B5563] hover:bg-[#E5E7EB]"}`}
+            >
+              <LayoutGrid size={15} />
+            </button>
+            {viewMode === "catalogue" && (
+              <button
+                onClick={() => {
+                  setPrintedAt(new Date().toLocaleDateString("fr-FR"));
+                  setTimeout(() => window.print(), 0);
+                }}
+                title="Imprimer le catalogue"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold bg-[#F8F9FA] text-[#374151] border border-[#E5E7EB] hover:bg-[#E5E7EB] transition-all"
+              >
+                <Printer size={14} />
+                <span className="hidden sm:inline">Imprimer</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* ======================================================== */}
       {/* 3. TABLEAU DES ARTICLES (DESKTOP & MOBILE)               */}
       {/* ======================================================== */}
-      <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-xs overflow-hidden">
+      {/* Vue catalogue — grille de fiches imprimable (G12) */}
+      {viewMode === "catalogue" && (
+        <div className="print-root bg-white rounded-2xl border border-[#E5E7EB] shadow-xs p-4 md:p-6">
+          <div className="hidden print:block text-center mb-6">
+            <div className="text-lg font-bold text-[#111827]">
+              {company.raisonSociale || "SARL BM Motors"} — Catalogue produits
+            </div>
+            <div className="text-xs text-[#6B7280]">
+              {filteredTotal} article(s) · Page {page}/{totalPages}
+              {brandFilter ? ` · Marque : ${brandFilter}` : ""}
+              {categoryFilter ? ` · Catégorie : ${categoryFilter}` : ""}
+              {printedAt ? ` · Imprimé le ${printedAt}` : ""}
+            </div>
+          </div>
+          {productsList.length === 0 ? (
+            <div className="p-12 text-center text-xs text-[#6B7280]">Aucune pièce trouvée.</div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {productsList.map((p) => {
+                const shownStock = warehouseFilter == null ? p.currentStock : (whStock[p.id] ?? 0);
+                return (
+                  <div key={p.id} className="rounded-xl border border-[#E5E7EB] overflow-hidden bg-white flex flex-col break-inside-avoid">
+                    <div className="aspect-square bg-[#F8F9FA] flex items-center justify-center">
+                      {p.photoUrl ? (
+                        <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Boxes size={36} className="text-[#D1D5DB]" />
+                      )}
+                    </div>
+                    <div className="p-3 flex flex-col flex-1">
+                      <div className="font-mono text-[10px] text-[#9CA3AF]">{p.sku}{p.oemCode ? ` · ${p.oemCode}` : ""}</div>
+                      <div className="text-xs font-bold text-[#111827] leading-snug line-clamp-2 mt-0.5">{p.name}</div>
+                      <div className="text-[10px] text-[#6B7280] mt-0.5">{p.brand || "Bashan"}{p.categoryName ? ` · ${p.categoryName}` : ""}</div>
+                      <div className="mt-auto pt-2 flex items-center justify-between">
+                        <span className="text-sm font-black text-[#111827]">{formatMoney(p.salePriceRetailCents)}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                          shownStock < 0
+                            ? "bg-[#FEF2F2] text-[#F7162D]"
+                            : shownStock <= p.minStockAlert
+                            ? "bg-[#FFFBEB] text-[#D97706]"
+                            : "bg-[#ECFDF5] text-[#059669]"
+                        }`}>
+                          Stock : {shownStock}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className={`bg-white rounded-2xl border border-[#E5E7EB] shadow-xs overflow-hidden${viewMode === "catalogue" ? " hidden" : ""}`}>
         {productsList.length === 0 ? (
           <div className="p-12 text-center space-y-3">
             <Package size={40} className="mx-auto text-[#9CA3AF]" />

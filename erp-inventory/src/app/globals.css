@@ -85,3 +85,9 @@ body {
   background: #9CA3AF;
 }
 
+
+/* Impression : masquer le chrome applicatif (sidebar, header) — catalogue G12 & futurs états */
+@media print {
+  aside, header, nav { display: none !important; }
+  main { margin: 0 !important; padding: 0 !important; }
+}

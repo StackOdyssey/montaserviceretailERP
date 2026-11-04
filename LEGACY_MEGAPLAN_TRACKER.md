@@ -53,10 +53,13 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 
 ## Phase C — Stock & catalogue
 
-### ⬜ G12 — Vue catalogue produits
+### ✅ G12 — Vue catalogue produits
 **Legacy:** produitCatalogue (frs+marque filters, print) + CataloguePhoto (photo grid).
-- [ ] "Vue catalogue" toggle on `/stock`: card grid w/ photos (R2 `photo_url` already on 295 products), marque/categorie filters, print stylesheet → shareable catalogue
-- Effort: S · Deps: none
+- [x] "Vue catalogue" toggle on `/stock` (List/LayoutGrid icons): card grid w/ photo, SKU, marque, prix vente, stock badge — partage même pagination/filtres serveur
+- [x] `getProductBrands` + `brand` filter param on getProducts/getProductsCount → select "Toutes marques"
+- [x] Print stylesheet: `@media print` hides app chrome (globals.css), print-only header (société, nb articles, filtres actifs, date), "Imprimer" button → shareable catalogue
+- [x] **Verified dev:** 50 cards page 1, JMC filter → 34 produits, print button present
+- Effort: S · Deploy: prod (branch `feature/g12-catalogue-view`) — no migration needed
 
 ### ⬜ G14 — Marques gérées
 **Legacy:** marques CRUD list (7 rows) + marqueImport; ours: free-text `products.brand`.
