@@ -89,11 +89,11 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 
 ## Phase D — Reporting & profil
 
-### ⬜ G15 — CA mensuel (+ objectifs)
+### ✅ G15 — CA mensuel (+ objectifs)
 **Legacy:** CAmois + objectifsListe (both 💀) — dashboard "Total Objectif : November".
-- [ ] `/comptabilite` new tab "CA mensuel": CA TTC by month ×12, per commercial, per client top-N, vs prior year
-- [ ] Optional: `sales_targets` table (month, commercial, target) + progress bar on dashboard
-- Effort: M · Deps: none
+- [x] `/comptabilite` new tab "CA mensuel" → `MonthlyCA` + `getMonthlyRevenue`: 12 mois vs N-1 (Δ%), CA par commercial, Top 10 clients — same CA convention as journée (BL/FAC−AVOIR, BL→FAC dedup)
+- [ ] Optional `sales_targets` table — de-scoped (legacy objectifs 💀, no data to anchor)
+- Effort: M · Deploy: prod (branch `feature/g15-ca-mensuel`, no migration)
 
 ### ⬜ G16 — Profil employé
 **Legacy:** employeFiche + employes (13 accounts, 6 profiles).

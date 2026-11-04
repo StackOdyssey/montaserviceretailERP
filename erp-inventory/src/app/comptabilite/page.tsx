@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Lock,
   Unlock,
+  TrendingUp,
 } from "lucide-react";
 import {
   TvaAccountingExport,
@@ -39,11 +40,12 @@ import { formatMoney } from "@/lib/money";
 import { unwrap } from "@/lib/action-result";
 import { useSettings } from "@/components/layout/SettingsProvider";
 import { useToast } from "@/components/ui/ToastProvider";
+import { MonthlyCA } from "@/components/accounting/MonthlyCA";
 
 export default function ComptabilitePage() {
   const company = useSettings();
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<"TVA" | "STOCK" | "MARGES" | "AGING" | "VALIDATION" | "JOURNEE">("TVA");
+  const [activeTab, setActiveTab] = useState<"TVA" | "STOCK" | "MARGES" | "AGING" | "VALIDATION" | "JOURNEE" | "CA">("TVA");
   const [tvaData, setTvaData] = useState<TvaAccountingExport | null>(null);
   const [stockData, setStockData] = useState<StockValuation | null>(null);
   const [marginsData, setMarginsData] = useState<ProfitMarginsReport | null>(null);
@@ -313,6 +315,18 @@ export default function ComptabilitePage() {
         >
           <BarChart3 className="w-4 h-4" />
           Feuille de journée
+        </button>
+
+        <button
+          onClick={() => setActiveTab("CA")}
+          className={`pb-3 text-sm font-bold flex items-center gap-2 border-b-2 transition ${
+            activeTab === "CA"
+              ? "border-[#F7162D] text-[#F7162D]"
+              : "border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white"
+          }`}
+        >
+          <TrendingUp className="w-4 h-4" />
+          CA mensuel
         </button>
       </div>
 
@@ -1036,6 +1050,11 @@ export default function ComptabilitePage() {
           )}
         </div>
       )}
+
+      {/* ======================================================== */}
+      {/* ONGLET 7 : CA MENSUEL (G15)                              */}
+      {/* ======================================================== */}
+      {activeTab === "CA" && <MonthlyCA />}
     </div>
   );
 }

@@ -552,3 +552,74 @@ export async function getDailySheet(from: string, to: string): Promise<DailyShee
     cancelledDocs: Number(cancelled?.n ?? 0),
   };
 }
+
+// ==========================================
+// G15 — CA MENSUEL (chiffre d'affaires par mois)
+// ==========================================
+
+export interface MonthlyRevenueData {
+  /** 12 derniers mois : total TTC signé + même mois N-1 pour comparaison. */
+  months: Array<{ ym: string; totalTtcCents: number; priorYearCents: number }>;
+  byCommercial: Array<{ name: string; totalTtcCents: number }>;
+  topClients: Array<{ name: string; totalTtcCents: number }>;
+}
+
+/**
+ * CA TTC par mois (12 derniers + N-1), par commercial et top clients.
+ * Même convention que getDailySheet : BL/FACTURE +, AVOIR −, VALE/PAYE,
+ * BL→FAC dédupliqué via document_links.
+ */
+export async function getMonthlyRevenue(): Promise<ActionResult<MonthlyRevenueData>> {
+  return actionResult(async () => {
+    await assertAuthenticated();
+    const d = requireDb();
+    const salesConds = and(
+      or(eq(salesDocuments.status, "VALIDE"), eq(salesDocuments.status, "PAYE")),
+      or(eq(salesDocuments.docType, "BL"), eq(salesDocuments.docType, "FACTURE"), eq(salesDocuments.docType, "AVOIR")),
+      sql`not exists (select 1 from document_links dl where dl.target_document_id = ${salesDocuments.id} and dl.link_type = 'BL_TO_FAC')`,
+      isNull(salesDocuments.deletedAt)
+    );
+    const signedTotal = sql<number>`coalesce(sum(case when ${salesDocuments.docType} = 'AVOIR' then -${salesDocuments.totalTtcCents} else ${salesDocuments.totalTtcCents} end),0)::bigint`;
+
+    const [monthRows, comRows, cliRows] = await Promise.all([
+      d.select({
+        ym: sql<string>`to_char(${salesDocuments.docDate}, 'YYYY-MM')`,
+        total: signedTotal,
+      }).from(salesDocuments).where(salesConds).groupBy(sql`1`),
+      d.select({
+        name: salesDocuments.commercialName,
+        total: signedTotal,
+      }).from(salesDocuments)
+        .where(and(salesConds, gte(salesDocuments.docDate, sql`(date_trunc('month', now()) - interval '11 months')::timestamp`)))
+        .groupBy(salesDocuments.commercialName)
+        .orderBy(sql`2 desc`),
+      d.select({
+        name: salesDocuments.customerName,
+        total: signedTotal,
+      }).from(salesDocuments)
+        .where(and(salesConds, gte(salesDocuments.docDate, sql`(date_trunc('month', now()) - interval '11 months')::timestamp`)))
+        .groupBy(salesDocuments.customerName)
+        .orderBy(sql`2 desc`)
+        .limit(10),
+    ]);
+
+    const byYm = new Map(monthRows.map((r) => [r.ym, Number(r.total)]));
+    const months: MonthlyRevenueData["months"] = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const cur = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const ym = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`;
+      const prior = `${cur.getFullYear() - 1}-${String(cur.getMonth() + 1).padStart(2, "0")}`;
+      months.push({
+        ym,
+        totalTtcCents: byYm.get(ym) ?? 0,
+        priorYearCents: byYm.get(prior) ?? 0,
+      });
+    }
+    return {
+      months,
+      byCommercial: comRows.map((r) => ({ name: r.name ?? "Non attribué", totalTtcCents: Number(r.total) })),
+      topClients: cliRows.map((r) => ({ name: r.name, totalTtcCents: Number(r.total) })),
+    };
+  });
+}
