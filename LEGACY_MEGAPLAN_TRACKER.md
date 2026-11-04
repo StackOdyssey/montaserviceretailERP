@@ -79,9 +79,10 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 - [x] feuilleRoute "abrégée" → Complète/Abrégée toggle on `/livraisons` (signature column, drops commercial/statut/action)
 - Effort: M · Deployed `erp-system-00135-xgb` `v1.6.0` (prod-verified marge/Val_PA + abrégée) — commercial select re-fed by `getDocumentCommercials` (`842a6ce`, deploys w/ next feature)
 
-### ⬜ G17 — Réception rapide (posixrecep/AchaPosix — 💀 upstream)
-- [ ] Quick-receive mode in SupplierReceiptModal: barcode/SKU-first entry, qty-only lines, no per-line price required, mobile-optimized
-- Effort: S-M · Deps: none
+### ✅ G17 — Réception rapide (posixrecep/AchaPosix — 💀 upstream)
+- [x] "Rapide" toggle in SupplierReceiptModal: SKU/barcode/OEM input + qty + Enter/add — resolves client-side against catalog, duplicate scan increments qty, price defaults from product PA (editable in the line rows)
+- [x] Verified dev: scan 1001→CDI 5 LIFA MOTO added, dup scan incremented, "ZZZZ" → "Introuvable"
+- Effort: S-M · Deploy: prod (branch `feature/g17-quick-receive`, no migration)
 
 ### ⏭️ G13 — Familles (DE-SCOPED)
 1 row "PAR DEFAUT" upstream — feature never used. Our categories = their categories. No action.

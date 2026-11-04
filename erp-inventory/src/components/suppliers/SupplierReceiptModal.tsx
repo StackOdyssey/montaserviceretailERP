@@ -68,6 +68,12 @@ export function SupplierReceiptModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // G17 — mode réception rapide : saisie SKU/code-barres + quantité.
+  const [quickMode, setQuickMode] = useState(false);
+  const [quickCode, setQuickCode] = useState("");
+  const [quickQty, setQuickQty] = useState(1);
+  const [quickMsg, setQuickMsg] = useState<string | null>(null);
+
   // Sync externe : la liste parent peut se recharger (loadData après création).
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -251,8 +257,45 @@ export function SupplierReceiptModal({
 
   const handleCostChange = (index: number, cost: string) => {
     setLines((prev) =>
-      prev.map((l, i) => (i === index ? { ...l, unitCostDh: cost } : l))
+      prev.map((l, i) => (i === index ? { ...l, unitCostDh : cost } : l))
     );
+  };
+
+  // Réception rapide : résoudre SKU / code-barres / OEM dans le catalogue chargé.
+  const handleQuickAdd = () => {
+    const code = quickCode.trim().toLowerCase();
+    if (!code) return;
+    const prod = catalog.find(
+      (p) =>
+        p.sku.toLowerCase() === code ||
+        p.oemCode?.toLowerCase() === code ||
+        p.barcode?.toLowerCase() === code
+    );
+    if (!prod) {
+      setQuickMsg(`Introuvable : ${quickCode.trim()}`);
+      return;
+    }
+    const qty = Math.max(1, quickQty);
+    setLines((prev) => {
+      const i = prev.findIndex((l) => l.productId === prod.id);
+      if (i >= 0) {
+        // Doublon scanné → cumuler la quantité.
+        return prev.map((l, j) => (j === i ? { ...l, quantity: l.quantity + qty } : l));
+      }
+      return [
+        ...prev,
+        {
+          productId: prod.id,
+          productName: prod.name,
+          sku: prod.sku,
+          quantity: qty,
+          unitCostDh: (prod.purchasePriceCents / 100).toFixed(2),
+        },
+      ];
+    });
+    setQuickMsg(null);
+    setQuickCode("");
+    setQuickQty(1);
   };
 
   // Calcul des totaux en direct
@@ -533,15 +576,61 @@ export function SupplierReceiptModal({
               <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                 Articles Reçus en Stock ({lines.length})
               </label>
-              <button
-                type="button"
-                onClick={handleAddLine}
-                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Ajouter une pièce
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setQuickMode((v) => !v)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                    quickMode
+                      ? "bg-[#F7162D] text-white"
+                      : "bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200"
+                  }`}
+                >
+                  Rapide
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddLine}
+                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Ajouter une pièce
+                </button>
+              </div>
             </div>
+
+            {quickMode && (
+              <div className="flex flex-col sm:flex-row gap-2 p-3 bg-red-50/60 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 rounded-xl">
+                <input
+                  type="text"
+                  value={quickCode}
+                  onChange={(e) => { setQuickCode(e.target.value); setQuickMsg(null); }}
+                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleQuickAdd())}
+                  placeholder="SKU / Code-barres / OEM — scanner ou taper puis Entrée"
+                  autoFocus
+                  aria-label="Code produit à recevoir"
+                  className="flex-1 px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-mono font-bold outline-none focus:border-[#F7162D]"
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    value={quickQty}
+                    onChange={(e) => setQuickQty(Math.max(1, parseInt(e.target.value) || 1))}
+                    aria-label="Quantité reçue"
+                    className="w-20 px-2 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-bold text-center"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleQuickAdd}
+                    className="px-4 py-2.5 bg-[#F7162D] hover:bg-[#D90E23] text-white text-xs font-bold rounded-lg transition"
+                  >
+                    + Ajouter
+                  </button>
+                </div>
+                {quickMsg && <div className="text-[11px] font-bold text-[#F7162D] sm:basis-full">{quickMsg}</div>}
+              </div>
+            )}
 
             <div className="space-y-3">
               {lines.map((line, index) => {
