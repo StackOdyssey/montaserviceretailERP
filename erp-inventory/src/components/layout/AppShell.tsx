@@ -449,16 +449,18 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
 
           <div className="flex items-center gap-4">
             <BusinessLineSelect />
-            <div className="text-right">
-              <span className="text-xs font-semibold text-[#111827] block">SARL BM Motors</span>
-              <span className="text-[11px] text-[#059669] font-medium flex items-center justify-end gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#059669] animate-pulse" />
-                Connecté
-              </span>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-[#FEF2F2] border border-[#FCA5A5] flex items-center justify-center text-[#F7162D] font-bold text-xs">
-              BM
-            </div>
+            <Link href="/profil" className="flex items-center gap-4 hover:opacity-80 transition-opacity" title="Mon profil">
+              <div className="text-right">
+                <span className="text-xs font-semibold text-[#111827] block">SARL BM Motors</span>
+                <span className="text-[11px] text-[#059669] font-medium flex items-center justify-end gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#059669] animate-pulse" />
+                  Connecté
+                </span>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-[#FEF2F2] border border-[#FCA5A5] flex items-center justify-center text-[#F7162D] font-bold text-xs">
+                BM
+              </div>
+            </Link>
           </div>
         </header>
 

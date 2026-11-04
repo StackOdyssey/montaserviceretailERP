@@ -95,11 +95,11 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 - [ ] Optional: `sales_targets` table (month, commercial, target) + progress bar on dashboard
 - Effort: M · Deps: none
 
-### ⬜ G16 — Profil employé
+### ✅ G16 — Profil employé
 **Legacy:** employeFiche + employes (13 accounts, 6 profiles).
-- [ ] Self page (parametres or user menu): own name, change own PIN, "mes ventes du jour"
-- [ ] Optional: role labels beyond CAISSIER/PROPRIETAIRE (display only — keep auth model)
-- Effort: S · Deps: none
+- [x] `/profil` page (linked from AppShell user chip): name+role, "Mes ventes du jour" (audit VALIDATION_DOCUMENT join), change own PIN (verify current + dup check + audit row); master session shows env-PIN note
+- [x] Role labels kept (CAISSIER/PROPRIETAIRE display only)
+- Effort: S · Deploy: prod (branch `feature/g16-profil`, no migration)
 
 ### ⬜ G19 — Imprimer / PDF / CSV partout
 **Legacy:** Imprimer+ImpEtat on every list, brPrint, ticketPosixPAI, ExportListProduit.
