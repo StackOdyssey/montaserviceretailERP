@@ -36,7 +36,7 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 - [x] Supplier payments: new modes → DEBITE immediately (only CHEQUE/EFFET_LCN stay EN_ATTENTE)
 - [x] **Decisions:** ACOMPTE → G23 (needs advances design + usage check) · RISTOURNE → covered by AVOIR `COMMERCIAL` · AVOIR-as-payment → de-scoped (avoirs already net into solde via doc math)
 - [x] **Verified dev:** VERSEMENT 150 DH → Encaissé + journée VERSEMENT group; POS TPE BL-2026-00017 no-fiche + journée CARTE_BANCAIRE group; 6 buttons in PaymentModal/SupplierModal
-- Effort: S-M · Deploy: prod migration 0030 + deploy (branch `feature/g21-payment-modes`)
+- Effort: S-M · Deployed `erp-system-00121-f2r` (`v1.2.0`, migration 0030 prod applied, live-verified 6 methods in PaymentModal)
 
 ### ✅ G22 — Chèque "Règlement au nom" (tiers endossé)
 **Legacy:** ListeChequesClts column "Régelement au Nom" — endorsed 3rd-party cheques are real usage.
@@ -121,3 +121,4 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 | 2026-11-03 | Legacy re-audit (42 routes) + audit doc + this tracker | `5d00226` | — |
 | 2026-11-03 | G11+G20 /clients page + fiche fields + CustomerModal stale-state fix | `024a6b0` | `erp-system-00116-jv8` (migration 0028 prod applied, live-verified /clients + drawer, console clean) |
 | 2026-11-04 | G22 payee_name on cheques/effets (`feat/g22-payee-name`) | `977edb0` | `erp-system-00118-t5b` (migration 0029 prod applied, live-verified payee field on Chèque, console clean) |
+| 2026-11-04 | G21 CARTE_BANCAIRE + VERSEMENT modes (`feature/g21-payment-modes`) | `63b33c8` | `erp-system-00121-f2r` `v1.2.0` (migration 0030 prod, live-verified 6 methods incl. TPE+Versement) |

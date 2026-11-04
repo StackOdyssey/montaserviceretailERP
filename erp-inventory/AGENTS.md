@@ -132,5 +132,6 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - **G11+G20 DEPLOYED:** `erp-system-00116-jv8`, migration 0028 on prod. `/clients` live.
 - **G22 DEPLOYED:** `erp-system-00118-t5b`, migration 0029 on prod (`customer_payments.payee_name`). Live-verified: "Règlement au nom de (tiers — chèque endossé)" field renders on Chèque in PaymentModal via /clients → Encaisser, console clean.
-- **Next: G21** payment modes (CARTE_BANCAIRE + VERSEMENT in `src/lib/payments.ts` PaymentMethod + journée totals), then G23 acomptes. Everything on feature branches per the non-negotiable rule.
-- Working tree clean; dev server on :3100.
+- **G21 DEPLOYED:** `erp-system-00121-f2r` `v1.2.0` (`63b33c8`, `feature/g21-payment-modes` merged+deleted). Migration 0030 prod — `payment_methods` += CARTE_BANCAIRE+VERSEMENT. POS has 4th TPE button (no fiche); VERSEMENT requires fiche like VIREMENT; supplier non-cheque/effet → DEBITE. `paymentMethodLabel()` in `src/lib/payments.ts`.
+- **Workflow:** `Github_Branching_instructions.md` (repo root) — feature/* branches, approval checkpoint before merge+deploy, semver tag per deploy. Tags: v1.0.0=00116, v1.1.0=00118, v1.2.0=00121.
+- **Next: G23** acomptes (assess SoldesClient usage first), then phase C (G12 catalogue vue, G14 marques, G18 stock parities, G17 quick-receive). Dev server :3100; working tree clean.
