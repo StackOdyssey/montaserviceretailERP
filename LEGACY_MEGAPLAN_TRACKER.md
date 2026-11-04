@@ -109,12 +109,12 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 - Effort: M · Deploy: prod (branch `feature/g19-print-csv`, no migration)
 
 ## Phase E — Data pull (last, before legacy shutdown)
-- [ ] Open items: CreditsClients (unpaid BLs) + ListeChequesClts (pending cheques w/ échéances + payee) → import as open docs/payments
-- [ ] Verify vs `situationClients` total reste **697 910,50 Dh** + situationFournisseurs (page 💀 — fallback: supplier balances via fournisseurSituation&id=N per supplier)
-- [ ] Doc headers by year via dateD/dateF POST on bls/devis/retours/receptions → historical docs (IMPORT status, no stock replay)
-- [ ] Payments history (paiementClients rows) + depenses
-- [ ] `MIGRATION_RECONCILE.md`: per-entity counts + sums old vs new
-- [ ] Fallback: open items + last 12 months; older = CSV archive only
+- [x] Open items: `situationClients` 40 debtors + `ListeChequesClts` 467 open chèques/effets → imported 99 unpaid VALIDE BLs + 467 `EN_ATTENTE` payments + 2 credit-balance payments (`import-legacy-balances.mjs`)
+- [x] Verified vs `situationClients` total reste → **net receivable = 697 910,50 Dh exact, 0 mismatches**
+- [ ] Doc headers by year via dateD/dateF POST on bls/devis/retours/receptions → optional archive only, skipped
+- [ ] Payments history + depenses — `paiementClients`/`paiementFournisseurs` both dead sources
+- [x] `MIGRATION_RECONCILE.md`: counts + sums documented
+- [ ] Supplier balances — ALL sources dead (situationFournisseurs / fournisseurSituation / paiementFournisseurs) → **manual entry needed for 8 suppliers**
 
 ## Newly discovered & de-scoped
 | Item | Verdict |

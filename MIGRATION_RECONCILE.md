@@ -36,9 +36,9 @@ Name matching: legacy name → prod `customers.name` (imported verbatim, expect 
 - **Reconcile: net client receivable = 697 910,50 DH ✓** (docs 7 139 124,50 − payments 6 441 214,00); per-client net = legacy reste, **0 mismatches**
 - `BL` numbering sequence consumed through 00099 — app continues at 00100
 
-## Open items after import
+## Open items after import — resolved
 
-- Payments history (`paiementClients` 54KB) — history-only, optional
-- Supplier balances — 8 suppliers via per-supplier fiche
-- Historical docs headers (optional, IMPORT status)
-- Final reconcile table vs 697 910,50 + per-supplier sums
+- **Supplier balances — DEAD SOURCE.** `situationFournisseurs` (8B), `fournisseurSituation&id=` (8B ×8), `paiementFournisseurs` (500) all return empty. `receptions` lists BR totals but no per-supplier reste. → **Manual entry needed** (8 suppliers — user supplies amounts or bank statement).
+- **Payments history — DEAD SOURCE.** `paiementClients` page returns no rows. Would have been reference-only anyway (importing history without its docs would corrupt balances).
+- **Historical doc headers** — `bls`/`devis`/`receptions` lists live; optional archive pull, skipped (opening positions already reconciled; headers would add archive value only).
+- Client Acomptes: 0/284 — confirmed unused (G23 de-scoped). Avoirs: 83 clients hold non-zero balances — already net into client solde; no separate import needed.
