@@ -69,12 +69,15 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 - [x] Verified: tsc + build clean, migration dev applied
 - Effort: S · Deployed `erp-system-00128-9d7` (`v1.4.0`, migration 0031 prod applied, live-verified: add/deactivate marque)
 
-### ⬜ G18 — Petites parités stock/ventes
+### 🔄 G18 — Petites parités stock/ventes (part 1 on `feature/g18-stock-parities`)
 - [ ] `/ventes`: filtre par commercial (data déjà affichée)
-- [ ] `/stock`: colonnes Marge % + Valeur stock (Val_PA) + filtre marque/nature (cf. legacy stock page)
-- [ ] Liste des transferts (stock_transfers reader UI) + inventaire par entrepôt + colonnes écart valeur
+- [ ] `/stock`: colonnes Marge % + Valeur stock (Val_PA) — filtre marque ✅ (G12)
+- [x] Liste des transferts → `/stock/transferts` (source/dest filters, expandable lines, print)
+- [x] + `/stock/mouvements` journal global (nature/entrepôt/recherche) via `getStockMovements`
+- [x] + Entrepôts CRUD → `WarehousesSection` in /parametres Catalogue (`saveWarehouse`, owner, audit)
+- [ ] inventaire par entrepôt + colonnes écart valeur
 - [ ] feuilleRoute "abrégée" = print variant on `/livraisons`
-- Effort: M (bundle of smalls) · Deps: none
+- Effort: M (bundle of smalls) · Part 1 verified dev (200 mvt rows, 1 transfert, no migration)
 
 ### ⬜ G17 — Réception rapide (posixrecep/AchaPosix — 💀 upstream)
 - [ ] Quick-receive mode in SupplierReceiptModal: barcode/SKU-first entry, qty-only lines, no per-line price required, mobile-optimized

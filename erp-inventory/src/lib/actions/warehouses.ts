@@ -1,8 +1,8 @@
 "use server";
 
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { auditLogs, db, productStock, products, stockMovements, stockTransferLines, stockTransfers, warehouses } from "@/db";
-import { assertAuthenticated, currentActor } from "@/lib/action-guard";
+import { assertAuthenticated, assertOwner, currentActor } from "@/lib/action-guard";
 import { assertPeriodOpen } from "@/lib/accounting-period";
 import { lockProducts, type Tx } from "@/lib/stock-lock";
 import { bumpWarehouseStock } from "@/lib/warehouse";
@@ -110,6 +110,99 @@ export async function getStockTransfers(): Promise<ActionResult<StockTransferIte
     createdAt: (r.createdAt ?? new Date()).toISOString(),
     lines: byTransfer.get(r.id) ?? [],
   }));
+  });
+}
+
+/** Crée ou renomme un entrepôt (owner). `isDefault` ne peut être retiré que via un autre entrepôt. */
+export async function saveWarehouse(data: {
+  id?: number;
+  name: string;
+  code?: string;
+}): Promise<ActionResult<{ id: number }>> {
+  return actionResult(async () => {
+    await assertOwner();
+    const d = requireDb();
+    const name = data.name.trim();
+    if (!name) throw new Error("Nom d'entrepôt requis");
+    if (data.id) {
+      await d.update(warehouses).set({ name }).where(eq(warehouses.id, data.id));
+      await d.insert(auditLogs).values({
+        action: "EDIT_ENTREPOT", entityType: "WAREHOUSE", actorName: await currentActor(),
+        entityId: data.id, details: `Entrepôt renommé → ${name}`,
+      });
+      return { id: data.id };
+    }
+    const code = (data.code?.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "_") || name.toUpperCase().replace(/[^A-Z0-9]/g, "_")).slice(0, 40);
+    const dup = (await d.select({ id: warehouses.id }).from(warehouses).where(eq(warehouses.code, code)).limit(1))[0];
+    if (dup) throw new Error(`Code entrepôt déjà utilisé : ${code}`);
+    const row = (await d.insert(warehouses).values({ code, name }).returning({ id: warehouses.id }))[0];
+    await d.insert(auditLogs).values({
+      action: "CREATION_ENTREPOT", entityType: "WAREHOUSE", actorName: await currentActor(),
+      entityId: row.id, details: `Entrepôt "${name}" (${code}) créé`,
+    });
+    return { id: row.id };
+  });
+}
+
+export interface StockMovementRow {
+  id: number;
+  productId: number;
+  sku: string;
+  productName: string;
+  movementType: string;
+  quantity: number;
+  unitCostCents: number | null;
+  warehouseName: string | null;
+  sourceDocumentType: string | null;
+  sourceDocumentId: number | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+/** Journal global des mouvements de stock (G18) — filtres type/entrepôt/recherche. */
+export async function getStockMovements(options?: {
+  movementType?: string;
+  warehouseId?: number;
+  search?: string;
+  limit?: number;
+}): Promise<ActionResult<StockMovementRow[]>> {
+  return actionResult(async () => {
+    await assertAuthenticated();
+    const d = requireDb();
+    const conds = [];
+    if (options?.movementType) conds.push(eq(stockMovements.movementType, options.movementType));
+    if (options?.warehouseId) conds.push(eq(stockMovements.warehouseId, options.warehouseId));
+    if (options?.search) {
+      const like = `%${options.search.trim()}%`;
+      conds.push(or(ilike(products.sku, like), ilike(products.name, like))!);
+    }
+    const rows = await d
+      .select({
+        m: stockMovements,
+        sku: products.sku,
+        productName: products.name,
+        warehouseName: warehouses.name,
+      })
+      .from(stockMovements)
+      .innerJoin(products, eq(stockMovements.productId, products.id))
+      .leftJoin(warehouses, eq(stockMovements.warehouseId, warehouses.id))
+      .where(conds.length ? and(...conds) : undefined)
+      .orderBy(sql`${stockMovements.id} desc`)
+      .limit(Math.min(Math.max(1, options?.limit ?? 200), 500));
+    return rows.map((r) => ({
+      id: r.m.id,
+      productId: r.m.productId,
+      sku: r.sku,
+      productName: r.productName,
+      movementType: r.m.movementType,
+      quantity: r.m.quantity,
+      unitCostCents: r.m.unitCostCents,
+      warehouseName: r.warehouseName,
+      sourceDocumentType: r.m.sourceDocumentType,
+      sourceDocumentId: r.m.sourceDocumentId,
+      reason: r.m.reason,
+      createdAt: (r.m.createdAt ?? new Date()).toISOString(),
+    }));
   });
 }
 

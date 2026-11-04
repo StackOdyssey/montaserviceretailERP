@@ -193,6 +193,22 @@ export default function StockCataloguePage() {
             <span>Inventaire</span>
           </Link>
 
+          <Link
+            href="/stock/mouvements"
+            className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
+          >
+            <History size={16} className="text-[#0D9488]" />
+            <span>Mouvements</span>
+          </Link>
+
+          <Link
+            href="/stock/transferts"
+            className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
+          >
+            <ArrowRightLeft size={16} className="text-[#7C3AED]" />
+            <span>Historique</span>
+          </Link>
+
           <button
             onClick={() => setIsTransferOpen(true)}
             className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"

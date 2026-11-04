@@ -25,6 +25,7 @@ import { clearAppCaches } from "@/components/pwa/clear-app-caches";
 import { UsersSection } from "@/components/settings/UsersSection";
 import { StaffSection } from "@/components/settings/StaffSection";
 import { BrandsSection } from "@/components/settings/BrandsSection";
+import { WarehousesSection } from "@/components/settings/WarehousesSection";
 import { useToast } from "@/components/ui/ToastProvider";
 import { unwrap } from "@/lib/action-result";
 
@@ -733,6 +734,7 @@ export default function ParametresPage() {
         {activeTab === "CATALOGUE" && (
           <div className="space-y-6">
             <BrandsSection />
+            <WarehousesSection />
           </div>
         )}
 
