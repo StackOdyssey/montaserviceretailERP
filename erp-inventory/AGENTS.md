@@ -136,4 +136,5 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **G12 DEPLOYED:** `erp-system-00125-8zw` `v1.3.0` (`a9ade51`). Catalogue card view + `getProductBrands` brand filter + `@media print` hides chrome (globals.css) — print-only header on catalogue view.
 - **Workflow:** `Github_Branching_instructions.md` (repo root) — feature/* branches, approval checkpoint before merge+deploy, semver tag per deploy. Tags: v1.0.0=00116, v1.1.0=00118, v1.2.0=00121, v1.3.0=00125.
 - **G23 DE-SCOPED** (2026-11-04): `situationClients` pull — 0/284 clients with non-zero acompte. Never used upstream. 83 clients have non-zero Avoirs → credit notes are real usage, fold into Phase E.
-- **Next:** Phase C — G12 catalogue vue (photo grid on /stock), G14 marques gérées (brands table+CRUD), G18 stock parities (bundle), G17 quick-receive. Dev server :3100; working tree clean.
+- **G14 DEPLOYED:** `erp-system-00128-9d7` `v1.4.0`. `brands` table (0031, backfilled), /parametres "Catalogue" tab → BrandsSection, ProductModal datalist. ⚠️ Prod verify inconclusive — tab clicks non-responsive in check session (PWA/hydration?), re-verify manually.
+- **Next:** G18 stock parities (bundle) → G17 quick-receive → Phase D (G15/G16/G19) → Phase E data pull. Dev server :3100.

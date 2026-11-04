@@ -67,7 +67,8 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 - [x] `BrandsSection` in /parametres new "Catalogue" tab (add + activate/deactivate chips)
 - [x] ProductModal: `<datalist>` suggestions from active brands (free-text still allowed)
 - [x] Verified: tsc + build clean, migration dev applied
-- Effort: S · Deploy: prod migration 0031 + deploy (branch `feature/g14-brands`)
+- Effort: S · Deployed `erp-system-00128-9d7` (`v1.4.0`, migration 0031 prod applied)
+- ⚠️ Prod verify inconclusive: "Catalogue" tab renders on /parametres but tab clicks didn't switch in the check session (SOCIETE stayed active) — likely PWA/hydration session issue vs real bug; re-check interactively if it reproduces
 
 ### ⬜ G18 — Petites parités stock/ventes
 - [ ] `/ventes`: filtre par commercial (data déjà affichée)
