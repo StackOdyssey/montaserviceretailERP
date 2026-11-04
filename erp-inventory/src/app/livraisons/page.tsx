@@ -17,6 +17,7 @@ export default function LivraisonsPage() {
   const [docs, setDocs] = useState<RouteSheetDoc[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [compact, setCompact] = useState(false); // feuille abrégée (signature) — G18
 
   const load = async () => {
     setLoading(true);
@@ -82,9 +83,25 @@ export default function LivraisonsPage() {
           <button onClick={load} className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl" title="Actualiser">
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           </button>
-          <button onClick={() => window.print()} className="px-4 py-2.5 bg-[#111827] text-white text-xs font-bold rounded-xl flex items-center gap-2">
-            <Printer size={14} /> Imprimer
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden print:hidden">
+              <button
+                onClick={() => setCompact(false)}
+                className={`px-3 py-2 text-[11px] font-bold ${!compact ? "bg-[#111827] text-white" : "bg-white text-gray-500"}`}
+              >
+                Complète
+              </button>
+              <button
+                onClick={() => setCompact(true)}
+                className={`px-3 py-2 text-[11px] font-bold ${compact ? "bg-[#111827] text-white" : "bg-white text-gray-500"}`}
+              >
+                Abrégée
+              </button>
+            </div>
+            <button onClick={() => window.print()} className="px-4 py-2.5 bg-[#111827] text-white text-xs font-bold rounded-xl flex items-center gap-2">
+              <Printer size={14} /> Imprimer
+            </button>
+          </div>
         </div>
       </div>
 
@@ -131,9 +148,15 @@ export default function LivraisonsPage() {
                 <th className="py-2.5 px-4">Client</th>
                 <th className="py-2.5 px-4">Ville</th>
                 <th className="py-2.5 px-4 text-right">Montant</th>
-                <th className="py-2.5 px-4">Commercial</th>
-                <th className="py-2.5 px-4 text-center">Statut</th>
-                <th className="py-2.5 px-4 text-center">Action</th>
+                {compact ? (
+                  <th className="py-2.5 px-4 text-center w-40">Signature</th>
+                ) : (
+                  <>
+                    <th className="py-2.5 px-4">Commercial</th>
+                    <th className="py-2.5 px-4 text-center">Statut</th>
+                    <th className="py-2.5 px-4 text-center">Action</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -141,30 +164,36 @@ export default function LivraisonsPage() {
                 <tr key={d.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                   <td className="py-2.5 px-4 font-mono font-bold text-[#F7162D]">{d.docNumber}</td>
                   <td className="py-2.5 px-4 font-semibold">{d.customerName}
-                    {d.customerPhone && <div className="text-[10px] text-gray-400">{d.customerPhone}</div>}
+                    {d.customerPhone && !compact && <div className="text-[10px] text-gray-400">{d.customerPhone}</div>}
                   </td>
                   <td className="py-2.5 px-4 text-gray-500">{d.customerCity || "—"}</td>
                   <td className="py-2.5 px-4 text-right font-mono font-bold">{formatMoney(d.totalTtcCents)}</td>
-                  <td className="py-2.5 px-4 text-gray-500">{d.commercialName || "—"}</td>
-                  <td className="py-2.5 px-4 text-center">{statusBadge(d.prepStatus)}</td>
-                  <td className="py-2.5 px-4 text-center">
-                    {busyId === d.id ? (
-                      <span className="text-[10px] text-gray-400">…</span>
-                    ) : (PREP_TRANSITIONS[d.prepStatus] ?? []).length > 0 ? (
-                      <select
-                        value=""
-                        onChange={(e) => e.target.value && setStatus(d, e.target.value)}
-                        className="px-2 py-1 text-[10px] font-bold border border-gray-200 rounded-lg bg-white outline-none focus:border-[#F7162D]"
-                      >
-                        <option value="">Changer…</option>
-                        {(PREP_TRANSITIONS[d.prepStatus] ?? []).map((s) => (
-                          <option key={s} value={s}>{PREP_STATUS_LABELS[s]}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="text-[10px] text-gray-300">—</span>
-                    )}
-                  </td>
+                  {compact ? (
+                    <td className="py-2.5 px-4"><div className="border-b border-gray-300 h-5" /></td>
+                  ) : (
+                    <>
+                      <td className="py-2.5 px-4 text-gray-500">{d.commercialName || "—"}</td>
+                      <td className="py-2.5 px-4 text-center">{statusBadge(d.prepStatus)}</td>
+                      <td className="py-2.5 px-4 text-center">
+                        {busyId === d.id ? (
+                          <span className="text-[10px] text-gray-400">…</span>
+                        ) : (PREP_TRANSITIONS[d.prepStatus] ?? []).length > 0 ? (
+                          <select
+                            value=""
+                            onChange={(e) => e.target.value && setStatus(d, e.target.value)}
+                            className="px-2 py-1 text-[10px] font-bold border border-gray-200 rounded-lg bg-white outline-none focus:border-[#F7162D]"
+                          >
+                            <option value="">Changer…</option>
+                            {(PREP_TRANSITIONS[d.prepStatus] ?? []).map((s) => (
+                              <option key={s} value={s}>{PREP_STATUS_LABELS[s]}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-[10px] text-gray-300">—</span>
+                        )}
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>

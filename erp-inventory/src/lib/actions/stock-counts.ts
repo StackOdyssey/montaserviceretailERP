@@ -25,6 +25,10 @@ export interface StockCountSummary {
   businessLineCode: string;
   totalLines: number;
   varianceLines: number;
+  /** Valeurs au coût figé : stock théorique, stock compté, écart (legacy Valeur.Selection/Inventaire/Ecart). */
+  selectionValueCents: number;
+  countedValueCents: number;
+  varianceValueCents: number;
 }
 
 export interface StockCountLineDTO {
@@ -130,6 +134,9 @@ export async function getStockCounts(businessLineCode?: string): Promise<StockCo
       businessLineCode: businessLines.code,
       totalLines: sql<number>`count(${stockCountLines.id})::int`,
       varianceLines: sql<number>`count(${stockCountLines.id}) filter (where ${stockCountLines.varianceQty} <> 0)::int`,
+      selectionValueCents: sql<number>`coalesce(sum(${stockCountLines.expectedQty} * ${stockCountLines.unitCostCents}),0)::int`,
+      countedValueCents: sql<number>`coalesce(sum(${stockCountLines.countedQty} * ${stockCountLines.unitCostCents}),0)::int`,
+      varianceValueCents: sql<number>`coalesce(sum(${stockCountLines.varianceQty} * ${stockCountLines.unitCostCents}),0)::int`,
     })
     .from(stockCounts)
     .innerJoin(businessLines, eq(stockCounts.businessLineId, businessLines.id))
@@ -180,7 +187,14 @@ export async function getStockCount(
     .orderBy(asc(products.sku));
 
   return {
-    header: { ...header, totalLines: rows.length, varianceLines: rows.filter((r) => r.varianceQty !== 0).length },
+    header: {
+      ...header,
+      totalLines: rows.length,
+      varianceLines: rows.filter((r) => r.varianceQty !== 0).length,
+      selectionValueCents: rows.reduce((s, r) => s + r.expectedQty * r.unitCostCents, 0),
+      countedValueCents: rows.reduce((s, r) => s + r.countedQty * r.unitCostCents, 0),
+      varianceValueCents: rows.reduce((s, r) => s + r.varianceQty * r.unitCostCents, 0),
+    },
     lines: rows,
   };
 }

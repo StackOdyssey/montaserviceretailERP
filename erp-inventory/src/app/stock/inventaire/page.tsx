@@ -168,6 +168,14 @@ export default function InventoryPage() {
                     <div className="text-[11px] text-[#6B7280] mt-0.5">
                       {c.totalLines} article(s) • {c.varianceLines} écart(s)
                     </div>
+                    <div className="text-[10px] mt-0.5">
+                      <span className="text-[#9CA3AF]" title="Valeur sélection / inventaire">
+                        {formatMoney(c.selectionValueCents)} / {formatMoney(c.countedValueCents)}
+                      </span>
+                      <span className={`ml-1 font-bold ${c.varianceValueCents !== 0 ? "text-[#F7162D]" : "text-[#059669]"}`}>
+                        Écart {formatMoney(c.varianceValueCents)}
+                      </span>
+                    </div>
                   </button>
                 </li>
               ))}
