@@ -50,7 +50,7 @@ export function SupplierPaymentModal({
     if (isOpen) setSelectedSupplierId(preselectedSupplierId || (suppliers[0]?.id ?? 1));
   }
   const [amountDh, setAmountDh] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<"CHEQUE" | "EFFET_LCN" | "VIREMENT" | "ESPECES">("CHEQUE");
+  const [paymentMethod, setPaymentMethod] = useState<"CHEQUE" | "EFFET_LCN" | "VIREMENT" | "ESPECES" | "CARTE_BANCAIRE" | "VERSEMENT">("CHEQUE");
   const { paymentMethods } = useParameters();
   const [bankName, setBankName] = useState<string>("Attijariwafa Bank");
   const [referenceNumber, setReferenceNumber] = useState<string>("");
@@ -202,7 +202,7 @@ export function SupplierPaymentModal({
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2">
               Mode de paiement émis <span className="text-[#F7162D]">*</span>
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {paymentMethods.map((p) => ({ id: p.code, label: p.label })).map((m) => (
                 <button
                   type="button"

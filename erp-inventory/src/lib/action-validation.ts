@@ -21,8 +21,8 @@ const qty = z.number().int().positive().max(1_000_000);
 const pct = z.number().min(0).max(100);
 const name = z.string().trim().min(1).max(200);
 const optStr = (max = 200) => z.string().trim().max(max).optional();
-const paymentMethod = z.enum(["ESPECES", "CHEQUE", "EFFET_LCN", "VIREMENT", "A_CREDIT"]);
-const moneyMethod = z.enum(["ESPECES", "CHEQUE", "EFFET_LCN", "VIREMENT"]);
+const paymentMethod = z.enum(["ESPECES", "CHEQUE", "EFFET_LCN", "VIREMENT", "CARTE_BANCAIRE", "VERSEMENT", "A_CREDIT"]);
+const moneyMethod = z.enum(["ESPECES", "CHEQUE", "EFFET_LCN", "VIREMENT", "CARTE_BANCAIRE", "VERSEMENT"]);
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "format AAAA-MM-JJ attendu").optional();
 
 // ---- Schémas par action ----

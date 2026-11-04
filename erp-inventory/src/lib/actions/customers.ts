@@ -42,7 +42,7 @@ export interface CustomerPaymentItem {
   documentId: number | null;
   documentNumber?: string | null;
   amountCents: number;
-  paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT";
+  paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT" | "CARTE_BANCAIRE" | "VERSEMENT";
   paymentDate: string;
   referenceNumber: string | null;
   chequeDueDate: string | null;
@@ -299,7 +299,7 @@ export async function getCustomerStatement(customerId: number): Promise<Customer
 export async function recordCustomerPayment(data: {
   customerId: number;
   amountCents: number;
-  paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT";
+  paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT" | "CARTE_BANCAIRE" | "VERSEMENT";
   documentId?: number | null;
   referenceNumber?: string;
   chequeDueDate?: string;
@@ -346,7 +346,7 @@ export async function mergeCustomers(sourceId: number, targetId: number): Promis
 async function recordCustomerPaymentImpl(data: {
   customerId: number;
   amountCents: number;
-  paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT";
+  paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT" | "CARTE_BANCAIRE" | "VERSEMENT";
   documentId?: number | null;
   referenceNumber?: string;
   chequeDueDate?: string;

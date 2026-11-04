@@ -12,7 +12,7 @@ interface PaymentModalProps {
   onClose: () => void;
   onRequireCustomer?: () => void;
   onPayment: (data: {
-    paymentMethod: "ESPECES" | "CHEQUE" | "A_CREDIT";
+    paymentMethod: "ESPECES" | "CHEQUE" | "CARTE_BANCAIRE" | "A_CREDIT";
     chequeDetails?: {
       bankName: string;
       chequeNumber: string;
@@ -35,7 +35,7 @@ export function PaymentModal({
   isSubmitting,
 }: PaymentModalProps) {
   const toast = useToast();
-  const [paymentMethod, setPaymentMethod] = useState<"ESPECES" | "CHEQUE" | "A_CREDIT">("ESPECES");
+  const [paymentMethod, setPaymentMethod] = useState<"ESPECES" | "CHEQUE" | "CARTE_BANCAIRE" | "A_CREDIT">("ESPECES");
   const [chequeDetails, setChequeDetails] = useState({
     bankName: "",
     chequeNumber: "",
@@ -49,8 +49,8 @@ export function PaymentModal({
     creditLimitCents != null &&
     projectedBalance > creditLimitCents;
 
-  // T1.3 — crédit et chèque exigent une fiche client (matrice POS).
-  const requiresFile = paymentMethod !== "ESPECES" || docType === "FACTURE";
+  // T1.3 — crédit et chèque exigent une fiche client (matrice POS). Espèces et TPE = vente comptoir.
+  const requiresFile = paymentMethod === "CHEQUE" || paymentMethod === "A_CREDIT" || docType === "FACTURE";
   const missingFile = requiresFile && customerId == null;
 
   const handleSubmit = () => {
@@ -141,6 +141,24 @@ export function PaymentModal({
               </button>
 
               <button
+                onClick={() => setPaymentMethod("CARTE_BANCAIRE")}
+                className={`p-3 rounded-xl border-2 flex items-center gap-3 transition-all ${
+                  paymentMethod === "CARTE_BANCAIRE"
+                    ? "border-[#F7162D] bg-red-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <CreditCard size={20} className={paymentMethod === "CARTE_BANCAIRE" ? "text-[#F7162D]" : "text-gray-500"} />
+                <div className="text-left">
+                  <div className="font-semibold text-sm">Carte bancaire (TPE)</div>
+                  <div className="text-xs text-gray-500">Paiement immédiat par terminal</div>
+                </div>
+                {paymentMethod === "CARTE_BANCAIRE" && (
+                  <Check size={18} className="ml-auto text-[#F7162D]" />
+                )}
+              </button>
+
+              <button
                 onClick={() => setPaymentMethod("A_CREDIT")}
                 className={`p-3 rounded-xl border-2 flex items-center gap-3 transition-all ${
                   paymentMethod === "A_CREDIT"
@@ -167,9 +185,9 @@ export function PaymentModal({
               <div className="mt-0.5">
                 {docType === "FACTURE"
                   ? "FACTURE impossible sans fiche client. Créez ou sélectionnez le client."
-                  : "Espèces acceptées sans fiche. Chèque et crédit exigent une fiche client."}
+                  : "Espèces et carte bancaire acceptées sans fiche. Chèque et crédit exigent une fiche client."}
               </div>
-              {onRequireCustomer && (docType === "FACTURE" || paymentMethod !== "ESPECES") && (
+              {onRequireCustomer && (docType === "FACTURE" || paymentMethod === "CHEQUE" || paymentMethod === "A_CREDIT") && (
                 <button
                   onClick={onRequireCustomer}
                   className="mt-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg"

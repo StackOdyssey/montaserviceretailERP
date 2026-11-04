@@ -75,7 +75,7 @@ export interface SupplierPaymentItem {
   receiptId: number | null;
   receiptNumber?: string | null;
   amountCents: number;
-  paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT";
+  paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT" | "CARTE_BANCAIRE" | "VERSEMENT";
   paymentDate: string;
   referenceNumber: string | null;
   dueDate: string | null;
@@ -273,7 +273,7 @@ export async function createSupplierReceipt(data: {
 export async function recordSupplierPayment(data: {
   supplierId: number;
   amountCents: number;
-  paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT";
+  paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT" | "CARTE_BANCAIRE" | "VERSEMENT";
   receiptId?: number | null;
   referenceNumber?: string;
   dueDate?: string;
@@ -432,7 +432,7 @@ async function createSupplierReceiptImpl(data: {
 async function recordSupplierPaymentImpl(data: {
   supplierId: number;
   amountCents: number;
-  paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT";
+  paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT" | "CARTE_BANCAIRE" | "VERSEMENT";
   receiptId?: number | null;
   referenceNumber?: string;
   dueDate?: string;
@@ -471,7 +471,7 @@ async function recordSupplierPaymentImpl(data: {
             referenceNumber: data.referenceNumber ?? null,
             dueDate: data.dueDate ? new Date(data.dueDate) : null,
             bankName: data.bankName ?? null,
-            status: data.paymentMethod === "ESPECES" || data.paymentMethod === "VIREMENT" ? "DEBITE" : "EN_ATTENTE",
+            status: data.paymentMethod === "CHEQUE" || data.paymentMethod === "EFFET_LCN" ? "EN_ATTENTE" : "DEBITE",
             notes: data.notes ?? null,
           })
           .returning({ id: supplierPayments.id })

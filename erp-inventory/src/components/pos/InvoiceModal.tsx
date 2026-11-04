@@ -160,6 +160,7 @@ export function InvoiceModal({ document, onClose, onCancelled }: InvoiceModalPro
                 <div className="text-sm font-medium text-blue-900">
                   {document.paymentMethod === "ESPECES" && "Espèces"}
                   {document.paymentMethod === "CHEQUE" && "Chèque"}
+                  {document.paymentMethod === "CARTE_BANCAIRE" && "Carte bancaire"}
                   {document.paymentMethod === "A_CREDIT" && "Crédit client"}
                 </div>
                 {document.notes && document.paymentMethod === "CHEQUE" && (

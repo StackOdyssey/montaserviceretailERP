@@ -200,7 +200,7 @@ export default function POSPage() {
 
   // Process payment and create document
   const handlePayment = async (paymentData: {
-    paymentMethod: "ESPECES" | "CHEQUE" | "A_CREDIT";
+    paymentMethod: "ESPECES" | "CHEQUE" | "CARTE_BANCAIRE" | "A_CREDIT";
     chequeDetails?: {
       bankName: string;
       chequeNumber: string;

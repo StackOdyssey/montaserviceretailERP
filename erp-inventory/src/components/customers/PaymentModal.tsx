@@ -42,7 +42,7 @@ export function PaymentModal({
     preselectedCustomerId || (customers[0]?.id ?? 1)
   );
   const [amountDh, setAmountDh] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<"ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT">("ESPECES");
+  const [paymentMethod, setPaymentMethod] = useState<"ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT" | "CARTE_BANCAIRE" | "VERSEMENT">("ESPECES");
   const { paymentMethods } = useParameters();
   const [bankName, setBankName] = useState<string>("Attijariwafa Bank");
   const [payeeName, setPayeeName] = useState<string>("");
@@ -107,7 +107,7 @@ export function PaymentModal({
         documentId: docId,
         referenceNumber: referenceNumber.trim() || undefined,
         chequeDueDate: paymentMethod === "CHEQUE" || paymentMethod === "EFFET_LCN" ? chequeDueDate : undefined,
-        bankName: paymentMethod === "CHEQUE" || paymentMethod === "EFFET_LCN" || paymentMethod === "VIREMENT" ? bankName : undefined,
+        bankName: paymentMethod === "CHEQUE" || paymentMethod === "EFFET_LCN" || paymentMethod === "VIREMENT" || paymentMethod === "VERSEMENT" ? bankName : undefined,
         payeeName: paymentMethod === "CHEQUE" || paymentMethod === "EFFET_LCN" ? payeeName.trim() || undefined : undefined,
         notes: notes.trim() || undefined,
       }));
@@ -199,7 +199,7 @@ export function PaymentModal({
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2">
               Mode de paiement <span className="text-[#F7162D]">*</span>
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {paymentMethods.map((p) => ({ id: p.code, label: p.label })).map((m) => (
                 <button
                   type="button"
@@ -283,19 +283,19 @@ export function PaymentModal({
             </div>
           )}
 
-          {/* Virement bancaire */}
-          {paymentMethod === "VIREMENT" && (
+          {/* Virement bancaire / Versement */}
+          {(paymentMethod === "VIREMENT" || paymentMethod === "VERSEMENT") && (
             <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 rounded-xl space-y-2 animate-in fade-in">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Référence Virement / N° Ordre
+                    {paymentMethod === "VERSEMENT" ? "Référence Versement / N° Bordereau" : "Référence Virement / N° Ordre"}
                   </label>
                   <input
                     type="text"
                     value={referenceNumber}
                     onChange={(e) => setReferenceNumber(e.target.value)}
-                    placeholder="Ex: VIR-2026-99"
+                    placeholder={paymentMethod === "VERSEMENT" ? "Ex: VER-2026-99" : "Ex: VIR-2026-99"}
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-[#F7162D]"
                   />
                 </div>

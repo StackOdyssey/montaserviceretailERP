@@ -87,7 +87,7 @@ export default function NouveauBonDeLivraisonPage() {
 
   // Mode de règlement
   const [paymentMethod, setPaymentMethod] = useState<
-    "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT" | "A_CREDIT"
+    "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT" | "CARTE_BANCAIRE" | "VERSEMENT" | "A_CREDIT"
   >("ESPECES");
   const [payRef, setPayRef] = useState("");
   const [payDueDate, setPayDueDate] = useState("");
@@ -827,6 +827,15 @@ export default function NouveauBonDeLivraisonPage() {
                   <input value={payRef} onChange={(e) => setPayRef(e.target.value)} placeholder="N° chèque / effet"
                     className="px-2.5 py-2 bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl text-xs" />
                   <input type="date" value={payDueDate} onChange={(e) => setPayDueDate(e.target.value)} title="Date d'échéance"
+                    className="px-2.5 py-2 bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl text-xs" />
+                  <input value={payBank} onChange={(e) => setPayBank(e.target.value)} placeholder="Banque"
+                    className="px-2.5 py-2 bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl text-xs" />
+                </div>
+              )}
+              {(paymentMethod === "VIREMENT" || paymentMethod === "VERSEMENT" || paymentMethod === "CARTE_BANCAIRE") && (
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <input value={payRef} onChange={(e) => setPayRef(e.target.value)}
+                    placeholder={paymentMethod === "CARTE_BANCAIRE" ? "Réf. transaction TPE" : "Réf. virement / versement"}
                     className="px-2.5 py-2 bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl text-xs" />
                   <input value={payBank} onChange={(e) => setPayBank(e.target.value)} placeholder="Banque"
                     className="px-2.5 py-2 bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl text-xs" />

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { X, Phone, MapPin, FileText, User, HandCoins, Printer, Pencil, CalendarClock } from "lucide-react";
 import { CustomerAccountStatement, getCustomerStatement } from "@/lib/actions/customers";
 import { formatMoney } from "@/lib/money";
-import { paymentStatusLabel, isTerminalStatus } from "@/lib/payments";
+import { paymentStatusLabel, isTerminalStatus, paymentMethodLabel } from "@/lib/payments";
 
 interface ClientDrawerProps {
   customerId: number | null;
@@ -171,7 +171,7 @@ export function ClientDrawer({ customerId, refreshKey = 0, onClose, onEncaisser,
                 <li key={p.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50/50">
                   <div className="min-w-0">
                     <div className="text-sm font-semibold text-gray-900">
-                      {p.paymentMethod}{p.referenceNumber ? ` · ${p.referenceNumber}` : ""}
+                      {paymentMethodLabel(p.paymentMethod)}{p.referenceNumber ? ` · ${p.referenceNumber}` : ""}
                     </div>
                     <div className="text-[11px] text-gray-500">
                       {new Date(p.paymentDate).toLocaleDateString("fr-FR")}

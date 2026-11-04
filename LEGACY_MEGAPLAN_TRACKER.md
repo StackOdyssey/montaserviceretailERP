@@ -28,11 +28,15 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 
 ## Phase B — Règlements gaps
 
-### ⬜ G21 — Modes de règlement manquants
+### ✅ G21 — Modes de règlement manquants
 **Legacy:** acompte, carte bancaire, versement, avoir, ristourne — ours: 4 modes.
-- [ ] Add `CARTE_BANCAIRE` (TPE counter sales) + `VERSEMENT` to PaymentMethod + labels + flows
-- [ ] Decide ACOMPTE (→ G23), RISTOURNE (rebate credit — likely maps to AVOIR), AVOIR-as-payment (apply credit note to doc — check lettering logic)
-- Effort: S-M · Deps: touches receivables math — careful · Verify: payment each mode → journée totals
+- [x] `CARTE_BANCAIRE` + `VERSEMENT` seeded in `payment_methods` (migration 0030) — auto-flows to all method pickers
+- [x] POS: TPE button added (4th method, no fiche required like ESPECES); `/ventes/nouveau`: réf+banque fields for VIREMENT/VERSEMENT/CARTE_BANCAIRE; PaymentModal: versement ref+bank block
+- [x] Types/zod unions widened; `paymentMethodLabel()` helper in `lib/payments.ts` for raw-code displays
+- [x] Supplier payments: new modes → DEBITE immediately (only CHEQUE/EFFET_LCN stay EN_ATTENTE)
+- [x] **Decisions:** ACOMPTE → G23 (needs advances design + usage check) · RISTOURNE → covered by AVOIR `COMMERCIAL` · AVOIR-as-payment → de-scoped (avoirs already net into solde via doc math)
+- [x] **Verified dev:** VERSEMENT 150 DH → Encaissé + journée VERSEMENT group; POS TPE BL-2026-00017 no-fiche + journée CARTE_BANCAIRE group; 6 buttons in PaymentModal/SupplierModal
+- Effort: S-M · Deploy: prod migration 0030 + deploy (branch `feature/g21-payment-modes`)
 
 ### ✅ G22 — Chèque "Règlement au nom" (tiers endossé)
 **Legacy:** ListeChequesClts column "Régelement au Nom" — endorsed 3rd-party cheques are real usage.

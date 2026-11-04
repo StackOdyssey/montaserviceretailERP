@@ -1,5 +1,25 @@
 // Cycle de vie des paiements (chèques & effets LCN) — statuts et transitions.
-export type PaymentMethod = "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT";
+export type PaymentMethod =
+  | "ESPECES"
+  | "CHEQUE"
+  | "EFFET_LCN"
+  | "VIREMENT"
+  | "CARTE_BANCAIRE"
+  | "VERSEMENT";
+
+const METHOD_LABELS: Record<string, string> = {
+  ESPECES: "Espèces",
+  CHEQUE: "Chèque",
+  EFFET_LCN: "Effet / LCN",
+  VIREMENT: "Virement",
+  CARTE_BANCAIRE: "Carte bancaire",
+  VERSEMENT: "Versement",
+  A_CREDIT: "À crédit",
+};
+
+export function paymentMethodLabel(method: string): string {
+  return METHOD_LABELS[method] ?? method;
+}
 
 const CHEQUE_CYCLE = ["RECU", "REMIS_BANQUE", "ENCAISSE"];
 const CHEQUE_OFF = ["IMPAYE", "ANNULE"];

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { X, Printer, Share2, FileText } from "lucide-react";
 import { CustomerAccountStatement, getCustomerStatement } from "@/lib/actions/customers";
 import { formatMoney } from "@/lib/money";
-import { paymentStatusLabel, isTerminalStatus } from "@/lib/payments";
+import { paymentStatusLabel, isTerminalStatus, paymentMethodLabel } from "@/lib/payments";
 import { useSettings } from "@/components/layout/SettingsProvider";
 
 interface CustomerStatementModalProps {
@@ -277,7 +277,7 @@ export function CustomerStatementModal({
                               {new Date(pmt.paymentDate).toLocaleDateString("fr-FR")}
                             </td>
                             <td className="py-2 px-3 font-semibold text-gray-900">
-                              {pmt.paymentMethod === "EFFET_LCN" ? "Effet LCN" : pmt.paymentMethod}
+                              {paymentMethodLabel(pmt.paymentMethod)}
                             </td>
                             <td className="py-2 px-3 text-gray-600 font-mono">
                               {pmt.referenceNumber || "—"}

@@ -145,7 +145,7 @@ export const expenseCategories = pgTable("expense_categories", {
 
 export const paymentMethods = pgTable("payment_methods", {
   id: serial("id").primaryKey(),
-  code: text("code").notNull().unique(), // ESPECES, CHEQUE, EFFET_LCN, VIREMENT
+  code: text("code").notNull().unique(), // ESPECES, CHEQUE, EFFET_LCN, VIREMENT, CARTE_BANCAIRE, VERSEMENT
   label: text("label").notNull(),
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
@@ -484,7 +484,7 @@ export const customerPayments = pgTable("customer_payments", {
     .references(() => customers.id),
   documentId: integer("document_id").references(() => salesDocuments.id),
   amountCents: integer("amount_cents").notNull(),
-  paymentMethod: text("payment_method").notNull().default("ESPECES"), // ESPECES, CHEQUE, EFFET_LCN, VIREMENT
+  paymentMethod: text("payment_method").notNull().default("ESPECES"), // ESPECES, CHEQUE, EFFET_LCN, VIREMENT, CARTE_BANCAIRE, VERSEMENT
   paymentDate: timestamp("payment_date").defaultNow(),
   referenceNumber: text("reference_number"), // N° chèque / effet / virement
   chequeDueDate: timestamp("cheque_due_date"), // Date d'échéance chèque ou effet LCN
@@ -541,7 +541,7 @@ export const supplierPayments = pgTable("supplier_payments", {
     .references(() => suppliers.id),
   receiptId: integer("receipt_id").references(() => supplierReceipts.id),
   amountCents: integer("amount_cents").notNull(),
-  paymentMethod: text("payment_method").notNull().default("CHEQUE"), // ESPECES, CHEQUE, EFFET_LCN, VIREMENT
+  paymentMethod: text("payment_method").notNull().default("CHEQUE"), // ESPECES, CHEQUE, EFFET_LCN, VIREMENT, CARTE_BANCAIRE, VERSEMENT
   paymentDate: timestamp("payment_date").defaultNow(),
   referenceNumber: text("reference_number"), // N° chèque / effet / virement
   dueDate: timestamp("due_date"), // Date d'échéance si chèque ou effet

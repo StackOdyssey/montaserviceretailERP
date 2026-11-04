@@ -183,7 +183,7 @@ export async function createSalesDocument(data: {
   customerIce?: string;
   lines: SalesLineInput[];
   discountPercent: number;
-  paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT" | "A_CREDIT";
+  paymentMethod: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT" | "CARTE_BANCAIRE" | "VERSEMENT" | "A_CREDIT";
   paidAmountCents?: number;
   notes?: string;
   businessLineCode?: string;
@@ -245,7 +245,8 @@ export async function createSalesDocument(data: {
     data.paymentMethod === "A_CREDIT" ||
     data.paymentMethod === "CHEQUE" ||
     data.paymentMethod === "EFFET_LCN" ||
-    data.paymentMethod === "VIREMENT";
+    data.paymentMethod === "VIREMENT" ||
+    data.paymentMethod === "VERSEMENT";
   if (requiresCustomerFile && !data.customerId) {
     throw new Error(
       "CLIENT_REQUIS: créez ou sélectionnez la fiche client avant de valider (FACTURE et ventes à crédit / chèque / effet / virement exigent un client enregistré, pas de client comptoir)."

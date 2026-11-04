@@ -94,9 +94,13 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
           ? "Effet de commerce (LCN)"
           : doc.paymentMethod === "VIREMENT"
             ? "Virement bancaire"
-            : doc.paymentMethod === "A_CREDIT"
-              ? "À Crédit (En compte)"
-              : "—";
+            : doc.paymentMethod === "CARTE_BANCAIRE"
+              ? "Carte bancaire (TPE)"
+              : doc.paymentMethod === "VERSEMENT"
+                ? "Versement bancaire"
+                : doc.paymentMethod === "A_CREDIT"
+                  ? "À Crédit (En compte)"
+                  : "—";
 
   const commercial = doc.customerPhone ? `${doc.customerName} Tél :${doc.customerPhone}` : doc.customerName;
   const lieuLivraison = doc.customerCity || "—";
