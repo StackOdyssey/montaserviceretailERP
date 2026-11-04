@@ -31,7 +31,7 @@ import {
 import { getDocumentUbl } from "@/lib/actions/dgi";
 import { PREP_STATUS_LABELS, PREP_TRANSITIONS } from "@/lib/prep";
 import { unwrap } from "@/lib/action-result";
-import { getStaff } from "@/lib/actions/staff";
+import { getDocumentCommercials } from "@/lib/actions/sales";
 import { formatMoney } from "@/lib/money";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
 import { AvoirTypeModal, type AvoirType } from "@/components/sales/AvoirTypeModal";
@@ -117,8 +117,8 @@ export default function VentesListPage() {
   }, [searchTerm, statusFilter, typeFilter, commercialFilter, page]);
 
   useEffect(() => {
-    getStaff("COMMERCIAL")
-      .then((r) => setCommerciaux(unwrap(r).map((s) => s.name)))
+    getDocumentCommercials()
+      .then(setCommerciaux)
       .catch(() => {});
   }, []);
 

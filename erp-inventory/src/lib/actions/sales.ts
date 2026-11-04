@@ -105,6 +105,18 @@ export async function getSalesDocuments(
  * Nombre total de documents correspondant aux filtres de getSalesDocuments
  * (sans la limite) — sert à la pagination côté UI.
  */
+/** Commerciaux distincts ayant des documents — alimente le filtre /ventes (G18). */
+export async function getDocumentCommercials(): Promise<string[]> {
+  await assertAuthenticated();
+  const d = requireDb();
+  const rows = await d
+    .selectDistinct({ name: salesDocuments.commercialName })
+    .from(salesDocuments)
+    .where(isNull(salesDocuments.deletedAt))
+    .orderBy(asc(salesDocuments.commercialName));
+  return rows.map((r) => r.name).filter((n): n is string => !!n);
+}
+
 export async function getSalesDocumentsCount(options?: SalesDocFilters): Promise<number> {
   await assertAuthenticated();
   const d = requireDb();
