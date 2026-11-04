@@ -131,6 +131,6 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Resume point — megaplan phase 2 update (saved 2026-11-04)
 
 - **G11+G20 DEPLOYED:** `erp-system-00116-jv8`, migration 0028 on prod. `/clients` live.
-- **G22 merged to main** (`977edb0`, branch `feat/g22-payee-name`): `customer_payments.payee_name` (migration 0029 — dev applied, **prod migrate + deploy pending**). PaymentModal "Règlement au nom de" field on CHEQUE/EFFET_LCN.
+- **G22 DEPLOYED:** `erp-system-00118-t5b`, migration 0029 on prod (`customer_payments.payee_name`). Live-verified: "Règlement au nom de (tiers — chèque endossé)" field renders on Chèque in PaymentModal via /clients → Encaisser, console clean.
 - **Next: G21** payment modes (CARTE_BANCAIRE + VERSEMENT in `src/lib/payments.ts` PaymentMethod + journée totals), then G23 acomptes. Everything on feature branches per the non-negotiable rule.
 - Working tree clean; dev server on :3100.

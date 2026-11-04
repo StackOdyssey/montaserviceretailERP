@@ -36,10 +36,11 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 
 ### ✅ G22 — Chèque "Règlement au nom" (tiers endossé)
 **Legacy:** ListeChequesClts column "Régelement au Nom" — endorsed 3rd-party cheques are real usage.
-- [x] `customer_payments.payee_name` (migration 0029 — dev applied, prod pending deploy)
+- [x] `customer_payments.payee_name` (migration 0029 — dev+prod applied)
 - [x] PaymentModal field on CHEQUE/EFFET_LCN + `payeeName` on CustomerPaymentItem
 - [x] Verified dev: field renders in cheque block (branch `feat/g22-payee-name` merged `977edb0`)
-- Effort: XS · Deploy: prod migration 0029 + deploy pending
+- [x] Verified prod: `erp-system-00118-t5b` — "Règlement au nom de (tiers — chèque endossé)" field renders on Chèque selection, console clean
+- Effort: XS · Deployed `erp-system-00118-t5b`
 
 ### ⬜ G23 — Acomptes clients (assess first)
 **Legacy:** SoldesClient — advance deposits tracked per client, "Acompte Clt/P_Clt" columns in situation.
@@ -115,3 +116,4 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 |---|---|---|---|
 | 2026-11-03 | Legacy re-audit (42 routes) + audit doc + this tracker | `5d00226` | — |
 | 2026-11-03 | G11+G20 /clients page + fiche fields + CustomerModal stale-state fix | `024a6b0` | `erp-system-00116-jv8` (migration 0028 prod applied, live-verified /clients + drawer, console clean) |
+| 2026-11-04 | G22 payee_name on cheques/effets (`feat/g22-payee-name`) | `977edb0` | `erp-system-00118-t5b` (migration 0029 prod applied, live-verified payee field on Chèque, console clean) |
