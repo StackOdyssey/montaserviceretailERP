@@ -115,6 +115,7 @@ export const recordCustomerPaymentSchema = z.object({
   referenceNumber: optStr(100),
   chequeDueDate: dateStr,
   bankName: optStr(100),
+  payeeName: optStr(100),
   notes: optStr(2000),
 });
 

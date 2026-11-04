@@ -490,6 +490,7 @@ export const customerPayments = pgTable("customer_payments", {
   chequeDueDate: timestamp("cheque_due_date"), // Date d'échéance chèque ou effet LCN
   depositDate: timestamp("deposit_date"), // Date de dépôt en banque (chèque/effet déposé)
   bankName: text("bank_name"),
+  payeeName: text("payee_name"), // "Règlement au nom de" — chèque/effet endossé d'un tiers
   status: text("status").notNull().default("ENCAISSE"), // ENCAISSE, EN_ATTENTE, REJETE
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),

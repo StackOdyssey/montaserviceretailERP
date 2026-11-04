@@ -45,6 +45,7 @@ export function PaymentModal({
   const [paymentMethod, setPaymentMethod] = useState<"ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT">("ESPECES");
   const { paymentMethods } = useParameters();
   const [bankName, setBankName] = useState<string>("Attijariwafa Bank");
+  const [payeeName, setPayeeName] = useState<string>("");
   const [referenceNumber, setReferenceNumber] = useState<string>("");
   const [chequeDueDate, setChequeDueDate] = useState<string>(
     () => new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split("T")[0]
@@ -107,6 +108,7 @@ export function PaymentModal({
         referenceNumber: referenceNumber.trim() || undefined,
         chequeDueDate: paymentMethod === "CHEQUE" || paymentMethod === "EFFET_LCN" ? chequeDueDate : undefined,
         bankName: paymentMethod === "CHEQUE" || paymentMethod === "EFFET_LCN" || paymentMethod === "VIREMENT" ? bankName : undefined,
+        payeeName: paymentMethod === "CHEQUE" || paymentMethod === "EFFET_LCN" ? payeeName.trim() || undefined : undefined,
         notes: notes.trim() || undefined,
       }));
 
@@ -247,6 +249,19 @@ export function PaymentModal({
                     />
                   </div>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Règlement au nom de (tiers — chèque endossé)
+                </label>
+                <input
+                  type="text"
+                  value={payeeName}
+                  onChange={(e) => setPayeeName(e.target.value)}
+                  placeholder="Nom inscrit sur le chèque/effet si différent du client"
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-[#F7162D]"
+                />
               </div>
 
               <div>

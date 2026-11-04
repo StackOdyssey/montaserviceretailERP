@@ -1,0 +1,1 @@
+ALTER TABLE "customer_payments" ADD COLUMN "payee_name" text;

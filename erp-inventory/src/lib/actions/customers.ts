@@ -47,6 +47,7 @@ export interface CustomerPaymentItem {
   referenceNumber: string | null;
   chequeDueDate: string | null;
   bankName: string | null;
+  payeeName: string | null;
   status: string;
   notes: string | null;
   createdAt: string;
@@ -134,6 +135,7 @@ function mapPayment(p: PaymentRow, customerName: string, documentNumber: string 
     referenceNumber: p.referenceNumber,
     chequeDueDate: p.chequeDueDate ? p.chequeDueDate.toISOString() : null,
     bankName: p.bankName,
+    payeeName: p.payeeName,
     status: p.status as CustomerPaymentItem["status"],
     notes: p.notes,
     createdAt: (p.createdAt ?? new Date()).toISOString(),
@@ -302,6 +304,7 @@ export async function recordCustomerPayment(data: {
   referenceNumber?: string;
   chequeDueDate?: string;
   bankName?: string;
+  payeeName?: string;
   notes?: string;
 }): Promise<ActionResult<CustomerPaymentItem>> {
   return actionResult(() => recordCustomerPaymentImpl(data));
@@ -348,6 +351,7 @@ async function recordCustomerPaymentImpl(data: {
   referenceNumber?: string;
   chequeDueDate?: string;
   bankName?: string;
+  payeeName?: string;
   notes?: string;
 }): Promise<CustomerPaymentItem> {
   await assertAuthenticated();
@@ -414,6 +418,7 @@ async function recordCustomerPaymentImpl(data: {
           referenceNumber: data.referenceNumber ?? null,
           chequeDueDate: data.chequeDueDate ? new Date(data.chequeDueDate) : null,
           bankName: data.bankName ?? null,
+          payeeName: data.payeeName ?? null,
           status: initialStatus,
           notes: data.notes ?? null,
         })
