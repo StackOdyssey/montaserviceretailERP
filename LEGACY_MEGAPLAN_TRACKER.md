@@ -34,11 +34,12 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 - [ ] Decide ACOMPTE (→ G23), RISTOURNE (rebate credit — likely maps to AVOIR), AVOIR-as-payment (apply credit note to doc — check lettering logic)
 - Effort: S-M · Deps: touches receivables math — careful · Verify: payment each mode → journée totals
 
-### ⬜ G22 — Chèque "Règlement au nom" (tiers endossé)
+### ✅ G22 — Chèque "Règlement au nom" (tiers endossé)
 **Legacy:** ListeChequesClts column "Régelement au Nom" — endorsed 3rd-party cheques are real usage.
-- [ ] `customer_payments.payee_name` (migration)
-- [ ] PaymentModal field (cheque/effet only) + échéancier column
-- Effort: XS · Deps: migration
+- [x] `customer_payments.payee_name` (migration 0029 — dev applied, prod pending deploy)
+- [x] PaymentModal field on CHEQUE/EFFET_LCN + `payeeName` on CustomerPaymentItem
+- [x] Verified dev: field renders in cheque block (branch `feat/g22-payee-name` merged `977edb0`)
+- Effort: XS · Deploy: prod migration 0029 + deploy pending
 
 ### ⬜ G23 — Acomptes clients (assess first)
 **Legacy:** SoldesClient — advance deposits tracked per client, "Acompte Clt/P_Clt" columns in situation.
