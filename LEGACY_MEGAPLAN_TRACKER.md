@@ -101,10 +101,12 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 - [x] Role labels kept (CAISSIER/PROPRIETAIRE display only)
 - Effort: S · Deploy: prod (branch `feature/g16-profil`, no migration)
 
-### ⬜ G19 — Imprimer / PDF / CSV partout
+### ✅ G19 — Imprimer / PDF / CSV partout
 **Legacy:** Imprimer+ImpEtat on every list, brPrint, ticketPosixPAI, ExportListProduit.
-- [ ] Audit each list: `/stock`, `/ventes`, `/reglements`, `/clients`, `/fournisseurs`, `/livraisons`, `/comptabilite` tabs, `/depenses`, `/operations-log` → print stylesheet or CSV export where missing
-- Effort: M · Deps: after G11
+- [x] Audited all lists — already covered: /stock (table+catalogue print), /ventes (doc print), /reglements, /clients, /livraisons (Complète/Abrégée), /comptabilite (Imprimer A4 + CSV), mouvements/transferts
+- [x] Added Imprimer buttons → /fournisseurs, /depenses, /operations-log, /stock/inventaire (global `@media print` from G12 hides app chrome)
+- CSV export: /comptabilite + /stock CSV already exist — no other list needs one (all short operational lists)
+- Effort: M · Deploy: prod (branch `feature/g19-print-csv`, no migration)
 
 ## Phase E — Data pull (last, before legacy shutdown)
 - [ ] Open items: CreditsClients (unpaid BLs) + ListeChequesClts (pending cheques w/ échéances + payee) → import as open docs/payments

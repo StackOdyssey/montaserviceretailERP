@@ -14,6 +14,7 @@ import {
   FileText,
   ReceiptText,
   Undo2,
+  Printer,
 } from "lucide-react";
 import { SupplierItem, getSuppliers } from "@/lib/actions/suppliers";
 import { getSettings } from "@/lib/actions/settings";
@@ -90,6 +91,13 @@ export default function FournisseursPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => window.print()}
+            className="px-3.5 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 text-xs font-bold rounded-xl transition flex items-center gap-2 print:hidden"
+          >
+            <Printer className="w-4 h-4" />
+            Imprimer
+          </button>
           <button
             onClick={() => {
               setEditingSupplier(null);

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useTransition } from "react";
-import { ClipboardList, PlusCircle, Check, X, RefreshCw, AlertTriangle } from "lucide-react";
+import { ClipboardList, PlusCircle, Check, X, RefreshCw, AlertTriangle, Printer } from "lucide-react";
 import {
   cancelStockCount,
   createStockCount,
@@ -114,6 +114,13 @@ export default function InventoryPage() {
             Fige le stock théorique, saisit les quantités comptées, puis valide pour poster les ajustements (CMUP).
           </p>
         </div>
+        <button
+          onClick={() => window.print()}
+          className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs px-4 py-2.5 rounded-xl transition-all print:hidden"
+        >
+          <Printer size={16} />
+          <span>Imprimer</span>
+        </button>
         <button
           onClick={handleCreate}
           disabled={isPending}
