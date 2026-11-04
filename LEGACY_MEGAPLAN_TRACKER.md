@@ -82,7 +82,7 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 ### ✅ G17 — Réception rapide (posixrecep/AchaPosix — 💀 upstream)
 - [x] "Rapide" toggle in SupplierReceiptModal: SKU/barcode/OEM input + qty + Enter/add — resolves client-side against catalog, duplicate scan increments qty, price defaults from product PA (editable in the line rows)
 - [x] Verified dev: scan 1001→CDI 5 LIFA MOTO added, dup scan incremented, "ZZZZ" → "Introuvable"
-- Effort: S-M · Deploy: prod (branch `feature/g17-quick-receive`, no migration)
+- Effort: S-M · Deployed `erp-system-00139-gbf` (`v1.7.0`, no migration, prod-verified Rapide toggle) — also shipped `getDocumentCommercials` fix
 
 ### ⏭️ G13 — Familles (DE-SCOPED)
 1 row "PAR DEFAUT" upstream — feature never used. Our categories = their categories. No action.
@@ -135,3 +135,5 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 | 2026-11-04 | G12 vue catalogue + marque filter + print (`feature/g12-catalogue-view`) | `a9ade51` | `erp-system-00125-8zw` `v1.3.0` (live-verified cards+filter+print btn) |
 | 2026-11-04 | G14 marques gérées (`feature/g14-brands`) | `310c4b9` | `erp-system-00128-9d7` `v1.4.0` (migration 0031, user-verified) |
 | 2026-11-04 | G18 p1 mouvements + transferts + entrepôts (`feature/g18-stock-parities`) | `d626dee` | `erp-system-00132-l7m` `v1.5.0` (live-verified) |
+| 2026-11-04 | G18 p2 marge/Val_PA + commercial filter + inventaire valeur + feuille abrégée | `c7646ce` | `erp-system-00135-xgb` `v1.6.0` (live-verified; commercial fix `842a6ce` w/ next) |
+| 2026-11-04 | G17 réception rapide (`feature/g17-quick-receive`) | `0a71e6f` | `erp-system-00139-gbf` `v1.7.0` (live-verified Rapide toggle) |
