@@ -31,6 +31,7 @@ import {
 import { getDocumentUbl } from "@/lib/actions/dgi";
 import { PREP_STATUS_LABELS, PREP_TRANSITIONS } from "@/lib/prep";
 import { unwrap } from "@/lib/action-result";
+import { getStaff } from "@/lib/actions/staff";
 import { formatMoney } from "@/lib/money";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
 import { AvoirTypeModal, type AvoirType } from "@/components/sales/AvoirTypeModal";
@@ -65,6 +66,8 @@ export default function VentesListPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
+  const [commercialFilter, setCommercialFilter] = useState("");
+  const [commerciaux, setCommerciaux] = useState<string[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<SalesDocumentItem | null>(null);
   const [avoirTargetDoc, setAvoirTargetDoc] = useState<SalesDocumentItem | null>(null);
   const [convertTargetDoc, setConvertTargetDoc] = useState<SalesDocumentItem | null>(null);
@@ -79,6 +82,7 @@ export default function VentesListPage() {
         search: searchTerm,
         status: statusFilter,
         docType: typeFilter === "ALL" ? undefined : (typeFilter as SalesDocumentItem["docType"]),
+        commercial: commercialFilter || undefined,
       };
       const [data, total] = await Promise.all([
         getSalesDocuments({ ...base, limit: PAGE_SIZE, offset: (targetPage - 1) * PAGE_SIZE }),
@@ -97,7 +101,7 @@ export default function VentesListPage() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      const key = JSON.stringify([searchTerm, statusFilter, typeFilter]);
+      const key = JSON.stringify([searchTerm, statusFilter, typeFilter, commercialFilter]);
       if (filtersKeyRef.current !== key) {
         filtersKeyRef.current = key;
         // Filtres modifiés : repartir en page 1 (re-déclenche l'effet via `page`).
@@ -110,7 +114,13 @@ export default function VentesListPage() {
     }, 150);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, statusFilter, typeFilter, page]);
+  }, [searchTerm, statusFilter, typeFilter, commercialFilter, page]);
+
+  useEffect(() => {
+    getStaff("COMMERCIAL")
+      .then((r) => setCommerciaux(unwrap(r).map((s) => s.name)))
+      .catch(() => {});
+  }, []);
 
   const totalPages = Math.max(1, Math.ceil(totalDocs / PAGE_SIZE));
 
@@ -235,6 +245,19 @@ export default function VentesListPage() {
               {f.label}
             </button>
           ))}
+          {commerciaux.length > 0 && (
+            <select
+              value={commercialFilter}
+              onChange={(e) => setCommercialFilter(e.target.value)}
+              className="ml-auto px-3 py-1.5 text-xs font-semibold bg-[#F8F9FA] border border-[#E5E7EB] rounded-lg outline-none focus:border-[#4338CA]"
+              aria-label="Filtrer par commercial"
+            >
+              <option value="">Tous commerciaux</option>
+              {commerciaux.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 

@@ -529,7 +529,7 @@ export default function StockCataloguePage() {
                         {formatMoney(p.purchasePriceCents)}
                       </td>
 
-                      {/* Prix Vente Détail TTC */}
+                      {/* Prix Vente Détail TTC + Marge % */}
                       <td className="py-3 px-4 text-right">
                         <span className="font-bold text-[#111827]">
                           {formatMoney(p.salePriceRetailCents)}
@@ -537,6 +537,11 @@ export default function StockCataloguePage() {
                         {p.salePriceWholesaleCents && (
                           <div className="text-[10px] text-[#6B7280]">
                             Gros: {formatMoney(p.salePriceWholesaleCents)}
+                          </div>
+                        )}
+                        {p.purchasePriceCents > 0 && (
+                          <div className="text-[10px] font-semibold text-[#0D9488]">
+                            Marge {Math.round(((p.salePriceRetailCents - p.purchasePriceCents) / p.salePriceRetailCents) * 100)}%
                           </div>
                         )}
                       </td>
@@ -561,6 +566,9 @@ export default function StockCataloguePage() {
                             Stock négatif
                           </div>
                         )}
+                        <div className="text-[9px] text-[#9CA3AF] mt-0.5" title="Valeur stock au prix d'achat">
+                          Val. {formatMoney(shownStock * p.purchasePriceCents)}
+                        </div>
                       </td>
 
                       {/* Actions */}

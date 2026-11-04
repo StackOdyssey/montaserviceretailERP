@@ -50,6 +50,7 @@ type SalesDocFilters = {
   search?: string;
   status?: string;
   customerId?: number;
+  commercial?: string;
 };
 
 function salesDocConds(options?: SalesDocFilters) {
@@ -57,6 +58,7 @@ function salesDocConds(options?: SalesDocFilters) {
   if (options?.docType) conds.push(eq(salesDocuments.docType, options.docType));
   if (options?.status && options.status !== "ALL") conds.push(eq(salesDocuments.status, options.status));
   if (options?.customerId) conds.push(eq(salesDocuments.customerId, options.customerId));
+  if (options?.commercial) conds.push(eq(salesDocuments.commercialName, options.commercial));
   const search = options?.search?.trim();
   if (search) {
     const like = `%${search}%`;
