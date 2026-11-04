@@ -218,6 +218,13 @@
       "when": 1793801300299,
       "tag": "0030_g21_payment_modes",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1793803627769,
+      "tag": "0031_g14_brands",
+      "breakpoints": true
     }
   ]
 }

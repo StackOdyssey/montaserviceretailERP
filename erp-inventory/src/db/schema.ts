@@ -152,6 +152,14 @@ export const paymentMethods = pgTable("payment_methods", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const brands = pgTable("brands", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(), // Marque produit (LIFA MOTO, JMC…)
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const settingsHistory = pgTable("settings_history", {
   id: serial("id").primaryKey(),
   actorUserId: integer("actor_user_id"),

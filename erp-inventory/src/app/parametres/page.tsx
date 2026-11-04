@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Smartphone,
   Server,
+  Tags,
   Cloud,
   HelpCircle,
 } from "lucide-react";
@@ -23,6 +24,7 @@ import { revokeAllSessions } from "@/lib/actions/auth";
 import { clearAppCaches } from "@/components/pwa/clear-app-caches";
 import { UsersSection } from "@/components/settings/UsersSection";
 import { StaffSection } from "@/components/settings/StaffSection";
+import { BrandsSection } from "@/components/settings/BrandsSection";
 import { useToast } from "@/components/ui/ToastProvider";
 import { unwrap } from "@/lib/action-result";
 
@@ -30,7 +32,7 @@ export default function ParametresPage() {
   const router = useRouter();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<
-    "SOCIETE" | "FISCAL" | "BANQUE" | "SECURITE" | "NUMEROTATION" | "CLOUD" | "DECISIONS"
+    "SOCIETE" | "FISCAL" | "BANQUE" | "SECURITE" | "NUMEROTATION" | "CATALOGUE" | "CLOUD" | "DECISIONS"
   >("SOCIETE");
 
   const [savedNotification, setSavedNotification] = useState(false);
@@ -221,6 +223,7 @@ export default function ParametresPage() {
           { id: "BANQUE", label: "Banques & RIB", icon: CreditCard },
           { id: "SECURITE", label: "Code PIN & Accès", icon: Lock },
           { id: "NUMEROTATION", label: "Numérotation BL", icon: Hash },
+          { id: "CATALOGUE", label: "Catalogue", icon: Tags },
           { id: "CLOUD", label: "Système", icon: Server },
           { id: "DECISIONS", label: "Décisions & Questions", icon: HelpCircle },
         ].map((tab) => {
@@ -724,6 +727,15 @@ export default function ParametresPage() {
         {/* ========================================================================= */}
         {/* 6. INFRASTRUCTURE & BACKUP CLOUD                                          */}
         {/* ========================================================================= */}
+        {/* ========================================================================= */}
+        {/* 6. CATALOGUE — marques gérées (G14)                                       */}
+        {/* ========================================================================= */}
+        {activeTab === "CATALOGUE" && (
+          <div className="space-y-6">
+            <BrandsSection />
+          </div>
+        )}
+
         {activeTab === "CLOUD" && (
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-xs space-y-6">
             <div className="border-b border-gray-100 dark:border-gray-800 pb-4">

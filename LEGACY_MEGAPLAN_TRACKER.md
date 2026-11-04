@@ -61,11 +61,13 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 - [x] **Verified dev:** 50 cards page 1, JMC filter → 34 produits, print button present
 - Effort: S · Deployed `erp-system-00125-8zw` (`v1.3.0`, no migration — live-verified 50 cards + marque filter + print btn)
 
-### ⬜ G14 — Marques gérées
+### ✅ G14 — Marques gérées
 **Legacy:** marques CRUD list (7 rows) + marqueImport; ours: free-text `products.brand`.
-- [ ] `brands` table + CRUD in /parametres (or /stock sub-tab) + datalist on ProductModal
-- [ ] Backfill distinct brands from products
-- Effort: S · Deps: migration
+- [x] `brands` table (migration 0031 + backfill DISTINCT from products) + `lib/actions/brands.ts` (getBrands/saveBrand/setBrandActive + audit)
+- [x] `BrandsSection` in /parametres new "Catalogue" tab (add + activate/deactivate chips)
+- [x] ProductModal: `<datalist>` suggestions from active brands (free-text still allowed)
+- [x] Verified: tsc + build clean, migration dev applied
+- Effort: S · Deploy: prod migration 0031 + deploy (branch `feature/g14-brands`)
 
 ### ⬜ G18 — Petites parités stock/ventes
 - [ ] `/ventes`: filtre par commercial (data déjà affichée)

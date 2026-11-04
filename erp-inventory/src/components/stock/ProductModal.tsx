@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Camera, Check, AlertCircle, Archive } from "lucide-react";
 import { ProductItem, saveProduct, archiveProduct } from "@/lib/actions/products";
+import { getBrands } from "@/lib/actions/brands";
 import { unwrap } from "@/lib/action-result";
 import { compressImageToWebP } from "@/lib/image-compressor";
 import { getPhotoUploadUrl } from "@/lib/actions/media";
@@ -29,6 +30,12 @@ export function ProductModal({
   const [oemCode, setOemCode] = useState("");
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("Bashan");
+  const [brandList, setBrandList] = useState<string[]>([]);
+  useEffect(() => {
+    getBrands(true)
+      .then((r) => setBrandList(unwrap(r).map((b) => b.name)))
+      .catch(() => {});
+  }, []);
   const [categoryName, setCategoryName] = useState("Freinage");
   const [purchasePriceDH, setPurchasePriceDH] = useState("");
   const [salePriceRetailDH, setSalePriceRetailDH] = useState("");
@@ -262,9 +269,15 @@ export function ProductModal({
                 type="text"
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
+                list="brands-datalist"
                 placeholder="ex: Bashan, Yamaha, MBK, Honda"
                 className="w-full px-3 py-2 text-sm bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl focus:border-[#F7162D] focus:ring-1 focus:ring-[#F7162D] outline-none"
               />
+              <datalist id="brands-datalist">
+                {brandList.map((b) => (
+                  <option key={b} value={b} />
+                ))}
+              </datalist>
             </div>
 
             <div>
