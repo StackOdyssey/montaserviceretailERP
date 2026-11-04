@@ -59,7 +59,7 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 - [x] `getProductBrands` + `brand` filter param on getProducts/getProductsCount → select "Toutes marques"
 - [x] Print stylesheet: `@media print` hides app chrome (globals.css), print-only header (société, nb articles, filtres actifs, date), "Imprimer" button → shareable catalogue
 - [x] **Verified dev:** 50 cards page 1, JMC filter → 34 produits, print button present
-- Effort: S · Deploy: prod (branch `feature/g12-catalogue-view`) — no migration needed
+- Effort: S · Deployed `erp-system-00125-8zw` (`v1.3.0`, no migration — live-verified 50 cards + marque filter + print btn)
 
 ### ⬜ G14 — Marques gérées
 **Legacy:** marques CRUD list (7 rows) + marqueImport; ours: free-text `products.brand`.
@@ -125,3 +125,5 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 | 2026-11-03 | G11+G20 /clients page + fiche fields + CustomerModal stale-state fix | `024a6b0` | `erp-system-00116-jv8` (migration 0028 prod applied, live-verified /clients + drawer, console clean) |
 | 2026-11-04 | G22 payee_name on cheques/effets (`feat/g22-payee-name`) | `977edb0` | `erp-system-00118-t5b` (migration 0029 prod applied, live-verified payee field on Chèque, console clean) |
 | 2026-11-04 | G21 CARTE_BANCAIRE + VERSEMENT modes (`feature/g21-payment-modes`) | `63b33c8` | `erp-system-00121-f2r` `v1.2.0` (migration 0030 prod, live-verified 6 methods incl. TPE+Versement) |
+| 2026-11-04 | G23 de-scoped — 0/284 acomptes upstream | `d85c9b3` | — |
+| 2026-11-04 | G12 vue catalogue + marque filter + print (`feature/g12-catalogue-view`) | `a9ade51` | `erp-system-00125-8zw` `v1.3.0` (live-verified cards+filter+print btn) |

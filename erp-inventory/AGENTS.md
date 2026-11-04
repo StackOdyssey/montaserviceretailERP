@@ -133,6 +133,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **G11+G20 DEPLOYED:** `erp-system-00116-jv8`, migration 0028 on prod. `/clients` live.
 - **G22 DEPLOYED:** `erp-system-00118-t5b`, migration 0029 on prod (`customer_payments.payee_name`). Live-verified: "Règlement au nom de (tiers — chèque endossé)" field renders on Chèque in PaymentModal via /clients → Encaisser, console clean.
 - **G21 DEPLOYED:** `erp-system-00121-f2r` `v1.2.0` (`63b33c8`, `feature/g21-payment-modes` merged+deleted). Migration 0030 prod — `payment_methods` += CARTE_BANCAIRE+VERSEMENT. POS has 4th TPE button (no fiche); VERSEMENT requires fiche like VIREMENT; supplier non-cheque/effet → DEBITE. `paymentMethodLabel()` in `src/lib/payments.ts`.
-- **Workflow:** `Github_Branching_instructions.md` (repo root) — feature/* branches, approval checkpoint before merge+deploy, semver tag per deploy. Tags: v1.0.0=00116, v1.1.0=00118, v1.2.0=00121.
+- **G12 DEPLOYED:** `erp-system-00125-8zw` `v1.3.0` (`a9ade51`). Catalogue card view + `getProductBrands` brand filter + `@media print` hides chrome (globals.css) — print-only header on catalogue view.
+- **Workflow:** `Github_Branching_instructions.md` (repo root) — feature/* branches, approval checkpoint before merge+deploy, semver tag per deploy. Tags: v1.0.0=00116, v1.1.0=00118, v1.2.0=00121, v1.3.0=00125.
 - **G23 DE-SCOPED** (2026-11-04): `situationClients` pull — 0/284 clients with non-zero acompte. Never used upstream. 83 clients have non-zero Avoirs → credit notes are real usage, fold into Phase E.
 - **Next:** Phase C — G12 catalogue vue (photo grid on /stock), G14 marques gérées (brands table+CRUD), G18 stock parities (bundle), G17 quick-receive. Dev server :3100; working tree clean.
