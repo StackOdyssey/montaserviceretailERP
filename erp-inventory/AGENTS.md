@@ -104,7 +104,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 **G11+G20 shipped (dev-verified, NOT yet deployed):**
 - `/clients`: fuzzy search, 25/p pagination, commercial filter, "avec solde dû" toggle, aging J+ badges, summary cards; `ClientDrawer` (KPIs + Documents/Règlements/Relevé tabs + Encaisser/Relevé A4/Modifier); nav entry Clients.
-- Migration **0028 APPLIED TO DEV ONLY** — `customers.assigned_staff_id`, `risk_class`, `payment_term_days`. **Must run `db:migrate` on prod before/with deploy** (prod conn string via Neon MCP `get_connection_string`, project twilight-pine-29350562, branch br-fancy-block-b13o37dw).
+- Migration **0028 applied dev+prod** — `customers.assigned_staff_id`, `risk_class`, `payment_term_days`. **Deployed prod `erp-system-00116-jv8`** (2026-11-04) — live-verified: login, nav "Clients", `/clients` 295 rows/12 pages + summary cards + filters, ClientDrawer (KPIs, Documents/Règlements/Relevé tabs, Encaisser/Relevé A4/Modifier), console clean.
 - Bug fixed: `CustomerModal` never repopulated on edit — `useState(customer?.x)` initializers ran once at mount while isOpen=false; added reset-on-open useEffect (latent bug also affected /reglements).
 - `ClientDrawer` takes `refreshKey` prop — bump to refetch statement after saves (stale-statement revert bug).
 

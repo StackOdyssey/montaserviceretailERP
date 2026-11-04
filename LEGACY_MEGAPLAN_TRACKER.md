@@ -24,7 +24,7 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 - [x] `customers.assigned_staff_id` → staff, `risk_class` (NORMAL/ROI/DOUTEUX/LITIGIEUX/ARNAQUEUR), `payment_term_days` — migration 0028 (dev appliquée, prod à faire au déploiement)
 - [x] CustomerModal: select commercial (getStaff), classification, échéance
 - [x] `/clients`: filtre par commercial + badges risque/aging
-- [ ] Prod migration 0028 — au déploiement
+- [x] Prod migration 0028 — appliquée au déploiement (`erp-system-00116-jv8`)
 
 ## Phase B — Règlements gaps
 
@@ -113,4 +113,4 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 | Date | Item | Commit | Prod revision |
 |---|---|---|---|
 | 2026-11-03 | Legacy re-audit (42 routes) + audit doc + this tracker | `5d00226` | — |
-| 2026-11-03 | G11+G20 /clients page + fiche fields + CustomerModal stale-state fix | `024a6b0` | pending (migration 0028 prod needed) |
+| 2026-11-03 | G11+G20 /clients page + fiche fields + CustomerModal stale-state fix | `024a6b0` | `erp-system-00116-jv8` (migration 0028 prod applied, live-verified /clients + drawer, console clean) |
