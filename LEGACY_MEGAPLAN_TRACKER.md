@@ -46,10 +46,10 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · ⏭️ de-scoped
 - [x] Verified prod: `erp-system-00118-t5b` — "Règlement au nom de (tiers — chèque endossé)" field renders on Chèque selection, console clean
 - Effort: XS · Deployed `erp-system-00118-t5b`
 
-### ⬜ G23 — Acomptes clients (assess first)
+### ⏭️ G23 — Acomptes clients (DE-SCOPED 2026-11-04)
 **Legacy:** SoldesClient — advance deposits tracked per client, "Acompte Clt/P_Clt" columns in situation.
-- [ ] Check upstream usage volume first (SoldesClient data pull); if real: `customer_advances` or negative payments + solde display on /clients drawer
-- Effort: M · Deps: G11, data check — may de-scope
+- Data pull on `situationClients` (284 clients): **0 non-zero acompte balances** — columns exist but feature never used (same as G13 familles).
+- No `customer_advances` table needed. Note: 83 clients DO have non-zero **Avoirs** — credit notes are real usage; fold into Phase E data pull.
 
 ## Phase C — Stock & catalogue
 
