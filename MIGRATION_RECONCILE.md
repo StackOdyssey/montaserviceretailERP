@@ -27,6 +27,15 @@ Legacy `reste` already nets in-hand cheques ⇒ for every client:
 
 Name matching: legacy name → prod `customers.name` (imported verbatim, expect near-exact; report unmatched).
 
+## Executed 2026-11-04 — `scripts/import-legacy-balances.mjs --apply`
+
+- **99 BL docs** `BL-2026-00001..00099` (VALIDE, unpaid, `IMPORT LEGACY` notes) = reste + in-hand cheques per client
+- **467 payments `EN_ATTENTE`** linked to their client's doc — mode (CHEQUE/EFFET_LCN), reference, échéance (Date Dépôt), `payee_name`
+- **2 credit-balance payments `ENCAISSE`**: HICHAM AZAZ −13 823 + ABDERRAHMANE ARIHA −1 390 (negative-reste clients can't carry a doc — modelled as received overpayment)
+- Name matching: **0 unmatched** of 99 plan clients
+- **Reconcile: net client receivable = 697 910,50 DH ✓** (docs 7 139 124,50 − payments 6 441 214,00); per-client net = legacy reste, **0 mismatches**
+- `BL` numbering sequence consumed through 00099 — app continues at 00100
+
 ## Open items after import
 
 - Payments history (`paiementClients` 54KB) — history-only, optional
