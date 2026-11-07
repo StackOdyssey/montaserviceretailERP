@@ -98,7 +98,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Resume point — LEGACY MEGAPLAN phase 2 (saved 2026-11-03)
 
-**Plan:** `~/.devin/plans/plan-f7d1272704d0c09d.md`. Tracker: `LEGACY_MEGAPLAN_TRACKER.md` (repo root, committed). Audit: `LEGACY_FEATURE_AUDIT.md`. Page dumps: `References_/legacy-pages/*.html|.txt` (untracked, regenerate via `MONTA_USER=Montassir MONTA_PASS=123456780 node scripts/fetch-legacy-pages.mjs <pages>`).
+**Plan:** `~/.devin/plans/plan-f7d1272704d0c09d.md`. Tracker: `LEGACY_MEGAPLAN_TRACKER.md` (repo root, committed). Audit: `LEGACY_FEATURE_AUDIT.md`. Page dumps: `References_/legacy-pages/*.html|.txt` (untracked, regenerate via `MONTA_USER=$MONTA_USER MONTA_PASS=$MONTA_PASS node scripts/fetch-legacy-pages.mjs <pages>` — creds from the owner, never written in repo files).
 
 **Committed:** `5d00226` audit+tracker+fetch script · `024a6b0` **G11+G20 /clients page** · `e087c49` tracker update.
 
