@@ -17,6 +17,8 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  // Masque le header `X-Powered-By: Next.js` (empreinte framework).
+  poweredByHeader: false,
   // INTERDICTION D'INDEXATION — appliqué à TOUTES les réponses, quel que soit le domaine
   // (URL Cloud Run actuelle et tout futur domaine acheté). Application interne : ne doit
   // jamais être indexée, suivie ni archivée par les moteurs de recherche.
@@ -28,6 +30,18 @@ const nextConfig: NextConfig = {
           {
             key: "X-Robots-Tag",
             value: "noindex, nofollow, noarchive, nosnippet, noimageindex",
+          },
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "same-origin" },
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
+          // CSP en mode rapport uniquement pour l'instant : observe sans casser.
+          // Next exige 'unsafe-inline' (hydration, styles) — le durcissement vient après.
+          {
+            key: "Content-Security-Policy-Report-Only",
+            value:
+              "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
           },
         ],
       },
