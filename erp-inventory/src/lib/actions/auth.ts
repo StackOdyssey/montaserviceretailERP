@@ -3,7 +3,7 @@
 import { and, count, eq, gte } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { createSessionToken, verifyAdminPin, pinHmac, SESSION_COOKIE_NAME } from "@/lib/auth";
-import { assertAuthenticated } from "@/lib/action-guard";
+import { assertAuthenticated, assertOwner } from "@/lib/action-guard";
 import { isLiveSession } from "@/lib/session";
 import { bumpSessionVersion, getSessionVersion } from "@/lib/session-version";
 import { auditLogs, db, users } from "@/db";
@@ -166,7 +166,7 @@ export async function logout(): Promise<void> {
  * Révoque toutes les sessions (tous appareils), y compris la session courante.
  */
 export async function revokeAllSessions(): Promise<void> {
-  await assertAuthenticated();
+  await assertOwner();
   const version = await bumpSessionVersion();
   try {
     await db?.insert(auditLogs).values({

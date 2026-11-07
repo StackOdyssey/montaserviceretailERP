@@ -81,18 +81,45 @@ export async function changeMyPin(data: {
     const newPin = data.newPin.trim();
     if (!/^\d{4,8}$/.test(newPin)) throw new Error("Le PIN doit contenir 4 à 8 chiffres");
     const d = requireDb();
+    // Anti-énumération : un PIN incorrect en entrée est compté ; 5 échecs / 15 min.
+    const since = new Date(Date.now() - 15 * 60 * 1000);
+    const fails = (
+      await d
+        .select({ n: sql<number>`count(*)` })
+        .from(auditLogs)
+        .where(and(eq(auditLogs.action, "CHANGEMENT_PIN_ECHEC"), eq(auditLogs.entityId, session.uid), gte(auditLogs.createdAt, since)))
+    )[0];
+    if (Number(fails?.n ?? 0) >= 5) {
+      throw new Error("Trop de tentatives. Réessayez dans 15 minutes");
+    }
     const user = (
       await d.select().from(users).where(eq(users.id, session.uid)).limit(1)
     )[0];
     if (!user) throw new Error("Utilisateur introuvable");
     if (user.pinHmac !== pinHmac(data.currentPin.trim())) {
+      await d.insert(auditLogs).values({
+        action: "CHANGEMENT_PIN_ECHEC",
+        entityType: "USER",
+        entityId: session.uid,
+        actorName: session.user,
+        details: "PIN actuel incorrect",
+      });
       throw new Error("PIN actuel incorrect");
     }
     // Unicité : le PIN ne doit pas être celui d'un autre compte.
     const dup = (
       await d.select({ id: users.id }).from(users).where(eq(users.pinHmac, pinHmac(newPin))).limit(1)
     )[0];
-    if (dup && dup.id !== session.uid) throw new Error("Ce PIN est déjà utilisé par un autre compte");
+    if (dup && dup.id !== session.uid) {
+      await d.insert(auditLogs).values({
+        action: "CHANGEMENT_PIN_ECHEC",
+        entityType: "USER",
+        entityId: session.uid,
+        actorName: session.user,
+        details: "PIN proposé refusé (collision)",
+      });
+      throw new Error("PIN non autorisé, choisissez-en un autre");
+    }
     await d
       .update(users)
       .set({ pinHmac: pinHmac(newPin), updatedAt: new Date() })
