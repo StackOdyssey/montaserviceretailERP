@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths: ["erp-inventory/**"]
+  pull_request:
+    paths: ["erp-inventory/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: erp-inventory
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: erp-inventory/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit -p .
+      - run: npx eslint . --max-warnings 0
+      - run: npm run build
