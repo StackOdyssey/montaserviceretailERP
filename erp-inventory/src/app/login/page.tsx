@@ -20,7 +20,7 @@ export default function LoginPage() {
 
   // Ajout d'un chiffre au PIN tactile
   const handleKeyPress = (num: string) => {
-    if (pin.length >= 6) return;
+    if (pin.length >= 8) return;
     setError(null);
 
     // Vibration haptique subtile pour retour tactile sur smartphone
@@ -28,13 +28,8 @@ export default function LoginPage() {
       navigator.vibrate(25);
     }
 
-    const newPin = pin + num;
-    setPin(newPin);
-
-    // Validation automatique si 4 chiffres saisis (PIN standard)
-    if (newPin.length === 4) {
-      submitPin(newPin);
-    }
+    // Pas de validation automatique : les PIN font 4 à 8 chiffres (Valider ou Entrée).
+    setPin(pin + num);
   };
 
   const handleDelete = () => {
@@ -81,11 +76,13 @@ export default function LoginPage() {
         handleDelete();
       } else if (e.key === "Escape") {
         handleClear();
+      } else if (e.key === "Enter" && pin.length > 0 && !isSubmitting) {
+        submitPin(pin);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [pin]);
+  });
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#111827] px-4 py-8 text-white select-none">
@@ -115,7 +112,7 @@ export default function LoginPage() {
         {/* 1. Indicateur visuel des points PIN */}
         <div className={`flex flex-col items-center space-y-3 ${shake ? "animate-bounce" : ""}`}>
           <div className="flex items-center justify-center gap-4 py-2">
-            {[0, 1, 2, 3].map((idx) => {
+            {Array.from({ length: Math.max(4, pin.length) }, (_, i) => i).map((idx) => {
               const isFilled = pin.length > idx;
               return (
                 <div
@@ -137,7 +134,7 @@ export default function LoginPage() {
             </div>
           ) : (
             <div className="text-[11px] text-gray-500 font-medium">
-              Saisissez votre code PIN à 4 chiffres
+              Saisissez votre code PIN puis appuyez sur Valider
             </div>
           )}
         </div>

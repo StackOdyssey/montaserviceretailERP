@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, Delete, LogIn } from "lucide-react";
 import { loginWithPin } from "@/lib/actions/auth";
@@ -37,12 +37,21 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     }
   };
 
+  // PIN de 4 à 8 chiffres : pas de validation automatique (bouton ou Entrée).
   const digit = (d: string) => {
-    if (pin.length >= 6) return;
-    const next = pin + d;
-    setPin(next);
-    if (next.length === 6) submit(next);
+    if (pin.length >= 8) return;
+    setPin(pin + d);
   };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key >= "0" && e.key <= "9") digit(e.key);
+      else if (e.key === "Backspace") setPin((p) => p.slice(0, -1));
+      else if (e.key === "Enter") submit(pin);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   return (
     <div className="fixed inset-0 z-[100] bg-[#111827]/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 select-none">
@@ -53,11 +62,11 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
       <p className="text-gray-400 text-xs mt-1 mb-6">Entrez un code PIN pour reprendre</p>
 
       {/* Cellules PIN */}
-      <div className="flex gap-2.5 mb-4">
-        {Array.from({ length: 6 }).map((_, i) => (
+      <div className="flex gap-2 mb-4">
+        {Array.from({ length: Math.max(4, pin.length) }).map((_, i) => (
           <div
             key={i}
-            className={`w-10 h-12 rounded-xl border-2 flex items-center justify-center text-xl font-bold transition-all ${
+            className={`w-8 h-11 rounded-xl border-2 flex items-center justify-center text-xl font-bold transition-all ${
               pin.length > i
                 ? "border-[#F7162D] bg-[#F7162D]/20 text-white"
                 : "border-gray-600 bg-white/5 text-transparent"
