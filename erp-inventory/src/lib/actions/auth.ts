@@ -35,9 +35,19 @@ async function recentPinFailures(ip: string): Promise<{ perIp: number; global: n
   };
 }
 
+// Cloud Run (Google Front End) AJOUTE l'IP réelle du client en fin de X-Forwarded-For :
+// les entrées de gauche sont fournies par le client et falsifiables. Prendre la dernière
+// entrée empêche de contourner le verrou par IP avec un en-tête forgé.
 async function clientIp(): Promise<string> {
   const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "inconnue";
+  const hops = (h.get("x-forwarded-for") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  return hops[hops.length - 1] || h.get("x-real-ip") || "inconnue";
+}
+
+// Délai progressif après échecs (par IP) : 0, 1, 2, 4, 8 s… plafonné à 8 s.
+// Ralentit le devinage en série sans gêner une faute de frappe isolée.
+function failureDelayMs(failures: number): number {
+  return failures <= 0 ? 0 : Math.min(1000 * 2 ** (failures - 1), 8000);
 }
 
 /**
@@ -63,6 +73,8 @@ export async function loginWithPin(pin: string): Promise<AuthResult> {
       message: "Trop de tentatives incorrectes. Connexion suspendue 15 minutes.",
     };
   }
+  const delay = failureDelayMs(failures.perIp);
+  if (delay > 0) await new Promise((r) => setTimeout(r, delay));
 
   // Identification : PIN utilisateur nominatif (users.pin_hmac) ou clé maîtresse
   // ADMIN_PIN. Les deux comparaisons passent par le même HMAC (temps constant).
