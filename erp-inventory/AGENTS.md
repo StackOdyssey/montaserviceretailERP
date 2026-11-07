@@ -1,6 +1,6 @@
 <!-- BEGIN:nextjs-agent-rules -->
 
-# This is NOT the Next.js you know
+## This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 
@@ -144,3 +144,18 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **Phase E DONE (opening positions):** `0049427`+`6681681` on main. Prod net receivable = **697 910,50 DH exact**. Script: `scripts/import-legacy-balances.mjs` (dry-run → --apply, neon tagged template, dates as plain strings). Model: per client `debt_doc = reste + Σ pending cheques` → unpaid VALIDE BL + payments `EN_ATTENTE` (net = reste); negative-reste clients → `ENCAISSE` compensating payment, no doc. `MIGRATION_RECONCILE.md` = full spec+results.
 - **ONLY REMAINING:** 8 supplier debts — all legacy sources dead → user enters amounts (or provides them → insert unpaid supplier_receipt per supplier, same pattern).
 - Dev server :3100 (dev branch — import is prod-only). Prod: `erp-system-00142-cpd` `v1.8.0`.
+
+## Resume point — security remediation (saved 2026-11-07)
+
+- **Security audit `SECURITY_AUDIT_2026-11-07.md` at repo root (untracked by design — describes weaknesses). All 9 remediation steps DONE:**
+  1. Neon DB password rotated (Secret Manager v2, GitHub secret updated, backup verified); legacy montaservice cred removed from AGENTS.md (git history untouched — private repo, owner should change pass)
+  2. PIN brute-force: `clientIp()` = right-most XFF entry (prod-verified real IP), progressive delays 1→8s, 15min lockout; login+lock screens accept 4–8 digits, no auto-submit — `v1.9.0` / `erp-system-00152-vm6`
+  3. next 16.3.8→**16.4.5** + dompurify 3.4.17, `npm audit`=0 — `v1.9.1` / `erp-system-00154-6hr`
+  4. Security headers (HSTS, XFO DENY + frame-ancestors 'none', nosniff, Referrer-Policy, Permissions-Policy camera=self, poweredByHeader off, CSP **Report-Only**) — `v1.9.2` / `erp-system-00155-sgk`
+  5. PIN oracle fixed: `changeMyPin` generic error + `CHANGEMENT_PIN_ECHEC` audit rows + 5-fail/15min cap; `revokeAllSessions` → `assertOwner()` — `v1.9.3` / `erp-system-00156-8nm`
+  6. Least-privilege: app runs as **`erp-runtime@erp-syste`** (secretAccessor×6 + logWriter); builds run as **`erp-deployer`**; default compute SA's `roles/editor` **removed**; Cloud Build trigger restricted to `includedFiles: erp-inventory/**` (docs pushes no longer redeploy)
+  7. Import bookkeeping: the 2 solde-créditeur ESPECES payments (ids 472/473) back-dated to `2024-12-31` (out of Nov-4 till); `IMPORT_LEGACY` audit row added; net receivable still exactly **697 910,50 DH**
+  8. **IAP enabled on Cloud Run** (project has no org → custom OAuth client `1046319022554-oeirf7rhh6keb18ke7kk0cmoenanvk2q` via `gcloud iap settings set`); `iap.httpsResourceAccessor` → davidsmithny01@gmail.com (project-level); IAP SA granted `run.invoker`. Chain: Google sign-in → PIN pad. **IronBee can't drive prod pages anymore** (no Google auth) — prod verify = curl/gcloud logs/user.
+  9. CI: `.github/workflows/ci.yml` (tsc+eslint-errors+build, paths erp-inventory/**, workflow_dispatch) — first run green; `dependabot.yml` weekly npm; vuln alerts ON. 4 set-state-in-effect errors fixed (ClientDrawer/CustomerModal render-phase adjust, TransferModal debounce).
+- **Residual:** 2 moderate dev-only Dependabot alerts (typescript-estree/tsx — upstream majors); secret scanning needs GHAS; optional IAM-invoker second layer under IAP; CSP still report-only (promote after observing violations).
+- **State:** `main` @ `3a2ec1c`+deployed via trigger; prod revision auto-deployed for each merged change; latest tag `v1.9.3`.
