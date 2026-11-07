@@ -41,9 +41,9 @@ export function TransferModal({ isOpen, onClose, onDone }: { isOpen: boolean; on
 
   useEffect(() => {
     const term = search.trim();
-    if (term.length < 2) { setMatches([]); return; }
     let active = true;
     const t = setTimeout(() => {
+      if (term.length < 2) { setMatches([]); return; }
       getProducts({ search: term, limit: 8 }).then((r) => { if (active) setMatches(r); }).catch(() => {});
     }, 250);
     return () => { active = false; clearTimeout(t); };

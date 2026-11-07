@@ -35,17 +35,26 @@ export function ClientDrawer({ customerId, refreshKey = 0, onClose, onEncaisser,
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<"DOCS" | "PAYMENTS" | "LEDGER">("DOCS");
 
-  useEffect(() => {
-    if (!customerId) return;
+  const [prevCustomerId, setPrevCustomerId] = useState(customerId);
+  if (customerId !== prevCustomerId) {
+    setPrevCustomerId(customerId);
     setTab("DOCS");
-  }, [customerId]);
+    setStatement(null);
+    if (customerId) setLoading(true);
+  }
+  const [prevRefreshKey, setPrevRefreshKey] = useState(refreshKey);
+  if (refreshKey !== prevRefreshKey) {
+    setPrevRefreshKey(refreshKey);
+    if (customerId) setLoading(true);
+  }
 
   useEffect(() => {
     if (!customerId) return;
-    setLoading(true);
+    let active = true;
     getCustomerStatement(customerId)
-      .then(setStatement)
-      .finally(() => setLoading(false));
+      .then((s) => { if (active) setStatement(s); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [customerId, refreshKey]);
 
   if (!customerId) return null;

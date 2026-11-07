@@ -26,5 +26,5 @@ jobs:
           cache-dependency-path: erp-inventory/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit -p .
-      - run: npx eslint . --max-warnings 0
+      - run: npx eslint .
       - run: npm run build

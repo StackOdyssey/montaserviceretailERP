@@ -46,8 +46,16 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
 
   // Ré-initialise les champs à chaque ouverture (le composant reste monté :
   // sans reset, une édition après une création garde les valeurs précédentes).
-  useEffect(() => {
-    if (!isOpen) return;
+  // Ajustement pendant le rendu (pattern React officiel, évite set-state-in-effect).
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
+  }
+  const [prevCustomer, setPrevCustomer] = useState(customer);
+  if (customer !== prevCustomer) {
+    setPrevCustomer(customer);
+  }
+  if ((isOpen !== prevIsOpen || customer !== prevCustomer) && isOpen) {
     setName(customer?.name || "");
     setPhone(customer?.phone || "");
     setEmail(customer?.email || "");
@@ -67,10 +75,16 @@ export function CustomerModal({ isOpen, onClose, onSaved, customer }: CustomerMo
     setRepresentative(customer?.representative || "");
     setForce(false);
     setError(null);
+  }
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
     getStaff("COMMERCIAL")
-      .then((res) => setCommercials(unwrap(res)))
-      .catch(() => setCommercials([]));
-  }, [isOpen, customer]);
+      .then((res) => { if (active) setCommercials(unwrap(res)); })
+      .catch(() => { if (active) setCommercials([]); });
+    return () => { active = false; };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
