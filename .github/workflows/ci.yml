@@ -6,6 +6,7 @@ on:
     paths: ["erp-inventory/**"]
   pull_request:
     paths: ["erp-inventory/**"]
+  workflow_dispatch: {}
 
 permissions:
   contents: read
