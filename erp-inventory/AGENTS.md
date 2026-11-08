@@ -10,6 +10,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Project notes (BM Motors ERP)
 
+## PERMANENT USER PROTOCOL — "save for resume" / "resume"
+
+- **"save (for 'resume')"** → append/refresh the LATEST `## Resume point` section at the bottom of this file (what was done, decisions, pending questions, exact next step, prod revision/tag), commit + push (docs-only — trigger skips docs). Also update `LEGACY_MEGAPLAN_TRACKER.md` if plan items changed.
+- **"resume"** → read the LATEST `## Resume point` section (bottom of this file), check `git status`/`git log`/prod revision, then report **Done vs Left** as a table and propose the next step. Don't start coding until the user picks.
+- Guided steps needing the user: one sub-step at a time, wait for confirmation before the next.
+- Lint: CI gates errors only (`npx eslint .`); 17 cosmetic warnings tolerated.
+
 - Verify: `npx tsc --noEmit -p .`, `npm run build`, `npm run db:migrate` (dev Neon branch from `.env.local`). Lint has pre-existing errors (no-unescaped-entities, AppShell `set-state-in-effect`) — only check files you touched.
 - AppShell: every hook MUST run before the `pathname === "/login"` early return — it stays mounted across `/login` → `/` navigations; a conditional return before hooks throws React's "Expected static flag was missing".
 - Money tests: `money.test.ts` uses an extensionless import; run via a temp copy that rewrites `./money` → `./money.ts`, then `node --experimental-strip-types --test`.
@@ -159,3 +166,33 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   9. CI: `.github/workflows/ci.yml` (tsc+eslint-errors+build, paths erp-inventory/**, workflow_dispatch) — first run green; `dependabot.yml` weekly npm; vuln alerts ON. 4 set-state-in-effect errors fixed (ClientDrawer/CustomerModal render-phase adjust, TransferModal debounce).
 - **Residual:** 2 moderate dev-only Dependabot alerts (typescript-estree/tsx — upstream majors); secret scanning needs GHAS; optional IAM-invoker second layer under IAP; CSP still report-only (promote after observing violations).
 - **State:** `main` @ `3a2ec1c`+deployed via trigger; prod revision auto-deployed for each merged change; latest tag `v1.9.3`.
+
+## Resume point — LATEST (saved 2026-11-08)
+
+**Session 2026-11-08 summary (chat history):**
+1. `resume` → reported: security steps 1–9 done; leftovers = 2 dev-only Dependabot alerts (minimatch/esbuild), CSP report-only, supplier debts (user checking amounts), optional IAM-invoker layer, montaservice pass (owner's action).
+2. User asked for a **Moroccan-market feature review** (read-only, no code). Findings below.
+3. User tested IAP with another Google account (`horizontime.marrakech@gmail.com`) → correctly blocked ("You don't have access"). User wants to **add the real owner's email** to IAP — **PENDING: waiting for the owner's Gmail.** Command when given:
+   `gcloud projects add-iam-policy-binding erp-syste --member="user:EMAIL" --role="roles/iap.httpsResourceAccessor"` (or console: Security → IAP → erp-system → Add principal → "IAP-secured Web App User"). Suggest a personal PIN for the owner via Paramètres → Utilisateurs (audit attribution).
+
+**Moroccan-market review — proposed backlog (none started):**
+- Legal/accounting (priority):
+  - **M1** A4 print footer (`src/components/sales/DocumentPrintView.tsx` ~L298-311) lacks company **ICE / IF / RC / Patente(TP) / CNSS** — data exists in settings (all filled on prod). Mandatory invoice mentions (CGI). Small fix.
+  - **M2** No amount-in-words ("Arrêtée la présente facture à la somme de …") — no number-to-French-words helper exists.
+  - **M3** A4 print shows only "Total Net" HT (L276-279); no TVA/TTC lines nor "TVA non applicable" mention (POS `InvoiceModal` has them) — inconsistent.
+  - **M4** Prod `settings.vat_liable=false` (non-assujetti) on a SARL with ~7M DH receivables → **confirm TVA status with accountant** (question, not code).
+  - **M5** Loi 69-21 délais de paiement: aging exists, no 60/120-day compliance view / quarterly declaration export (CA ≥ 2M DH).
+  - **M6** Droit de timbre 0.25% on cash-paid invoices — none; confirm applicability with accountant.
+  - **M7** No accountant journal export (ventes/achats/banque, PCM accounts → Sage-style CSV).
+- Operations:
+  - **O1** Clôture de caisse (fond de caisse, expected vs counted, écart) — missing.
+  - **O2** Supplier purchase orders (from `minStockAlert`) → receive against PO — missing.
+  - **O3** WhatsApp relances for overdue balances / upcoming cheque due dates — missing (wa.me sharing + aging exist).
+  - **O4** Moto-model compatibility (Docker, C50, Booster…) searchable — only free-text "Marque / Compatibilité".
+  - **O5** Printable bordereau de remise de chèques en banque — missing.
+  - **O6** Chèque impayé workflow (re-debit client + bank fee) — status exists, no flow.
+- Nice-to-have: offline POS queue (IAP makes outages blocking), 80mm thermal ticket, Arabic print option, loyalty/mechanic tiers.
+- **Recommended order:** M1–M3 (small, before first invoices — prod has 0 factures, no daily use yet) + ask accountant M4/M6 → O1 + O3 → M5, O2, M7.
+
+**Next step on resume:** (a) get owner's Gmail → add to IAP; (b) ask user whether to start M1–M3 on branch `feature/invoice-legal-mentions`.
+**State:** `main` clean & pushed; prod revision from last trigger deploy (check `gcloud run services describe erp-system --region europe-west1 --project erp-syste --format="value(status.traffic[0].revisionName)"`); latest tag `v1.9.3`.
