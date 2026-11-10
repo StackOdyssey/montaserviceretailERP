@@ -1,8 +1,8 @@
 // Service Worker BM Motors ERP — cache STATIQUE uniquement.
 // Ne met JAMAIS en cache les pages applicatives (HTML) ni les données authentifiées.
 
-const CACHE_NAME = "bm-motors-static-v3";
-const STATIC_ASSETS = ["/manifest.json", "/bashan-logo.png", "/favicon.ico"];
+const CACHE_NAME = "bm-motors-static-v4";
+const STATIC_ASSETS = ["/manifest.json", "/bm-motors-logo-wide.png", "/icon-192.png", "/favicon.ico"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)));

@@ -90,16 +90,14 @@ export default function LoginPage() {
       <div className="w-full max-w-sm flex flex-col items-center space-y-6">
         {/* Logo & Identité BM Motors */}
         <div className="flex flex-col items-center text-center space-y-2">
-          <div className="w-20 h-20 relative rounded-2xl bg-white p-2 shadow-2xl border-2 border-[#F7162D] flex items-center justify-center">
-            <Image
-              src="/bashan-logo.png"
-              alt="Logo Bashan"
-              width={72}
-              height={24}
-              className="object-contain"
-              priority
-            />
-          </div>
+          <Image
+            src="/bm-motors-logo-wide.png"
+            alt="Logo BM Motors"
+            width={273}
+            height={70}
+            className="object-contain drop-shadow-2xl"
+            priority
+          />
           <h1 className="text-xl font-black tracking-tight text-white mt-2">
             SARL BM MOTORS
           </h1>

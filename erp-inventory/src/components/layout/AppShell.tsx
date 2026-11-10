@@ -171,16 +171,16 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
           isCollapsed ? "w-[76px]" : "w-[260px]"
         )}
       >
-        {/* En-tête Sidebar avec Logo Bashan */}
+        {/* En-tête Sidebar avec Logo BM Motors */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-[#E5E7EB]">
           <Link href="/" className="flex items-center gap-3 overflow-hidden">
             <div className="relative w-9 h-9 shrink-0 flex items-center justify-center">
               <Image
-                src="/bashan-logo.png"
-                alt="Logo Bashan"
+                src="/icon-192.png"
+                alt="Logo BM Motors"
                 width={36}
-                height={12}
-                className="object-contain"
+                height={36}
+                className="rounded-lg"
                 priority
               />
             </div>
@@ -315,11 +315,11 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
           </button>
           <div className="flex items-center gap-2">
             <Image
-              src="/bashan-logo.png"
-              alt="Logo"
+              src="/icon-192.png"
+              alt="Logo BM Motors"
               width={30}
-              height={10}
-              className="object-contain"
+              height={30}
+              className="rounded-md"
             />
             <span className="font-bold text-sm tracking-tight text-[#111827]">BM MOTORS</span>
           </div>
@@ -348,11 +348,11 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
             <div className="h-16 flex items-center justify-between px-4 border-b border-[#E5E7EB]">
               <div className="flex items-center gap-3">
                 <Image
-                  src="/bashan-logo.png"
-                  alt="Logo Bashan"
+                  src="/icon-192.png"
+                  alt="Logo BM Motors"
                   width={30}
-                  height={10}
-                  className="object-contain"
+                  height={30}
+                  className="rounded-md"
                 />
                 <div className="flex flex-col">
                   <span className="font-bold text-sm text-[#111827]">BM MOTORS</span>

@@ -22,6 +22,8 @@ export async function proxy(request: NextRequest) {
     pathname === "/manifest.json" ||
     pathname === "/sw.js" ||
     pathname === "/bashan-logo.png" ||
+    pathname.startsWith("/bm-motors-logo") ||
+    pathname === "/apple-touch-icon.png" ||
     pathname.startsWith("/icon-") ||
     pathname === "/favicon.ico"
   ) {

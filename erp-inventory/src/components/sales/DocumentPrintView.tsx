@@ -175,7 +175,7 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
               <div className="space-y-1">
                 <div className="relative w-44 h-14">
                   <Image
-                    src={company?.logoUrl || "/bashan-logo.png"}
+                    src={company?.logoUrl || "/bm-motors-logo-wide.png"}
                     alt="Logo"
                     fill
                     sizes="176px"
@@ -288,7 +288,7 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
             <div className="mt-6 pt-2 border-t border-black flex items-start gap-3">
               <div className="relative w-28 h-10 shrink-0">
                 <Image
-                  src={company?.logoUrl || "/bashan-logo.png"}
+                  src={company?.logoUrl || "/bm-motors-logo-wide.png"}
                   alt="Logo"
                   fill
                   sizes="112px"

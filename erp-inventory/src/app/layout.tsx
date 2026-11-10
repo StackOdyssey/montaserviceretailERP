@@ -37,8 +37,8 @@ export const metadata: Metadata = {
     title: "BM Motors",
   },
   icons: {
-    icon: "/bashan-logo.png",
-    apple: "/bashan-logo.png",
+    icon: [{ url: "/icon-192.png", type: "image/png", sizes: "192x192" }],
+    apple: "/apple-touch-icon.png",
   },
   // Application interne : ne jamais indexer, suivre ni archiver (aucun domaine autorisé).
   robots: {
