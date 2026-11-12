@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Mode standalone optimisé pour le conteneur Docker et Google Cloud Run
   output: "standalone",
+  // Autorise l'origine du proxy de preview navigateur (127.0.0.1) pour le HMR en dev
+  allowedDevOrigins: ["127.0.0.1"],
   // Fige la racine du projet sur erp-inventory/ : le dossier parent
   // (C:\Dev\ERP_System) contient un autre lockfile et des fichiers de
   // référence (exemples, captures, vidéos), ce qui fausse l'inférence

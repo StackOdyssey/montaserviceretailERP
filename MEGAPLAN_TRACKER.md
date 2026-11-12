@@ -2,6 +2,7 @@
 **Clone of** `C:\Dev\ERP_System` (BM Motors ERP) @ commit `c102f00` (includes parked payment-terms work)
 **Purpose:** Retail-shop ERP version ("Détail"), cloned from the wholesale codebase, targeting feature parity + improvements over the legacy Bestway/POSIX system analysed in `Legacy_Analysis\POS_CLONE_SPEC.md` + `ANALYSIS.md` §11.
 **Rule:** same as before — tracker is source of truth; update after every work block; no production deploy without explicit owner approval.
+**Boundary (user, 2026-11-12):** ALL new work lands HERE in `D:\Dev\ERPSoftware` — never in `C:\Dev\ERP_System` (the wholesale repo stays untouched, including its tracked docs like `AGENTS.md`/`LEGACY_MEGAPLAN_TRACKER.md`). Merge-back to wholesale is a separate explicit decision, only after approval + finished work.
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · blocked `(!)` · legacy ref = legacy route/table
 
@@ -10,10 +11,12 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · blocked `(!)` · legacy
 ## PHASE 0 — CLONE & BASELINE
 - [x] P0.1 git clone `C:\Dev\ERP_System` → `D:\Dev\ERPSoftware` (all branches, HEAD @ c102f00)
 - [x] P0.2 copy `.env.local`, `AGENTS.md` mods, `New_logo.png`, `SECURITY_AUDIT_2026-11-07.md`
-- [~] P0.3 `npm ci` in `erp-inventory/` — RUNNING (bg shell a84966)
-- [ ] P0.4 verify `npm run dev` boots + login works against DB
-- [ ] P0.5 **DECISION:** retail DB = new Neon branch/project vs shared prod DB → default: **separate Neon branch** (retail data isolated from wholesale)
-- [ ] P0.6 run migrations on the retail DB (incl. `0032_payment_terms` — feature branch already merged in this clone's HEAD)
+- [x] P0.3 `npm ci` in `erp-inventory/` — 415 pkgs, ~3min
+- [x] P0.4 verify `npm run dev` boots + login works against DB — `/login` 200 (19.5KB), `/` 307→login, ready 1.7s
+- [x] P0.5 **DECISION (user, 2026-11-12): each business line gets its OWN database** → retail gets a dedicated Neon branch; wholesale keeps prod DB; quads/buggys gets a third later
+  - [x] P0.5a create Neon branch `retail` (copy-on-write incl. prod data so login/demo works) — `br-dry-feather-b134yukf`, endpoint `ep-restless-silence-b1vfmgz3`, parent `br-fancy-block-b13o37dw` (prod), created 2026-11-12
+  - [x] P0.5b point clone `.env.local` at retail branch + run pending migrations — DATABASE_URL/UNPOOLED → `ep-restless-silence-b1vfmgz3` (new role password from branch conn string; prod branch password differs)
+- [x] P0.6 run migrations on the retail DB — `npm run db:migrate` OK (2026-11-12); branch verified: 1 user, 428 products copied from prod
 - [ ] P0.7 rename/branding pass: app name + logo slot for the retail business
 - [ ] P0.8 first commit "clone baseline" on new branch `feat/retail-pos`
 
@@ -77,4 +80,4 @@ Clone `posix_mag.php` + `posix_controller.php` behavior; fixes built in.
 - Legacy data scope: full import vs opening-state only (D1)
 
 ## LOG
-- 2026-11-12 — repo cloned to `D:\Dev\ERPSoftware` @ c102f00; env copied; npm ci running; tracker created from `POS_CLONE_SPEC.md` (live-verified) + `ANALYSIS.md` §11
+- 2026-11-12 — repo cloned to `D:\Dev\ERPSoftware` @ c102f00; env copied; npm ci done; dev server verified (/login 200, auth 307); baseline commit `chore: clone baseline + retail megaplan tracker`; tracker created from `POS_CLONE_SPEC.md` (live-verified) + `ANALYSIS.md` §11
