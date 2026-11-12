@@ -16,6 +16,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **"resume"** → read the LATEST `## Resume point` section (bottom of this file), check `git status`/`git log`/prod revision, then report **Done vs Left** as a table and propose the next step. Don't start coding until the user picks.
 - Guided steps needing the user: one sub-step at a time, wait for confirmation before the next.
 - Lint: CI gates errors only (`npx eslint .`); 17 cosmetic warnings tolerated.
+- **ACTIVE WORKSTREAM (since 2026-11-12): legacy PHP codebase analysis** — on "resume", FIRST read `C:\Dev\ERP_System\Legacy_Analysis\TRACKER.md` (checkpoint + phases) and continue from its "Next action"; coverage list in `FILES_CHECKLIST.md`, findings in `ANALYSIS.md`. Folder is git-excluded (`.git/info/exclude`) — never commit it. NO ERP code changes until the analysis is complete.
 
 - Verify: `npx tsc --noEmit -p .`, `npm run build`, `npm run db:migrate` (dev Neon branch from `.env.local`). Lint has pre-existing errors (no-unescaped-entities, AppShell `set-state-in-effect`) — only check files you touched.
 - AppShell: every hook MUST run before the `pathname === "/login"` early return — it stays mounted across `/login` → `/` navigations; a conditional return before hooks throws React's "Expected static flag was missing".
