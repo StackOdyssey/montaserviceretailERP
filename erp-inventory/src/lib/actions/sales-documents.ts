@@ -159,6 +159,8 @@ async function getDocumentPrintContextImpl(documentId: number): Promise<Document
         identifiantFiscal: c.identifiantFiscal,
         registreCommerce: c.registreCommerce,
         taxeProfessionnelle: c.taxeProfessionnelle,
+        cnss: c.cnss,
+        rcTribunal: c.rcTribunal,
         capitalCents: c.capitalCents,
         footerText: c.footerText,
         logoUrl: c.logoUrl,
@@ -235,6 +237,10 @@ async function convertBlToFactureImpl(
   )[0];
   const convVatLiable = liableRow?.liable ?? true;
   const convNotes = `Facture issue des BL : ${active.map((b) => b.docNumber).join(", ")}${convVatLiable ? "" : ` — ${VAT_NOT_LIABLE_MENTION}`}`;
+  // Le délai court depuis la livraison (loi 69-21) : la facture reprend l'échéance
+  // la plus proche des BL, pas un nouveau délai depuis la date de facture.
+  const blDueDates = active.map((b) => b.dueDate).filter((x): x is Date => x != null);
+  const convDueDate = blDueDates.length ? new Date(Math.min(...blDueDates.map((x) => x.getTime()))) : null;
 
   let docId = 0;
   await d.transaction(async (tx) => {
@@ -270,6 +276,8 @@ async function convertBlToFactureImpl(
           totalTtcCents: totalTtc,
           paidAmountCents: paidAmount,
           paymentMethod: head.paymentMethod,
+          paymentCondition: head.paymentCondition,
+          dueDate: convDueDate,
           notes: convNotes,
           vatDisplay: convVatLiable ? "SHOWN" : "HIDDEN",
           priceBasis: "TTC",

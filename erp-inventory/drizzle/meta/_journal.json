@@ -225,6 +225,13 @@
       "when": 1793803627769,
       "tag": "0031_g14_brands",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794325703958,
+      "tag": "0032_payment_terms",
+      "breakpoints": true
     }
   ]
 }

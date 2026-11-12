@@ -35,6 +35,8 @@ export interface SalesDocumentItem {
   totalTtcCents: number;
   paidAmountCents: number;
   paymentMethod?: string | null;
+  paymentCondition?: string | null;
+  dueDate?: string | null;
   notes?: string | null;
   avType?: string | null;
   businessLineId?: number;
@@ -69,6 +71,8 @@ export interface CompanyPrintInfo {
   identifiantFiscal: string | null;
   registreCommerce: string | null;
   taxeProfessionnelle: string | null;
+  cnss: string | null;
+  rcTribunal: string | null;
   capitalCents: number;
   footerText: string | null;
   logoUrl: string | null;
@@ -132,6 +136,8 @@ export function mapDoc(doc: DocRow, lines: LineRow[]): SalesDocumentItem {
     totalTtcCents: doc.totalTtcCents,
     paidAmountCents: doc.paidAmountCents,
     paymentMethod: doc.paymentMethod,
+    paymentCondition: doc.paymentCondition,
+    dueDate: doc.dueDate ? doc.dueDate.toISOString() : null,
     notes: doc.notes,
     avType: doc.avType,
     businessLineId: doc.businessLineId,

@@ -11,6 +11,8 @@ import {
 } from "@/lib/actions/sales-documents";
 import { formatMoney } from "@/lib/money";
 import { unwrap } from "@/lib/action-result";
+import { amountInWordsMAD } from "@/lib/amount-in-words";
+import { conditionLabel } from "@/lib/payment-terms";
 
 interface DocumentPrintViewProps {
   document: SalesDocumentItem;
@@ -44,7 +46,27 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
   const docLabel = ctx?.docLabel ?? (doc.docType === "FACTURE" ? "FACTURE" : "BON DE LIVRAISON");
   // Décision propriétaire (Q13–Q16) : seule la remise est affichée sur les documents ;
   // la TVA n'est jamais rendue à l'impression (elle reste saisie dans les paramètres).
+  // Exception légale : une FACTURE/AVOIR validée en régime assujetti (TVA calculée)
+  // doit montrer HT / TVA / TTC — jamais le cas en régime non-assujetti.
   const showDiscount = true;
+  const showVatTotals =
+    (doc.docType === "FACTURE" || doc.docType === "AVOIR") && Boolean(ctx?.vatDisplay.showVat) && doc.tvaAmountCents > 0;
+  const arretePrefix: Record<string, string> = {
+    FACTURE: "Arrêtée la présente facture",
+    AVOIR: "Arrêté le présent avoir",
+    BL: "Arrêté le présent bon de livraison",
+    BC: "Arrêté le présent bon de commande",
+    DEVIS: "Arrêté le présent devis",
+  };
+  const legalIds = [
+    company?.ice && `ICE : ${company.ice}`,
+    company?.identifiantFiscal && `IF : ${company.identifiantFiscal}`,
+    company?.registreCommerce &&
+      `RC : ${company.registreCommerce}${company.rcTribunal ? ` (${company.rcTribunal})` : ""}`,
+    company?.taxeProfessionnelle && `TP : ${company.taxeProfessionnelle}`,
+    company?.cnss && `CNSS : ${company.cnss}`,
+  ].filter(Boolean) as string[];
+  const conditionText = conditionLabel(doc.paymentCondition);
 
   const handlePrint = () => window.print();
 
@@ -273,16 +295,47 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
                     <span>{num(doc.discountAmountCents)}</span>
                   </div>
                 )}
-                <div className="flex justify-between border border-black px-2 py-1 font-bold">
-                  <span>Total Net ............:</span>
-                  <span>{num(doc.totalNetHtCents)}</span>
-                </div>
+                {showVatTotals ? (
+                  <>
+                    <div className="flex justify-between border border-black px-2 py-1">
+                      <span>Total HT ............:</span>
+                      <span>{num(doc.totalNetHtCents)}</span>
+                    </div>
+                    <div className="flex justify-between border border-black px-2 py-1">
+                      <span>TVA {doc.tvaRate}% ............:</span>
+                      <span>{num(doc.tvaAmountCents)}</span>
+                    </div>
+                    <div className="flex justify-between border border-black px-2 py-1 font-bold">
+                      <span>Total TTC ............:</span>
+                      <span>{num(doc.totalTtcCents)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between border border-black px-2 py-1 font-bold">
+                    <span>Total Net ............:</span>
+                    <span>{num(doc.totalNetHtCents)}</span>
+                  </div>
+                )}
               </div>
             </div>
 
+            {/* MONTANT EN LETTRES */}
+            <p className="mt-3">
+              {arretePrefix[doc.docType] ?? "Arrêté le présent document"} à la somme de :{" "}
+              <span className="font-bold">{amountInWordsMAD(showVatTotals ? doc.totalTtcCents : doc.totalNetHtCents)}</span>
+            </p>
+
             {/* MODE DE PAIEMENT */}
             <p className="mt-4 font-bold">Mode de Paiement :</p>
-            <div className="border border-black px-2 py-2">{paymentLabel}</div>
+            <div className="border border-black px-2 py-2">
+              {paymentLabel}
+              {(conditionText || doc.dueDate) && (
+                <span>
+                  {conditionText ? ` — Conditions : ${conditionText}` : ""}
+                  {doc.dueDate ? ` — Échéance : ${new Date(doc.dueDate).toLocaleDateString("fr-FR")}` : ""}
+                </span>
+              )}
+            </div>
 
             {/* PIED DE PAGE */}
             <div className="mt-6 pt-2 border-t border-black flex items-start gap-3">
@@ -309,6 +362,13 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
                     {company?.phone ? `   GSM : ${company.phone}` : ""}
                   </p>
                 )}
+                {(company?.legalForm || company?.capitalCents) && (
+                  <p>
+                    {(company?.legalForm || "").replace(/_/g, " ")}
+                    {company?.capitalCents ? ` au capital de ${num(company.capitalCents)} DH` : ""}
+                  </p>
+                )}
+                {legalIds.length > 0 && <p className="font-semibold">{legalIds.join("  |  ")}</p>}
               </div>
             </div>
           </div>

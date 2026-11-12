@@ -409,6 +409,10 @@ export const salesDocuments = pgTable("sales_documents", {
   totalTtcCents: integer("total_ttc_cents").notNull().default(0), // Net HT + TVA
   paidAmountCents: integer("paid_amount_cents").notNull().default(0),
   paymentMethod: text("payment_method"),
+  // Conditions de règlement (src/lib/payment-terms.ts) + date d'échéance calculée.
+  // NULL = non renseigné (balance âgée retombe sur doc_date).
+  paymentCondition: text("payment_condition"),
+  dueDate: timestamp("due_date"),
   notes: text("notes"),
   sourceBlId: integer("source_bl_id"), // Lien si facture ou avoir issu d'un BL
   avType: text("av_type"), // Avoir : RETOUR (marchandise reprise), COMMERCIAL (geste), CORRECTION

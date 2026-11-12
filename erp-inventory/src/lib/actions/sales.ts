@@ -26,6 +26,15 @@ import { initialStatusFor } from "@/lib/payments";
 import { applyMovement, type CmupState } from "@/lib/stock";
 import { validateInput, createSalesDocumentSchema } from "@/lib/action-validation";
 import {
+  computeDueDate,
+  defaultConditionFor,
+  isCustomCondition,
+  LEGAL_ABSOLUTE_MAX_DAYS,
+  termDays,
+  toDateInput,
+  type PaymentConditionCode,
+} from "@/lib/payment-terms";
+import {
   businessMessage,
   loadDocumentById,
   mapDoc,
@@ -211,6 +220,9 @@ export async function createSalesDocument(data: {
   paymentReference?: string;
   paymentDueDate?: string;
   paymentBankName?: string;
+  /** Conditions de règlement (src/lib/payment-terms.ts) ; défaut = fiche client. */
+  paymentCondition?: PaymentConditionCode | null;
+  conditionDueDate?: string;
 }): Promise<SalesDocResult> {
   await assertAuthenticated();
   try {
@@ -266,11 +278,39 @@ export async function createSalesDocument(data: {
       "CLIENT_REQUIS: créez ou sélectionnez la fiche client avant de valider (FACTURE et ventes à crédit / chèque / effet / virement exigent un client enregistré, pas de client comptoir)."
     );
   }
+  let clientTermDays: number | null = null;
   if (data.customerId) {
     const existing = (
-      await d.select({ id: customers.id }).from(customers).where(eq(customers.id, data.customerId)).limit(1)
+      await d
+        .select({ id: customers.id, termDays: customers.paymentTermDays })
+        .from(customers)
+        .where(eq(customers.id, data.customerId))
+        .limit(1)
     )[0];
     if (!existing) throw new Error("CLIENT_INTROUVABLE: la fiche client sélectionnée n'existe plus.");
+    clientTermDays = existing.termDays;
+  }
+
+  // Conditions de règlement : saisie explicite, sinon fiche client, sinon immédiat si réglé.
+  const docDateNow = new Date();
+  const paidUpFront =
+    data.paymentMethod !== "A_CREDIT" && (data.paidAmountCents === undefined || data.paidAmountCents > 0);
+  let paymentCondition: string | null = data.paymentCondition ?? null;
+  let conditionDueDate = data.conditionDueDate ?? null;
+  if (data.paymentCondition === undefined) {
+    const def = defaultConditionFor(paidUpFront ? null : clientTermDays, paidUpFront);
+    paymentCondition = def.code;
+    if (def.customDays != null) conditionDueDate = toDateInput(new Date(docDateNow.getTime() + def.customDays * 86400000));
+  }
+  if (isCustomCondition(paymentCondition) && !conditionDueDate) {
+    throw new Error("ECHEANCE_REQUISE: saisissez la date d'échéance pour une condition personnalisée ou en plusieurs échéances.");
+  }
+  const dueDate = computeDueDate(paymentCondition, docDateNow, conditionDueDate);
+  if (dueDate && termDays(docDateNow, dueDate) > LEGAL_ABSOLUTE_MAX_DAYS) {
+    throw new Error("DELAI_LEGAL_DEPASSE: le délai de paiement dépasse 120 jours (maximum légal, loi 69-21).");
+  }
+  if (dueDate && termDays(docDateNow, dueDate) < 0) {
+    throw new Error("ECHEANCE_INVALIDE: la date d'échéance ne peut pas précéder la date du document.");
   }
   if (docType === "FACTURE") {
     let ice = data.customerIce?.trim() || null;
@@ -423,7 +463,9 @@ export async function createSalesDocument(data: {
           customerEmail: data.customerEmail ?? null,
           customerCity: data.customerCity ?? "Casablanca",
           customerIce: data.customerIce ?? null,
-          docDate: new Date(),
+          docDate: docDateNow,
+          paymentCondition,
+          dueDate,
           status: isFullyPaid ? "PAYE" : "VALIDE",
           totalBrutHtCents: totals.totalBrutHT,
           discountPercent: totals.discountPercent,

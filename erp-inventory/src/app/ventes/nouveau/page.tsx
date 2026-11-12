@@ -27,6 +27,17 @@ import { formatMoney, calculateDocumentTotals } from "@/lib/money";
 import { useSettings, useParameters } from "@/components/layout/SettingsProvider";
 import { useBusinessLine } from "@/components/layout/BusinessLineProvider";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
+import {
+  PAYMENT_CONDITIONS,
+  computeDueDate,
+  conditionLabel,
+  defaultConditionFor,
+  isCustomCondition,
+  legalTermWarning,
+  termDays,
+  toDateInput,
+  type PaymentConditionCode,
+} from "@/lib/payment-terms";
 
 interface CartLine extends SalesLineInput {
   currentStock: number;
@@ -92,6 +103,10 @@ export default function NouveauBonDeLivraisonPage() {
   const [payRef, setPayRef] = useState("");
   const [payDueDate, setPayDueDate] = useState("");
   const [payBank, setPayBank] = useState("");
+  // Conditions de règlement : "" = automatique (fiche client / immédiat si réglé).
+  const [condition, setCondition] = useState<PaymentConditionCode | "">("");
+  const [conditionDueDate, setConditionDueDate] = useState("");
+  const [clientTermDays, setClientTermDays] = useState<number | null>(null);
 
   // Clé d'idempotence par panier : un retry/double-clic renvoie le doc créé
   // au lieu d'un doublon. Régénérée après chaque validation réussie.
@@ -138,6 +153,7 @@ export default function NouveauBonDeLivraisonPage() {
     setCustomerPhone(c.phone || "");
     setCustomerCity(c.city || "Casablanca");
     setCustomerIce(c.ice || "");
+    setClientTermDays(c.paymentTermDays ?? null);
   };
 
   // Crée la fiche client depuis la saisie libre (évite les doublons type
@@ -268,6 +284,18 @@ export default function NouveauBonDeLivraisonPage() {
     company.vatLiable ? company.defaultVatRate : 0
   );
 
+  // Aperçu des conditions (même règle que le serveur, src/lib/payment-terms.ts).
+  const paidUpFront = paymentMethod !== "A_CREDIT";
+  const autoCondition = defaultConditionFor(paidUpFront ? null : clientTermDays, paidUpFront);
+  const effectiveCondition = condition || autoCondition.code;
+  const today = new Date();
+  const effectiveDueInput =
+    condition === "" && autoCondition.customDays != null
+      ? toDateInput(new Date(today.getTime() + autoCondition.customDays * 86400000))
+      : conditionDueDate;
+  const previewDue = computeDueDate(effectiveCondition, today, effectiveDueInput);
+  const previewWarning = previewDue ? legalTermWarning(termDays(today, previewDue)) : null;
+
   // Validation du BL
   const handleValidateBL = async () => {
     if (cart.length === 0) {
@@ -296,6 +324,8 @@ export default function NouveauBonDeLivraisonPage() {
         paymentReference: payRef.trim() || undefined,
         paymentDueDate: payDueDate || undefined,
         paymentBankName: payBank.trim() || undefined,
+        paymentCondition: condition || undefined,
+        conditionDueDate: isCustomCondition(effectiveCondition) ? effectiveDueInput || undefined : undefined,
         commercialId,
         livreurId,
       });
@@ -390,6 +420,7 @@ export default function NouveauBonDeLivraisonPage() {
                 onChange={(e) => {
                   setCustomerName(e.target.value);
                   setCustomerId(null);
+                  setClientTermDays(null);
                 }}
                 onBlur={() =>
                   setTimeout(() => {
@@ -840,6 +871,46 @@ export default function NouveauBonDeLivraisonPage() {
                   <input value={payBank} onChange={(e) => setPayBank(e.target.value)} placeholder="Banque"
                     className="px-2.5 py-2 bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl text-xs" />
                 </div>
+              )}
+            </div>
+
+            {/* CONDITIONS DE RÈGLEMENT (quand le client paie) */}
+            <div className="space-y-1.5">
+              <label htmlFor="payment-condition" className="text-xs font-bold text-[#374151] block">
+                Conditions de règlement
+              </label>
+              <select
+                id="payment-condition"
+                value={condition}
+                onChange={(e) => setCondition(e.target.value as PaymentConditionCode | "")}
+                className="w-full px-2.5 py-2 text-xs bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl outline-none focus:border-[#F7162D]"
+              >
+                <option value="">
+                  Automatique{autoCondition.code ? ` (${conditionLabel(autoCondition.code)}${autoCondition.customDays != null ? ` ${autoCondition.customDays} j` : ""})` : " (fiche client)"}
+                </option>
+                {PAYMENT_CONDITIONS.map((c) => (
+                  <option key={c.code} value={c.code}>{c.label}</option>
+                ))}
+              </select>
+              {isCustomCondition(condition) && (
+                <input
+                  type="date"
+                  aria-label="Date d'échéance du document"
+                  value={conditionDueDate}
+                  min={toDateInput(today)}
+                  onChange={(e) => setConditionDueDate(e.target.value)}
+                  className="w-full px-2.5 py-2 bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl text-xs"
+                />
+              )}
+              {previewDue && (
+                <p className="text-[11px] text-[#4B5563]">
+                  Échéance : <span className="font-semibold">{previewDue.toLocaleDateString("fr-FR")}</span>
+                </p>
+              )}
+              {previewWarning && (
+                <p className="text-[11px] font-semibold text-[#B45309] bg-[#FFFBEB] border border-[#FDE68A] rounded-lg px-2 py-1.5">
+                  {previewWarning}
+                </p>
               )}
             </div>
 

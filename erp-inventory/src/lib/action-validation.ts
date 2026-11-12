@@ -2,6 +2,7 @@
 // Les actions sont des endpoints POST publics : le type TS ne borne que l'appelant
 // interne, pas le wire. Toute mutation doit valider son payload avant d'agir.
 import { z } from "zod";
+import { PAYMENT_CONDITION_CODES } from "@/lib/payment-terms";
 
 /** Valide un payload d'action ; lève une erreur métier lisible en cas d'entrée forgée. */
 export function validateInput<S extends z.ZodTypeAny>(schema: S, data: unknown): z.infer<S> {
@@ -60,6 +61,9 @@ export const createSalesDocumentSchema = z.object({
   paymentReference: z.string().max(80).optional(),
   paymentDueDate: z.string().max(30).optional(),
   paymentBankName: z.string().max(80).optional(),
+  paymentCondition: z.enum(PAYMENT_CONDITION_CODES).nullish(),
+  /** Date d'échéance saisie pour PERSONNALISE / ECHEANCES. */
+  conditionDueDate: dateStr,
 });
 
 export const createSupplierReceiptSchema = z.object({

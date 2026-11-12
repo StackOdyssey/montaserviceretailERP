@@ -665,7 +665,7 @@ export async function getSupplierAging(): Promise<{ rows: PartyAgingRow[]; total
   const nameById = new Map(sups.map((s) => [s.id, s.name]));
   const now = Date.now();
 
-  const empty = (): AgingBuckets => ({ b0_30: 0, b31_60: 0, b61_90: 0, b90_plus: 0, total: 0 });
+  const empty = (): AgingBuckets => ({ notDue: 0, b0_30: 0, b31_60: 0, b61_90: 0, b90_plus: 0, total: 0 });
   const key = (days: number): keyof AgingBuckets =>
     days <= 30 ? "b0_30" : days <= 60 ? "b31_60" : days <= 90 ? "b61_90" : "b90_plus";
 

@@ -700,6 +700,8 @@ async function mergeCustomersImpl(sourceId: number, targetId: number): Promise<C
 }
 
 export interface AgingBuckets {
+  /** Pas encore échu (échéance future). */
+  notDue: number;
   b0_30: number;
   b31_60: number;
   b61_90: number;
@@ -716,7 +718,7 @@ export interface PartyAgingRow {
 }
 
 function emptyAging(): AgingBuckets {
-  return { b0_30: 0, b31_60: 0, b61_90: 0, b90_plus: 0, total: 0 };
+  return { notDue: 0, b0_30: 0, b31_60: 0, b61_90: 0, b90_plus: 0, total: 0 };
 }
 
 function agingKey(days: number): keyof AgingBuckets {
@@ -727,7 +729,8 @@ function agingKey(days: number): keyof AgingBuckets {
 }
 
 /**
- * Balance âgée des créances clients (par ancienneté du document impayé).
+ * Balance âgée des créances clients : jours de RETARD depuis l'échéance du document
+ * (due_date) ; sans échéance (historique), la date du document fait foi.
  */
 export async function getCustomerAging(): Promise<{ rows: PartyAgingRow[]; totals: AgingBuckets }> {
   await assertAuthenticated();
@@ -755,11 +758,12 @@ export async function getCustomerAging(): Promise<{ rows: PartyAgingRow[]; total
     const remaining = Math.max(0, doc.totalTtcCents - doc.paidAmountCents);
     if (remaining <= 0) continue;
     const date = new Date(doc.docDate ?? doc.createdAt ?? new Date());
-    const days = Math.floor((now - date.getTime()) / 86400000);
+    const ref = doc.dueDate ?? date;
+    const days = Math.floor((now - ref.getTime()) / 86400000);
     const e =
       map.get(doc.customerId) ??
       { name: nameById.get(doc.customerId) ?? doc.customerName, buckets: emptyAging(), count: 0, oldest: null };
-    e.buckets[agingKey(days)] += remaining;
+    e.buckets[days < 0 ? "notDue" : agingKey(days)] += remaining;
     e.buckets.total += remaining;
     e.count += 1;
     if (!e.oldest || date < e.oldest) e.oldest = date;
@@ -777,6 +781,7 @@ export async function getCustomerAging(): Promise<{ rows: PartyAgingRow[]; total
     .sort((a, b) => b.buckets.total - a.buckets.total);
 
   const totals = rows.reduce((acc, r) => {
+    acc.notDue += r.buckets.notDue;
     acc.b0_30 += r.buckets.b0_30;
     acc.b31_60 += r.buckets.b31_60;
     acc.b61_90 += r.buckets.b61_90;

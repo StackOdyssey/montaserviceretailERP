@@ -803,7 +803,8 @@ export default function ComptabilitePage() {
                   <thead>
                     <tr className="bg-gray-50 dark:bg-gray-800/60 text-gray-500 uppercase font-bold tracking-wider">
                       <th className="py-2.5 px-4">Tiers</th>
-                      <th className="py-2.5 px-3 text-right">0-30 j</th>
+                      <th className="py-2.5 px-3 text-right">Non échu</th>
+                      <th className="py-2.5 px-3 text-right">Retard 0-30 j</th>
                       <th className="py-2.5 px-3 text-right">31-60 j</th>
                       <th className="py-2.5 px-3 text-right">61-90 j</th>
                       <th className="py-2.5 px-3 text-right">90+ j</th>
@@ -814,6 +815,7 @@ export default function ComptabilitePage() {
                     {(block.data?.rows ?? []).map((r) => (
                       <tr key={r.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40">
                         <td className="py-2.5 px-4 font-semibold text-gray-800 dark:text-gray-200">{r.name}</td>
+                        <td className="py-2.5 px-3 text-right font-mono text-[#059669]">{formatMoney(r.buckets.notDue)}</td>
                         <td className="py-2.5 px-3 text-right font-mono">{formatMoney(r.buckets.b0_30)}</td>
                         <td className="py-2.5 px-3 text-right font-mono">{formatMoney(r.buckets.b31_60)}</td>
                         <td className="py-2.5 px-3 text-right font-mono">{formatMoney(r.buckets.b61_90)}</td>
@@ -823,7 +825,7 @@ export default function ComptabilitePage() {
                     ))}
                     {(block.data?.rows ?? []).length === 0 && (
                       <tr>
-                        <td colSpan={6} className="py-6 px-4 text-center text-gray-400">
+                        <td colSpan={7} className="py-6 px-4 text-center text-gray-400">
                           Aucun encours.
                         </td>
                       </tr>
@@ -833,6 +835,7 @@ export default function ComptabilitePage() {
                     <tfoot>
                       <tr className="bg-gray-50 font-black border-t-2 border-gray-300">
                         <td className="py-2.5 px-4 uppercase text-right">Totaux :</td>
+                        <td className="py-2.5 px-3 text-right font-mono">{formatMoney(block.data.totals.notDue)}</td>
                         <td className="py-2.5 px-3 text-right font-mono">{formatMoney(block.data.totals.b0_30)}</td>
                         <td className="py-2.5 px-3 text-right font-mono">{formatMoney(block.data.totals.b31_60)}</td>
                         <td className="py-2.5 px-3 text-right font-mono">{formatMoney(block.data.totals.b61_90)}</td>
