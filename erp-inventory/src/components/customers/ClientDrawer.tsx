@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Phone, MapPin, FileText, User, HandCoins, Printer, Pencil, CalendarClock } from "lucide-react";
+import { X, Phone, MapPin, FileText, User, HandCoins, Printer, Pencil, CalendarClock, Tag } from "lucide-react";
 import { CustomerAccountStatement, getCustomerStatement } from "@/lib/actions/customers";
+import { CustomerPricesModal } from "@/components/customers/CustomerPricesModal";
 import { formatMoney } from "@/lib/money";
 import { paymentStatusLabel, isTerminalStatus, paymentMethodLabel } from "@/lib/payments";
 
@@ -34,6 +35,7 @@ export function ClientDrawer({ customerId, refreshKey = 0, onClose, onEncaisser,
   const [statement, setStatement] = useState<CustomerAccountStatement | null>(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<"DOCS" | "PAYMENTS" | "LEDGER">("DOCS");
+  const [isPricesOpen, setIsPricesOpen] = useState(false);
 
   const [prevCustomerId, setPrevCustomerId] = useState(customerId);
   if (customerId !== prevCustomerId) {
@@ -235,6 +237,12 @@ export function ClientDrawer({ customerId, refreshKey = 0, onClose, onEncaisser,
             <Printer className="w-4 h-4" /> Relevé A4
           </button>
           <button
+            onClick={() => setIsPricesOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition"
+          >
+            <Tag className="w-4 h-4" /> Tarifs
+          </button>
+          <button
             onClick={() => statement && onEdit(statement)}
             disabled={!statement}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition disabled:opacity-50"
@@ -242,6 +250,15 @@ export function ClientDrawer({ customerId, refreshKey = 0, onClose, onEncaisser,
             <Pencil className="w-4 h-4" /> Modifier
           </button>
         </div>
+
+        {isPricesOpen && statement && (
+          <CustomerPricesModal
+            isOpen={isPricesOpen}
+            onClose={() => setIsPricesOpen(false)}
+            customerId={statement.customer.id}
+            customerName={statement.customer.name}
+          />
+        )}
       </div>
     </div>
   );
