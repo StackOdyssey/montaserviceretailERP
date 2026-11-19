@@ -95,7 +95,7 @@ export default function POSPage() {
 
   // Product search state
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
@@ -146,7 +146,6 @@ export default function POSPage() {
       const results = await getProducts({
         search: searchTerm,
         businessLineCode,
-        categoryId: selectedCategory ?? undefined,
       });
       setProducts(results);
     } catch (err) {
@@ -154,7 +153,7 @@ export default function POSPage() {
     } finally {
       setIsLoadingProducts(false);
     }
-  }, [searchTerm, businessLineCode, selectedCategory]);
+  }, [searchTerm, businessLineCode]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -806,27 +805,6 @@ export default function POSPage() {
               >
                 <PackagePlus size={18} />
               </button>
-            </div>
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              <button
-                onClick={() => setSelectedCategory(null)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
-                  selectedCategory === null ? "bg-[#F7162D] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                Toutes
-              </button>
-              {categories.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
-                    selectedCategory === cat.id ? "bg-[#F7162D] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {cat.name}
-                </button>
-              ))}
             </div>
           </div>
 
