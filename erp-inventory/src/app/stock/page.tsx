@@ -20,6 +20,7 @@ import {
   LayoutGrid,
   List,
   Printer,
+  Barcode,
 } from "lucide-react";
 import {
   getProducts,
@@ -595,6 +596,14 @@ export default function StockCataloguePage() {
                           >
                             <History size={15} />
                           </button>
+
+                          <Link
+                            href={`/etiquettes?sku=${encodeURIComponent(p.sku)}`}
+                            title="Imprimer des étiquettes code-barres"
+                            className="p-1.5 text-[#374151] hover:text-[#111827] hover:bg-[#E5E7EB] rounded-lg transition-colors"
+                          >
+                            <Barcode size={15} />
+                          </Link>
 
                           <button
                             onClick={() => {

@@ -18,6 +18,7 @@
     "aws4fetch": "^1.0.20",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.3",
+    "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.49.0",
     "next": "^16.4.5",
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
+    "@types/jsbarcode": "^3.11.4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

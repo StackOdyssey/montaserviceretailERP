@@ -103,3 +103,23 @@ body {
     width: 76mm !important;
   }
 }
+
+/* Étiquettes code-barres — feuille A4 : grille 3 colonnes × 62 mm, ~24/planche */
+@page labels {
+  size: A4;
+  margin: 8mm;
+}
+.label-sheet {
+  grid-template-columns: repeat(3, 62mm);
+}
+@media print {
+  .label-sheet {
+    page: labels;
+    border: 0 !important;
+    padding: 0 !important;
+    gap: 4mm;
+  }
+  .barcode-label {
+    border-color: #9ca3af;
+  }
+}

@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Camera, Check, AlertCircle, Archive } from "lucide-react";
+import { X, Camera, Check, AlertCircle, Archive, Wand2 } from "lucide-react";
 import { ProductItem, saveProduct, archiveProduct } from "@/lib/actions/products";
+import { generateInternalBarcode } from "@/lib/actions/barcodes";
 import { getBrands } from "@/lib/actions/brands";
 import { unwrap } from "@/lib/action-result";
 import { compressImageToWebP } from "@/lib/image-compressor";
@@ -50,6 +51,7 @@ export function ProductModal({
   const [isUploading, setIsUploading] = useState(false);
   const [compressionInfo, setCompressionInfo] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingBarcode, setIsGeneratingBarcode] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -399,7 +401,47 @@ export function ProductModal({
             </div>
           </div>
 
-          {/* Ligne 6 : Photo avec compression WebP client */}
+          {/* Ligne 6 : Code-barres (saisie manuelle / scan, ou génération interne EAN-13) */}
+          <div>
+            <label className="block text-xs font-bold text-[#374151] mb-1">
+              Code-barres (EAN-13 ou code interne)
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                placeholder="Scannez le code fabricant ou générez-en un"
+                className="flex-1 px-3 py-2 text-sm bg-[#F8F9FA] border border-[#E5E7EB] rounded-xl focus:border-[#F7162D] focus:ring-1 focus:ring-[#F7162D] outline-none font-mono"
+              />
+              <button
+                type="button"
+                disabled={isGeneratingBarcode}
+                onClick={async () => {
+                  try {
+                    setIsGeneratingBarcode(true);
+                    setErrorMessage(null);
+                    const { barcode: generated } = unwrap(await generateInternalBarcode());
+                    setBarcode(generated);
+                  } catch (err) {
+                    setErrorMessage((err as Error).message || "Échec de la génération du code-barres");
+                  } finally {
+                    setIsGeneratingBarcode(false);
+                  }
+                }}
+                title="Générer un code-barres interne (EAN-13, préfixe 20…)"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-[#0D9488] hover:bg-[#0F766E] rounded-xl disabled:opacity-50 transition-colors shrink-0"
+              >
+                <Wand2 size={14} />
+                {isGeneratingBarcode ? "Génération…" : "Générer"}
+              </button>
+            </div>
+            <span className="text-[10px] text-[#6B7280] mt-0.5 block">
+              Laissé vide : la pièce reste retrouvable par sa référence. « Générer » crée un code interne réservé au magasin.
+            </span>
+          </div>
+
+          {/* Ligne 7 : Photo avec compression WebP client */}
           <div>
             <label className="block text-xs font-bold text-[#374151] mb-1">
               Photo de la pièce (WebP &lt; 80 Ko)
