@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { X, Printer, Check, Ban } from "lucide-react";
+import { X, Printer, Check, Ban, Ticket } from "lucide-react";
 import { SalesDocumentItem } from "@/lib/actions/sales";
 import { cancelDocument } from "@/lib/actions/sales-documents";
 import { unwrap } from "@/lib/action-result";
 import { formatMoney } from "@/lib/money";
 import { DocumentPrintView } from "@/components/sales/DocumentPrintView";
+import { TicketPrintView } from "@/components/pos/TicketPrintView";
 
 interface InvoiceModalProps {
   document: SalesDocumentItem;
@@ -15,6 +16,7 @@ interface InvoiceModalProps {
 
 export function InvoiceModal({ document, onClose, onCancelled }: InvoiceModalProps) {
   const [showPrintView, setShowPrintView] = useState(false);
+  const [showTicketView, setShowTicketView] = useState(false);
   const [currentDocument, setCurrentDocument] = useState(document);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -151,8 +153,8 @@ export function InvoiceModal({ document, onClose, onCancelled }: InvoiceModalPro
               </div>
             </div>
 
-            {/* Payment Info */}
-            {document.paymentMethod && (
+            {/* Payment Info — masqué sur devis (pas de règlement) */}
+            {document.paymentMethod && document.docType !== "DEVIS" && (
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
                 <div className="text-xs font-semibold text-blue-700 mb-1">
                   Mode de paiement
@@ -195,11 +197,18 @@ export function InvoiceModal({ document, onClose, onCancelled }: InvoiceModalPro
             )}
             <div className="flex gap-2">
               <button
+                onClick={() => setShowTicketView(true)}
+                className="flex-1 px-4 py-2.5 bg-amber-100 hover:bg-amber-200 text-amber-800 font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <Ticket size={16} />
+                <span>Ticket</span>
+              </button>
+              <button
                 onClick={() => setShowPrintView(true)}
                 className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
               >
                 <Printer size={16} />
-                <span>Imprimer</span>
+                <span>A4</span>
               </button>
               <button
                 onClick={onClose}
@@ -215,6 +224,9 @@ export function InvoiceModal({ document, onClose, onCancelled }: InvoiceModalPro
 
       {showPrintView && (
         <DocumentPrintView document={document} onClose={() => setShowPrintView(false)} />
+      )}
+      {showTicketView && (
+        <TicketPrintView document={currentDocument} onClose={() => setShowTicketView(false)} />
       )}
     </>
   );

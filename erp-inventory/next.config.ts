@@ -5,6 +5,15 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // Autorise l'origine du proxy de preview navigateur (127.0.0.1) pour le HMR en dev
   allowedDevOrigins: ["127.0.0.1"],
+  // Les Server Actions comparent Origin ↔ Host : le proxy preview envoie
+  // origin 127.0.0.1:60498 vers host localhost:3000 — on whitelist l'origine proxy.
+  experimental: {
+    serverActions: {
+      allowedOrigins: ["127.0.0.1:60498", "localhost:60498"],
+      // Les photos produit/reçus transitent par les Server Actions (proxy vers R2)
+      bodySizeLimit: "8mb",
+    },
+  },
   // Fige la racine du projet sur erp-inventory/ : le dossier parent
   // (C:\Dev\ERP_System) contient un autre lockfile et des fichiers de
   // référence (exemples, captures, vidéos), ce qui fausse l'inférence

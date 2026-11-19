@@ -465,7 +465,7 @@ export function AppShell({ children, lines, settings, parameters }: { children: 
         </header>
 
         {/* Contenu de la page */}
-        <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto">{children}</main>
+        <main className="flex-1 p-2 md:p-2 max-w-7xl w-full mx-auto">{children}</main>
       </div>
 
       {/* ======================================================== */}

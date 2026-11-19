@@ -6,7 +6,10 @@ import { ProductItem } from "@/lib/actions/products";
 import { formatMoney } from "@/lib/money";
 
 interface ProductQuickAddModalProps {
+  displayName?: string | null;
+  priceHtCents?: number;
   product: ProductItem;
+  quantityInCart?: number;
   onClose: () => void;
   onConfirm: (product: ProductItem, quantity: number) => void;
 }
@@ -18,7 +21,7 @@ interface ProductQuickAddModalProps {
  */
 const MAX_QTY = 1_000_000; // aligné sur la validation serveur (action-validation qty)
 
-export function ProductQuickAddModal({ product, onClose, onConfirm }: ProductQuickAddModalProps) {
+export function ProductQuickAddModal({ product, quantityInCart = 0, displayName, priceHtCents, onClose, onConfirm }: ProductQuickAddModalProps) {
   // Saisie brute : on ne borne que quand le caissier quitte le champ ou valide,
   // sinon vider le champ retombe instantanément sur 1 pendant la frappe.
   const [rawQty, setRawQty] = useState("1");
@@ -33,9 +36,11 @@ export function ProductQuickAddModal({ product, onClose, onConfirm }: ProductQui
 
   const parsed = parseInt(rawQty, 10);
   const quantity = Number.isNaN(parsed) ? 0 : Math.floor(parsed);
-  const clamp = (n: number) => (Number.isNaN(n) ? 1 : Math.min(MAX_QTY, Math.max(1, Math.floor(n))));
+  const availableStock = Math.max(0, product.currentStock - quantityInCart);
+  const maxQty = Math.min(availableStock, MAX_QTY);
+  const clamp = (n: number) => (Number.isNaN(n) ? Math.max(1, maxQty) : Math.min(maxQty, Math.max(1, Math.floor(n))));
   const commitQty = () => setRawQty(String(clamp(parsed || 1)));
-  const overStock = product.currentStock >= 0 && quantity > product.currentStock;
+  const overStock = maxQty > 0 && quantity > maxQty;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
@@ -43,7 +48,7 @@ export function ProductQuickAddModal({ product, onClose, onConfirm }: ProductQui
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div className="min-w-0">
             <div className="font-mono font-bold text-sm text-gray-900">{product.sku}</div>
-            <div className="text-xs text-gray-600 truncate">{product.name}</div>
+            <div className="text-xs text-gray-600 truncate">{displayName ?? product.name}</div>
           </div>
           <button
             onClick={onClose}
@@ -64,7 +69,10 @@ export function ProductQuickAddModal({ product, onClose, onConfirm }: ProductQui
 
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600">
-              Prix : <strong className="text-[#F7162D]">{formatMoney(product.salePriceRetailCents)}</strong>
+              Prix : <strong className="text-[#F7162D]">{formatMoney(priceHtCents ?? product.salePriceRetailCents)}</strong>
+              {priceHtCents != null && priceHtCents !== product.salePriceRetailCents && (
+                <s className="ml-1 text-[11px] text-gray-400 font-normal">{formatMoney(product.salePriceRetailCents)}</s>
+              )}
             </span>
             <span className="text-gray-600">
               Stock : <strong>{product.currentStock}</strong>
@@ -84,7 +92,7 @@ export function ProductQuickAddModal({ product, onClose, onConfirm }: ProductQui
               <input
                 type="number"
                 min={1}
-                max={MAX_QTY}
+                max={maxQty}
                 inputMode="numeric"
                 value={rawQty}
                 onChange={(e) => setRawQty(e.target.value)}
@@ -100,17 +108,28 @@ export function ProductQuickAddModal({ product, onClose, onConfirm }: ProductQui
                 <Plus size={18} />
               </button>
             </div>
-            {overStock && (
-              <p className="mt-1.5 text-[11px] font-semibold text-amber-600">
-                Quantité supérieure au stock disponible ({product.currentStock})
+            {quantityInCart > 0 && (
+              <p className="mt-1.5 text-[11px] font-semibold text-gray-500">
+                Déjà {quantityInCart} dans le panier — reste {availableStock}
               </p>
+            )}
+            {availableStock <= 0 ? (
+              <p className="mt-1.5 text-[11px] font-semibold text-amber-600">
+                Tout le stock disponible est déjà dans le panier.
+              </p>
+            ) : (
+              overStock && (
+                <p className="mt-1.5 text-[11px] font-semibold text-amber-600">
+                  Quantité supérieure au stock disponible ({availableStock})
+                </p>
+              )
             )}
           </div>
 
           <div className="flex justify-between items-center text-sm bg-gray-50 rounded-xl px-3 py-2.5">
             <span className="text-gray-600 font-semibold">Sous-total</span>
             <span className="font-mono font-black text-[#F7162D]">
-              {formatMoney(product.salePriceRetailCents * quantity)}
+              {formatMoney((priceHtCents ?? product.salePriceRetailCents) * quantity)}
             </span>
           </div>
         </div>
@@ -124,10 +143,11 @@ export function ProductQuickAddModal({ product, onClose, onConfirm }: ProductQui
           </button>
           <button
             onClick={() => onConfirm(product, clamp(parsed || 1))}
-            className="flex-[2] px-4 py-3 bg-[#F7162D] hover:bg-[#D90E23] text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-98"
+            disabled={maxQty < 1}
+            className="flex-[2] px-4 py-3 bg-[#F7162D] hover:bg-[#D90E23] text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50 disabled:active:scale-100"
           >
             <Check size={18} />
-            <span>Valider × {quantity || 1}</span>
+            <span>Valider × {Math.min(quantity || 1, Math.max(maxQty, 1))}</span>
           </button>
         </div>
       </div>

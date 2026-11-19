@@ -8,9 +8,11 @@ interface ProductGridProps {
   onAddToCart: (product: ProductItem) => void;
   /** Si false, les articles en rupture restent ajoutables (stock négatif toléré). Défaut : true. */
   disableOutOfStock?: boolean;
+  /** M1 — tarifs/désignations client résolus (productId → prix/désignation). */
+  pricing?: Record<number, { priceHtCents: number; designation: string | null }>;
 }
 
-export function ProductGrid({ products, onAddToCart, disableOutOfStock = true }: ProductGridProps) {
+export function ProductGrid({ products, onAddToCart, disableOutOfStock = true, pricing }: ProductGridProps) {
   const isOut = (p: ProductItem) => disableOutOfStock && p.currentStock <= 0;
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
@@ -45,7 +47,7 @@ export function ProductGrid({ products, onAddToCart, disableOutOfStock = true }:
               {product.sku}
             </div>
             <div className="text-xs text-gray-700 line-clamp-2 font-medium min-h-[2.5em]">
-              {product.name}
+              {pricing?.[product.id]?.designation ?? product.name}
             </div>
             {product.brand && (
               <div className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded inline-block">
@@ -56,7 +58,10 @@ export function ProductGrid({ products, onAddToCart, disableOutOfStock = true }:
             {/* Price and Stock */}
             <div className="flex items-center justify-between pt-1 border-t border-gray-100">
               <span className="text-sm font-bold text-[#F7162D]">
-                {formatMoney(product.salePriceRetailCents)}
+                {formatMoney(pricing?.[product.id]?.priceHtCents ?? product.salePriceRetailCents)}
+                {pricing?.[product.id] != null && (
+                  <span className="ml-1 text-[9px] font-bold text-amber-700 align-middle">★</span>
+                )}
               </span>
               <span
                 className={`text-[10px] font-semibold ${

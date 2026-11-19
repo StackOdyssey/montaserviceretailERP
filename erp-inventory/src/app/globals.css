@@ -91,3 +91,15 @@ body {
   aside, header, nav { display: none !important; }
   main { margin: 0 !important; padding: 0 !important; }
 }
+
+/* Ticket thermique 80mm (POS) — page nommée pour ne pas affecter l'impression A4 */
+@page ticket {
+  size: 80mm auto;
+  margin: 2mm;
+}
+@media print {
+  .ticket-sheet {
+    page: ticket;
+    width: 76mm !important;
+  }
+}
