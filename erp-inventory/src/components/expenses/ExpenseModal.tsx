@@ -6,7 +6,7 @@ import { recordExpense } from "@/lib/actions/expenses";
 import { useParameters, useSettings } from "@/components/layout/SettingsProvider";
 import { toCentimes } from "@/lib/money";
 import { compressImageToWebP } from "@/lib/image-compressor";
-import { getPhotoUploadUrl } from "@/lib/actions/media";
+import { uploadPhoto } from "@/lib/actions/media";
 import { unwrap } from "@/lib/action-result";
 
 interface ExpenseModalProps {
@@ -50,17 +50,12 @@ export function ExpenseModal({ isOpen, onClose, onSaved }: ExpenseModalProps) {
       const compressed = await compressImageToWebP(file, 1000, 1000, 0.8);
       setPhotoInfo(`WebP (${compressed.sizeKb} Ko)`);
 
-      // Dépôt direct vers Cloudflare R2 via URL présignée (les octets ne passent pas par Cloud Run)
+      // Dépôt vers R2 via la Server Action (proxy serveur — pas de CORS navigateur)
       setIsCompressing(false);
       setIsUploading(true);
-      const contentType = compressed.file.type || "image/webp";
-      const { uploadUrl, publicUrl } = await getPhotoUploadUrl({ contentType, sizeBytes: compressed.file.size });
-      const put = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: { "content-type": contentType },
-        body: compressed.file,
-      });
-      if (!put.ok) throw new Error(`téléversement refusé (${put.status})`);
+      const formData = new FormData();
+      formData.append("file", compressed.file, "recu.webp");
+      const { publicUrl } = unwrap(await uploadPhoto(formData));
       setPhotoPreview(publicUrl);
     } catch (err) {
       setError(err instanceof Error ? `Échec du reçu : ${err.message}` : "Erreur lors de l'ajout du reçu.");

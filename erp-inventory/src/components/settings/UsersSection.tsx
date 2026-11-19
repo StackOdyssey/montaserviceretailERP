@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { UserPlus, ShieldCheck, UserX, UserCheck, KeyRound } from "lucide-react";
+import { UserPlus, ShieldCheck, UserX, UserCheck, KeyRound, Coins } from "lucide-react";
 import { getUsers, saveUser, setUserActive, type UserItem } from "@/lib/actions/users";
 import { unwrap } from "@/lib/action-result";
+import { formatMoney } from "@/lib/money";
+
+function dhToCents(v: string): number | null {
+  const n = parseFloat(v.replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
+}
 
 /**
  * Gestion des utilisateurs caisse (gérant uniquement, section Sécurité).
@@ -19,8 +25,11 @@ export function UsersSection() {
   const [name, setName] = useState("");
   const [pin, setPin] = useState("");
   const [role, setRole] = useState<"GERANT" | "CAISSIER">("CAISSIER");
+  const [plafondDh, setPlafondDh] = useState("");
   const [resetFor, setResetFor] = useState<number | null>(null);
   const [resetPin, setResetPin] = useState("");
+  const [plafondFor, setPlafondFor] = useState<number | null>(null);
+  const [plafondInput, setPlafondInput] = useState("");
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
@@ -44,10 +53,11 @@ export function UsersSection() {
     setError(null);
     setNotice(null);
     try {
-      unwrap(await saveUser({ displayName: name.trim(), pin: pin.trim(), role }));
+      unwrap(await saveUser({ displayName: name.trim(), pin: pin.trim(), role, plafondCents: dhToCents(plafondDh) }));
       setName("");
       setPin("");
       setRole("CAISSIER");
+      setPlafondDh("");
       setNotice("Utilisateur créé.");
       await load();
     } catch (e) {
@@ -68,6 +78,23 @@ export function UsersSection() {
       setNotice(`PIN réinitialisé pour ${u.displayName}.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur lors de la réinitialisation.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSetPlafond = async (u: UserItem) => {
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+    try {
+      unwrap(await saveUser({ id: u.id, displayName: u.displayName, role: u.role, plafondCents: dhToCents(plafondInput) }));
+      setPlafondFor(null);
+      setPlafondInput("");
+      setNotice(`Plafond caisse mis à jour pour ${u.displayName}.`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur lors de la mise à jour.");
     } finally {
       setSaving(false);
     }
@@ -132,9 +159,39 @@ export function UsersSection() {
                 </span>
                 <span className="text-[11px] text-gray-400">
                   {u.role === "GERANT" ? "Gérant — tous droits" : "Caissier — opérations quotidiennes"}
+                  {u.plafondCents != null && ` · plafond caisse ${formatMoney(u.plafondCents)}`}
                 </span>
               </div>
-              {resetFor === u.id ? (
+              {plafondFor === u.id ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="Plafond DH"
+                    value={plafondInput}
+                    onChange={(e) => setPlafondInput(e.target.value)}
+                    className="w-24 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg font-mono"
+                  />
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => handleSetPlafond(u)}
+                    className="px-2.5 py-1.5 text-[11px] font-bold text-white bg-[#111827] rounded-lg disabled:opacity-40"
+                  >
+                    OK
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlafondFor(null);
+                      setPlafondInput("");
+                    }}
+                    className="px-2 py-1.5 text-[11px] font-bold text-gray-500"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : resetFor === u.id ? (
                 <div className="flex items-center gap-1.5">
                   <input
                     type="password"
@@ -168,6 +225,17 @@ export function UsersSection() {
                 <>
                   <button
                     type="button"
+                    onClick={() => {
+                      setPlafondFor(u.id);
+                      setPlafondInput(u.plafondCents != null ? (u.plafondCents / 100).toString() : "");
+                    }}
+                    className="p-1.5 text-gray-400 hover:text-[#111827] rounded-lg"
+                    title="Plafond caisse (liquidité)"
+                  >
+                    <Coins className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setResetFor(u.id)}
                     className="p-1.5 text-gray-400 hover:text-[#111827] rounded-lg"
                     title="Réinitialiser le PIN"
@@ -194,7 +262,7 @@ export function UsersSection() {
       </div>
 
       {/* Création */}
-      <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px_140px_auto] gap-2.5 items-end">
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px_120px_140px_auto] gap-2.5 items-end">
         <div>
           <label className="text-[11px] font-bold text-gray-500 block mb-1">Nom affiché</label>
           <input
@@ -214,6 +282,17 @@ export function UsersSection() {
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
             placeholder="••••"
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-[#F8F9FA] font-mono"
+          />
+        </div>
+        <div>
+          <label className="text-[11px] font-bold text-gray-500 block mb-1">Plafond caisse (DH)</label>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={plafondDh}
+            onChange={(e) => setPlafondDh(e.target.value)}
+            placeholder="Ex: 5000"
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-[#F8F9FA] font-mono"
           />
         </div>

@@ -3,15 +3,40 @@
 // directement par un composant client — passer par les actions.
 
 import { eq } from "drizzle-orm";
-import { db, salesDocuments, salesLines } from "@/db";
+import { db, salesDocuments, salesLines, salesTenders } from "@/db";
 
 export interface SalesLineInput {
   productId: number;
   productName: string;
   sku: string;
   oemCode?: string | null;
+  /** Prix HT — champ canonique. Le comptoir peut aussi envoyer le TTC saisi
+   * (snapshot ticket + contrôle de cohérence HT↔TTC côté serveur, tol. 2 c). */
   unitPriceHTCents: number;
+  unitPriceTtcCents?: number;
   quantity: number;
+  /** Renommage de ligne pour le ticket (legacy POS rename). */
+  customLabel?: string;
+  /** OFFERT — prix à 0, motif exigé par le garde hors-catalogue. */
+  isFree?: boolean;
+  /** R.For — prix forcé par le caissier (marqueur audit). */
+  priceForced?: boolean;
+  /** Remise par ligne en % (plafond appliqué côté serveur). */
+  discountPercent?: number;
+}
+
+/** Jambe de règlement POS — le crédit n'est pas une jambe, c'est le reliquat non réglé. */
+export interface TenderInput {
+  method: "ESPECES" | "CHEQUE" | "EFFET_LCN" | "VIREMENT" | "CARTE_BANCAIRE" | "VERSEMENT" | "BON_REDUCTION" | "AVOIR";
+  /** Part de la vente couverte par cette jambe (TTC, centimes). */
+  amountCents: number;
+  /** ESPECES : montant remis par le client → rendu = reçu − part. */
+  cashReceivedCents?: number;
+  referenceNumber?: string;
+  bankName?: string;
+  payeeName?: string;
+  issueDate?: string;
+  dueDate?: string;
 }
 
 export interface SalesDocumentItem {
@@ -52,10 +77,27 @@ export interface SalesDocumentItem {
     sku: string;
     oemCode?: string | null;
     unitPriceHTCents: number;
+    unitPriceTtcCents?: number | null;
     quantity: number;
     totalHtCents: number;
     unitCostCents?: number;
     tvaRate?: number;
+    customLabel?: string | null;
+    isFree?: boolean;
+    priceForced?: boolean;
+    discountPercent?: number;
+    discountAmountCents?: number;
+  }>;
+  tenders?: Array<{
+    id: number;
+    method: string;
+    amountCents: number;
+    cashReceivedCents?: number | null;
+    referenceNumber?: string | null;
+    bankName?: string | null;
+    payeeName?: string | null;
+    issueDate?: string | null;
+    dueDate?: string | null;
   }>;
 }
 
@@ -113,8 +155,9 @@ export function requireDb() {
 
 type DocRow = typeof salesDocuments.$inferSelect;
 type LineRow = typeof salesLines.$inferSelect;
+type TenderRow = typeof salesTenders.$inferSelect;
 
-export function mapDoc(doc: DocRow, lines: LineRow[]): SalesDocumentItem {
+export function mapDoc(doc: DocRow, lines: LineRow[], tenderRows: TenderRow[] = []): SalesDocumentItem {
   return {
     id: doc.id,
     docType: doc.docType as SalesDocumentItem["docType"],
@@ -153,19 +196,39 @@ export function mapDoc(doc: DocRow, lines: LineRow[]): SalesDocumentItem {
       sku: l.skuSnapshot,
       oemCode: l.oemCodeSnapshot,
       unitPriceHTCents: l.unitPriceHtCents,
+      unitPriceTtcCents: l.unitPriceTtcCents,
       quantity: l.quantity,
       totalHtCents: l.totalHtCents,
       unitCostCents: l.unitCostCents,
       tvaRate: l.tvaRate,
+      customLabel: l.customLabel,
+      isFree: l.isFree,
+      priceForced: l.priceForced,
+      discountPercent: l.discountPercent,
+      discountAmountCents: l.discountAmountCents,
+    })),
+    tenders: tenderRows.map((t) => ({
+      id: t.id,
+      method: t.method,
+      amountCents: t.amountCents,
+      cashReceivedCents: t.cashReceivedCents,
+      referenceNumber: t.referenceNumber,
+      bankName: t.bankName,
+      payeeName: t.payeeName,
+      issueDate: t.issueDate ? t.issueDate.toISOString() : null,
+      dueDate: t.dueDate ? t.dueDate.toISOString() : null,
     })),
   };
 }
 
-/** Charge un document + ses lignes (interne). */
+/** Charge un document + ses lignes + ses jambes de règlement (interne). */
 export async function loadDocumentById(id: number): Promise<SalesDocumentItem | null> {
   const d = requireDb();
   const doc = (await d.select().from(salesDocuments).where(eq(salesDocuments.id, id)).limit(1))[0];
   if (!doc) return null;
-  const lines = await d.select().from(salesLines).where(eq(salesLines.documentId, id));
-  return mapDoc(doc, lines);
+  const [lines, tenderRows] = await Promise.all([
+    d.select().from(salesLines).where(eq(salesLines.documentId, id)),
+    d.select().from(salesTenders).where(eq(salesTenders.documentId, id)),
+  ]);
+  return mapDoc(doc, lines, tenderRows);
 }

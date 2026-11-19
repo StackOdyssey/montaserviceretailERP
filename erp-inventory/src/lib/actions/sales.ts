@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, desc, eq, inArray, ilike, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, ilike, isNull, ne, or, sql } from "drizzle-orm";
 import {
   auditLogs,
   businessLineDocumentSettings,
@@ -10,6 +10,7 @@ import {
   products,
   salesDocuments,
   salesLines,
+  salesTenders,
   settings,
   staff,
   stockMovements,
@@ -24,6 +25,7 @@ import { lockProducts } from "@/lib/stock-lock";
 import { bumpWarehouseStock } from "@/lib/warehouse";
 import { initialStatusFor } from "@/lib/payments";
 import { applyMovement, type CmupState } from "@/lib/stock";
+import { resolveCustomerPrices } from "@/lib/pricing";
 import { validateInput, createSalesDocumentSchema } from "@/lib/action-validation";
 import {
   computeDueDate,
@@ -34,6 +36,7 @@ import {
   toDateInput,
   type PaymentConditionCode,
 } from "@/lib/payment-terms";
+import { actionResult, type ActionResult } from "@/lib/action-result";
 import {
   businessMessage,
   loadDocumentById,
@@ -42,17 +45,24 @@ import {
   type SalesDocResult,
   type SalesLineInput,
   type SalesDocumentItem,
+  type TenderInput,
 } from "@/lib/sales/shared";
 
 export type {
   SalesLineInput,
   SalesDocumentItem,
   SalesDocResult,
+  TenderInput,
   CompanyPrintInfo,
   DocumentPrintContext,
 } from "@/lib/sales/shared";
 
 type LineRow = typeof salesLines.$inferSelect;
+type TenderRow = typeof salesTenders.$inferSelect;
+
+/** Plafond serveur de la remise par ligne (legacy « Rem % » était plafonnée
+ * à 10 %… côté client uniquement — ici l'enforcement est réel). */
+const LINE_DISCOUNT_CAP_PERCENT = 10;
 
 type SalesDocFilters = {
   docType?: "BL" | "FACTURE" | "AVOIR" | "BC" | "DEVIS";
@@ -108,6 +118,52 @@ export async function getSalesDocuments(
   }
 
   return docs.map((doc) => mapDoc(doc, byDoc.get(doc.id) ?? []));
+}
+
+/**
+ * Tickets du jour pour le POS : documents BL/FACTURE/BC créés depuis `fromIso`
+ * (début de journée côté caisse — le client envoie son minuit local).
+ * Inclut lignes + jambes de règlement pour la réimpression ticket.
+ */
+export async function getDayTickets(fromIso?: string): Promise<ActionResult<SalesDocumentItem[]>> {
+  await assertAuthenticated();
+  return actionResult(async () => {
+    const d = requireDb();
+    const from = fromIso ? new Date(fromIso) : new Date(new Date().setHours(0, 0, 0, 0));
+    const docs = await d
+      .select()
+      .from(salesDocuments)
+      .where(
+        and(
+          isNull(salesDocuments.deletedAt),
+          inArray(salesDocuments.docType, ["BL", "FACTURE", "BC", "AVOIR", "DEVIS"]),
+          gte(salesDocuments.docDate, from)
+        )
+      )
+      .orderBy(desc(salesDocuments.id))
+      .limit(100);
+    if (docs.length === 0) return [];
+
+    const ids = docs.map((x) => x.id);
+    const [lines, tenderRows] = await Promise.all([
+      d.select().from(salesLines).where(inArray(salesLines.documentId, ids)),
+      d.select().from(salesTenders).where(inArray(salesTenders.documentId, ids)),
+    ]);
+    const byDoc = new Map<number, LineRow[]>();
+    for (const l of lines) {
+      const arr = byDoc.get(l.documentId) ?? [];
+      arr.push(l);
+      byDoc.set(l.documentId, arr);
+    }
+    const byDocT = new Map<number, TenderRow[]>();
+    for (const t of tenderRows) {
+      const arr = byDocT.get(t.documentId) ?? [];
+      arr.push(t);
+      byDocT.set(t.documentId, arr);
+    }
+
+    return docs.map((doc) => mapDoc(doc, byDoc.get(doc.id) ?? [], byDocT.get(doc.id) ?? []));
+  });
 }
 
 /**
@@ -223,6 +279,9 @@ export async function createSalesDocument(data: {
   /** Conditions de règlement (src/lib/payment-terms.ts) ; défaut = fiche client. */
   paymentCondition?: PaymentConditionCode | null;
   conditionDueDate?: string;
+  /** Paiement fractionné POS : si présent, remplace paymentMethod/paidAmountCents.
+   * Le reliquat non couvert devient du crédit (fiche client exigée). */
+  tenders?: TenderInput[];
 }): Promise<SalesDocResult> {
   await assertAuthenticated();
   try {
@@ -263,16 +322,72 @@ export async function createSalesDocument(data: {
   const vatLiable = vatRow?.liable ?? true;
   const tvaRate = effectiveVatRate(vatRow?.rate ?? 20, vatLiable);
 
+  // Résolution des prix ligne : le comptoir saisit en TTC, le HT est dérivé
+  // côté serveur (jamais de confiance aux seuls data-* du client). OFFERT ⇒ 0,
+  // prix nul interdit sinon. Le hors-catalogue est refusé plus bas sans motif.
+  const resolvedLines = data.lines.map((l) => {
+    let ht = l.unitPriceHTCents;
+    if (l.unitPriceTtcCents != null) {
+      const derived = Math.round(l.unitPriceTtcCents / (1 + tvaRate / 100));
+      if (ht == null) {
+        ht = derived;
+      } else if (Math.abs(Math.round(ht * (1 + tvaRate / 100)) - l.unitPriceTtcCents) > 2) {
+        throw new Error(`PRIX_INCOHERENT: ${l.sku} — HT et TTC envoyés divergent`);
+      }
+    }
+    if (ht == null) throw new Error(`PRIX_REQUIS: ${l.sku} — prix HT ou TTC attendu`);
+    if (l.isFree && ht !== 0) throw new Error(`OFFERT_PRIX_NON_NUL: ${l.sku} — une ligne offerte doit être à 0`);
+    if (!l.isFree && ht <= 0) throw new Error(`PRIX_INVALIDE: ${l.sku} — prix nul interdit hors OFFERT`);
+    if ((l.discountPercent ?? 0) > LINE_DISCOUNT_CAP_PERCENT) {
+      throw new Error(`REMISE_PLAFOND_DEPASSE: ${l.sku} — remise ligne > ${LINE_DISCOUNT_CAP_PERCENT}%`);
+    }
+    return { ...l, unitPriceHTCents: ht };
+  });
+
+  // Totaux calculés une fois (hors transaction) : remises ligne → brut,
+  // remise globale → net. Réutilisés par la gate client puis dans la tx.
+  const totals = calculateDocumentTotals(
+    resolvedLines.map((l) => ({
+      unitPriceHT: l.unitPriceHTCents,
+      quantity: l.quantity,
+      discountPercent: l.discountPercent,
+    })),
+    data.discountPercent,
+    tvaRate
+  );
+
+  // Jambes de règlement (split tenders) : le crédit n'est pas une jambe,
+  // c'est le reliquat non couvert — il exige une fiche client.
+  const tenders = data.tenders?.length ? data.tenders : null;
+  const tenderSum = tenders ? tenders.reduce((s, t) => s + t.amountCents, 0) : 0;
+  if (tenders) {
+    if (tenderSum > totals.totalTTC) {
+      throw new Error("REGLEMENT_EXCEDENT: le total des règlements dépasse le total TTC");
+    }
+    for (const t of tenders) {
+      if (t.method === "ESPECES" && t.cashReceivedCents != null && t.cashReceivedCents < t.amountCents) {
+        throw new Error("ESPECES_INSUFFISANT: montant remis inférieur à la jambe espèces");
+      }
+    }
+  }
+  const DEFERRED_METHODS = new Set(["CHEQUE", "EFFET_LCN", "VIREMENT", "VERSEMENT"]);
+  const hasDeferredLeg = tenders
+    ? tenders.some((t) => DEFERRED_METHODS.has(t.method))
+    : DEFERRED_METHODS.has(data.paymentMethod);
+  const hasCredit = tenders ? tenderSum < totals.totalTTC : data.paymentMethod === "A_CREDIT";
+  const paidAtSaleCents = tenders
+    ? tenderSum
+    : data.paymentMethod === "A_CREDIT"
+      ? (data.paidAmountCents ?? 0)
+      : (data.paidAmountCents ?? totals.totalTTC);
+
   // Exit gate Phase 3 : une facture à un client professionnel exige son ICE.
   // Matrice POS T1.4 (fail-closed) : Client Comptoir (customerId=null) uniquement
   // pour BL/BC/DEVIS en ESPECES. FACTURE et tout crédit/différé exigent une fiche.
   const requiresCustomerFile =
     docType === "FACTURE" ||
-    data.paymentMethod === "A_CREDIT" ||
-    data.paymentMethod === "CHEQUE" ||
-    data.paymentMethod === "EFFET_LCN" ||
-    data.paymentMethod === "VIREMENT" ||
-    data.paymentMethod === "VERSEMENT";
+    hasCredit ||
+    hasDeferredLeg;
   if (requiresCustomerFile && !data.customerId) {
     throw new Error(
       "CLIENT_REQUIS: créez ou sélectionnez la fiche client avant de valider (FACTURE et ventes à crédit / chèque / effet / virement exigent un client enregistré, pas de client comptoir)."
@@ -335,7 +450,7 @@ export async function createSalesDocument(data: {
 
   try {
     await d.transaction(async (tx) => {
-    await lockProducts(tx, data.lines.map((l) => l.productId));
+    await lockProducts(tx, resolvedLines.map((l) => l.productId));
     // Ligne métier (défaut PIECES)
     const line = (
       await tx
@@ -369,15 +484,15 @@ export async function createSalesDocument(data: {
       throw new Error("TVA_OBLIGATOIRE_FAC_AV: FAC et AV doivent afficher la TVA");
     }
 
-    const totals = calculateDocumentTotals(
-      data.lines.map((l) => ({ unitPriceHT: l.unitPriceHTCents, quantity: l.quantity })),
-      data.discountPercent,
-      tvaRate
-    );
-
     const affectsStock = docType === "BL" || docType === "FACTURE";
     const negRow = (await tx.select({ neg: settings.negativeStockAllowed }).from(settings).limit(1))[0];
     const negativeAllowed = negRow?.neg ?? false;
+
+    // M1 — prix résolus client (clientproduits → price_level → catalogue).
+    // Un prix égal au tarif résolu n'est PAS « hors catalogue ».
+    const clientPrices = data.customerId
+      ? await resolveCustomerPrices(tx, data.customerId, resolvedLines.map((l) => l.productId))
+      : new Map<number, { priceHtCents: number }>();
 
     // Effets de stock (COGS = CMUP courant). BL/FACTURE décrémentent ; BC/DEVIS non.
     const effects: Array<{
@@ -388,7 +503,7 @@ export async function createSalesDocument(data: {
       nextStock: number;
       nextCmup: number;
     }> = [];
-    for (const l of data.lines) {
+    for (const l of resolvedLines) {
       const p = (await tx.select().from(products).where(eq(products.id, l.productId)).limit(1))[0];
       if (!p) throw new Error(`PIECE_INTROUVABLE: ${l.sku}`);
 
@@ -396,7 +511,10 @@ export async function createSalesDocument(data: {
       // la base. Un prix hors catalogue est refusé (fail-closed) sauf motif tracé.
       // Produit SANS prix catalogue : tout prix saisi est « hors catalogue » et exige
       // aussi un motif (sinon un prix arbitraire passerait inaperçu).
-      const catalogPrices = [p.salePriceHtCents].filter((v) => v > 0);
+      const catalogPrices = [
+        p.salePriceHtCents,
+        clientPrices.get(l.productId)?.priceHtCents,
+      ].filter((v): v is number => typeof v === "number" && v > 0);
       const isOffCatalog = catalogPrices.length === 0 || !catalogPrices.includes(l.unitPriceHTCents);
       if (isOffCatalog) {
         if (!data.overrideReason?.trim()) {
@@ -434,8 +552,7 @@ export async function createSalesDocument(data: {
       businessLineId: line.id,
     });
 
-    const isFullyPaid =
-      data.paymentMethod !== "A_CREDIT" && (data.paidAmountCents ?? totals.totalTTC) >= totals.totalTTC;
+    const isFullyPaid = paidAtSaleCents >= totals.totalTTC;
 
     // Attribution : snapshot des noms (le doc garde le nom même si le staff change).
     const [commercial, livreur] = await Promise.all([
@@ -474,8 +591,9 @@ export async function createSalesDocument(data: {
           tvaRate: totals.tvaRate,
           tvaAmountCents: totals.tvaAmount,
           totalTtcCents: totals.totalTTC,
-          paidAmountCents: isFullyPaid ? totals.totalTTC : data.paidAmountCents ?? 0,
-          paymentMethod: data.paymentMethod,
+          paidAmountCents: Math.min(totals.totalTTC, paidAtSaleCents),
+          // Jambe principale (affichage/compat) — le découpage réel vit dans sales_tenders.
+          paymentMethod: tenders ? tenders[0].method : data.paymentMethod,
           notes: resolvedNotes ?? null,
           vatDisplay,
           priceBasis,
@@ -489,19 +607,30 @@ export async function createSalesDocument(data: {
     )[0].id;
 
     await tx.insert(salesLines).values(
-      data.lines.map((l) => ({
-        documentId: docId,
-        productId: l.productId,
-        productNameSnapshot: l.productName,
-        skuSnapshot: l.sku,
-        oemCodeSnapshot: l.oemCode ?? null,
-        unitPriceHtCents: l.unitPriceHTCents,
-        quantity: l.quantity,
-        totalHtCents: l.unitPriceHTCents * l.quantity,
-        unitCostCents: effects.find((e) => e.productId === l.productId)?.unitCostCents ?? 0,
-        tvaRate,
-        totalTtcCents: Math.round(l.unitPriceHTCents * l.quantity * (1 + tvaRate / 100)),
-      }))
+      resolvedLines.map((l) => {
+        const gross = l.unitPriceHTCents * l.quantity;
+        const ld = Math.min(100, Math.max(0, l.discountPercent ?? 0));
+        const net = ld > 0 ? Math.round(gross * (1 - ld / 100)) : gross;
+        return {
+          documentId: docId,
+          productId: l.productId,
+          productNameSnapshot: l.productName,
+          skuSnapshot: l.sku,
+          oemCodeSnapshot: l.oemCode ?? null,
+          unitPriceHtCents: l.unitPriceHTCents,
+          unitPriceTtcCents: l.unitPriceTtcCents ?? Math.round(l.unitPriceHTCents * (1 + tvaRate / 100)),
+          quantity: l.quantity,
+          totalHtCents: net,
+          discountPercent: ld,
+          discountAmountCents: gross - net,
+          unitCostCents: effects.find((e) => e.productId === l.productId)?.unitCostCents ?? 0,
+          tvaRate,
+          totalTtcCents: Math.round(net * (1 + tvaRate / 100)),
+          customLabel: l.customLabel?.trim() || null,
+          isFree: l.isFree ?? false,
+          priceForced: l.priceForced ?? false,
+        };
+      })
     );
 
     // Journal des opérations : toute validation BL/FACTURE/BC/DEVIS/AVOIR y figure.
@@ -533,23 +662,55 @@ export async function createSalesDocument(data: {
       }
     }
 
-    // Règlement à la vente (client identifié) : une ligne customer_payments liée au
-    // document — sinon soldes clients, relevés et échéancier ignorent le paiement
-    // (doc PAYE mais client « débiteur », chèque absent de l'échéancier).
-    const paidAtSale = isFullyPaid ? totals.totalTTC : data.paidAmountCents ?? 0;
-    if (data.customerId && affectsStock && paidAtSale > 0 && data.paymentMethod !== "A_CREDIT") {
-      const deferred = data.paymentMethod === "CHEQUE" || data.paymentMethod === "EFFET_LCN";
-      await tx.insert(customerPayments).values({
-        customerId: data.customerId,
-        documentId: docId,
-        amountCents: paidAtSale,
-        paymentMethod: data.paymentMethod,
-        referenceNumber: data.paymentReference?.trim() || null,
-        chequeDueDate: deferred ? new Date(data.paymentDueDate || Date.now()) : null,
-        bankName: data.paymentBankName?.trim() || null,
-        status: initialStatusFor(data.paymentMethod),
-        notes: `Règlement à la vente ${docNumber}`,
-      });
+    // Jambes de règlement : source de vérité du découpage (clôture caisse,
+    // ticket). En mode simple (appelants existants), une jambe déduite des
+    // champs historiques — même résultat qu'avant pour les anciens appelants.
+    const legRows: TenderInput[] = tenders
+      ? tenders
+      : paidAtSaleCents > 0 && data.paymentMethod !== "A_CREDIT"
+        ? [{
+            method: data.paymentMethod as TenderInput["method"],
+            amountCents: paidAtSaleCents,
+            referenceNumber: data.paymentReference,
+            bankName: data.paymentBankName,
+            dueDate: data.paymentDueDate,
+          }]
+        : [];
+    if (affectsStock && legRows.length) {
+      await tx.insert(salesTenders).values(
+        legRows.map((t) => ({
+          documentId: docId,
+          method: t.method,
+          amountCents: t.amountCents,
+          cashReceivedCents: t.cashReceivedCents ?? null,
+          referenceNumber: t.referenceNumber?.trim() || null,
+          bankName: t.bankName?.trim() || null,
+          payeeName: t.payeeName?.trim() || null,
+          issueDate: t.issueDate ? new Date(t.issueDate) : null,
+          dueDate: t.dueDate ? new Date(t.dueDate) : null,
+        }))
+      );
+    }
+
+    // Règlement à la vente (client identifié) : une ligne customer_payments PAR
+    // JAMBE liée au document — sinon soldes clients, relevés et échéancier
+    // ignorent le paiement (doc PAYE mais client « débiteur », chèque absent).
+    if (data.customerId && affectsStock && legRows.length) {
+      for (const leg of legRows) {
+        const deferred = leg.method === "CHEQUE" || leg.method === "EFFET_LCN";
+        await tx.insert(customerPayments).values({
+          customerId: data.customerId,
+          documentId: docId,
+          amountCents: leg.amountCents,
+          paymentMethod: leg.method,
+          referenceNumber: leg.referenceNumber?.trim() || null,
+          chequeDueDate: deferred ? new Date(leg.dueDate || Date.now()) : null,
+          bankName: leg.bankName?.trim() || null,
+          payeeName: leg.payeeName?.trim() || null,
+          status: initialStatusFor(leg.method),
+          notes: `Règlement à la vente ${docNumber}`,
+        });
+      }
     }
 
     // Acomptes clients (question ouverte Acomptes-Q19, réponse : oui) : impute les
@@ -566,7 +727,7 @@ export async function createSalesDocument(data: {
           )
         )
         .orderBy(asc(customerPayments.paymentDate));
-      const docPaid = isFullyPaid ? totals.totalTTC : data.paidAmountCents ?? 0;
+      const docPaid = Math.min(totals.totalTTC, paidAtSaleCents);
       let remainingDue = Math.max(0, totals.totalTTC - docPaid);
       let applied = 0;
       for (const p of credits) {

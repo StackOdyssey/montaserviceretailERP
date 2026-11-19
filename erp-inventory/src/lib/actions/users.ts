@@ -11,6 +11,7 @@ export interface UserItem {
   id: number;
   displayName: string;
   role: "GERANT" | "CAISSIER";
+  plafondCents: number | null;
   isActive: boolean;
   createdAt: string;
 }
@@ -30,6 +31,7 @@ export async function getUsers(): Promise<ActionResult<UserItem[]>> {
       id: users.id,
       displayName: users.displayName,
       role: users.role,
+      plafondCents: users.plafondCents,
       isActive: users.isActive,
       createdAt: users.createdAt,
     })
@@ -39,6 +41,7 @@ export async function getUsers(): Promise<ActionResult<UserItem[]>> {
     id: u.id,
     displayName: u.displayName,
     role: u.role === "GERANT" ? "GERANT" : "CAISSIER",
+    plafondCents: u.plafondCents,
     isActive: u.isActive,
     createdAt: (u.createdAt ?? new Date()).toISOString(),
   }));
@@ -67,6 +70,7 @@ export async function saveUser(data: {
   displayName: string;
   pin?: string;
   role: "GERANT" | "CAISSIER";
+  plafondCents?: number | null;
 }): Promise<ActionResult<{ id: number }>> {
   return actionResult(() => saveUserImpl(data));
 }
@@ -80,6 +84,7 @@ async function saveUserImpl(data: {
   displayName: string;
   pin?: string;
   role: "GERANT" | "CAISSIER";
+  plafondCents?: number | null;
 }): Promise<{ id: number }> {
   const session = await assertOwner();
   data = validateInput(saveUserSchema, data);
@@ -99,6 +104,7 @@ async function saveUserImpl(data: {
         .set({
           displayName: data.displayName,
           role: data.role,
+          ...(data.plafondCents !== undefined ? { plafondCents: data.plafondCents } : {}),
           ...(data.pin ? { pinHmac: pinHmac(data.pin) } : {}),
           updatedAt: new Date(),
         })
@@ -125,6 +131,7 @@ async function saveUserImpl(data: {
           displayName: data.displayName,
           pinHmac: pinHmac(data.pin!),
           role: data.role,
+          plafondCents: data.plafondCents ?? null,
         })
         .returning({ id: users.id })
     )[0];

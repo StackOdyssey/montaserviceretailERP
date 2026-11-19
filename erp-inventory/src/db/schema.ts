@@ -6,6 +6,7 @@ import {
   boolean,
   timestamp,
   numeric,
+  jsonb,
   unique,
 } from "drizzle-orm/pg-core";
 
@@ -269,6 +270,28 @@ export const productPrices = pgTable(
   ]
 );
 
+// Tarif/désignation spécifiques par client — équivalent du `clientproduits`
+// legacy (prix_fixe_ht + designation_fixe). Prix null = désignation seule.
+export const customerProductPrices = pgTable(
+  "customer_product_prices",
+  {
+    id: serial("id").primaryKey(),
+    customerId: integer("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    productId: integer("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    priceHtCents: integer("price_ht_cents"),
+    customDesignation: text("custom_designation"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    unique("customer_product_prices_customer_product_unique").on(table.customerId, table.productId),
+  ]
+);
+
 // ==========================================
 // 4. RÉFÉRENCES ÉQUIVALENTES ET CODES OEM
 // ==========================================
@@ -467,6 +490,10 @@ export const salesLines = pgTable("sales_lines", {
   unitCostCents: integer("unit_cost_cents").notNull().default(0), // COGS (CMUP au moment de la vente)
   tvaRate: integer("tva_rate").notNull().default(20),
   totalTtcCents: integer("total_ttc_cents").notNull().default(0),
+  unitPriceTtcCents: integer("unit_price_ttc_cents"), // prix unitaire TTC saisi au comptoir (HT dérivé côté serveur)
+  customLabel: text("custom_label"), // renommage de ligne pour le ticket (legacy POS rename)
+  isFree: boolean("is_free").notNull().default(false), // OFFERT — prix forcé à 0, motif exigé par le garde hors-catalogue
+  priceForced: boolean("price_forced").notNull().default(false), // R.For — prix forcé TTC (marqueur pour requêtes/audit)
   originalLineId: integer("original_line_id"), // AV : ligne d'origine (FAC/BL) créditée
 });
 
@@ -482,6 +509,47 @@ export const documentLinks = pgTable("document_links", {
     .notNull()
     .references(() => salesDocuments.id, { onDelete: "cascade" }),
   linkType: text("link_type").notNull(), // BL_TO_FAC, AV_TO_SOURCE
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ==========================================
+// 9c. JAMBES DE PAIEMENT D'UNE VENTE (split tenders POS)
+// ==========================================
+// Une vente peut être réglée en plusieurs jambes (ex: 100 espèce + 200 crédit).
+// sales_documents.payment_method garde la jambe principale (affichage/compat) ;
+// la vérité du découpage vit ici. Le rendu monnaie est dérivé de
+// cash_received_cents (pas de ligne « RENDU » comme dans le legacy).
+export const salesTenders = pgTable("sales_tenders", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id")
+    .notNull()
+    .references(() => salesDocuments.id, { onDelete: "cascade" }),
+  method: text("method").notNull(), // ESPECES | CARTE_BANCAIRE | CHEQUE | EFFET_LCN | VIREMENT | VERSEMENT | BON_REDUCTION | AVOIR
+  amountCents: integer("amount_cents").notNull(), // part de la vente couverte par cette jambe (TTC)
+  cashReceivedCents: integer("cash_received_cents"), // ESPECES : montant remis par le client → rendu = reçu − part
+  referenceNumber: text("reference_number"), // n° chèque / TPE / virement / bon / avoir
+  bankName: text("bank_name"),
+  payeeName: text("payee_name"), // chèque « à l'ordre de »
+  issueDate: timestamp("issue_date"), // date d'émission (chèque)
+  dueDate: timestamp("due_date"), // date d'encaissement prévue (chèque/effet)
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Tickets POS mis en attente (legacy « mise en attente ») — partagés entre
+// postes/serveur, contrairement au localStorage. Le payload JSON garde le
+// panier complet (lignes + remises + client + docType) pour rappel tel quel.
+export const parkedCarts = pgTable("parked_carts", {
+  id: serial("id").primaryKey(),
+  businessLineId: integer("business_line_id")
+    .notNull()
+    .references(() => businessLines.id),
+  docType: text("doc_type").notNull(), // BL | FACTURE | BC | DEVIS
+  customerId: integer("customer_id"),
+  customerName: text("customer_name"),
+  commercialId: integer("commercial_id"),
+  commercialName: text("commercial_name"),
+  payload: jsonb("payload").notNull(), // { cart, discountPercent, customer }
+  actorName: text("actor_name"), // qui a mis en attente
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -566,6 +634,27 @@ export const supplierPayments = pgTable("supplier_payments", {
 // ==========================================
 // 13. DÉPENSES QUOTIDIENNES DE CAISSE
 // ==========================================
+// Journées de caisse (legacy journee_start / cloture_journee). Une caisse =
+// une ligne métier : une seule journée OUVERTE à la fois par ligne. Le fond
+// (C2) persiste le comptage par coupure ; la clôture (C3) fige le déclaré et
+// le théorique par mode pour calculer l'écart même si les données bougent après.
+export const cashierDays = pgTable("cashier_days", {
+  id: serial("id").primaryKey(),
+  businessLineId: integer("business_line_id")
+    .notNull()
+    .references(() => businessLines.id),
+  status: text("status").notNull().default("OUVERTE"), // OUVERTE | CLOTUREE
+  openedBy: text("opened_by"),
+  openedAt: timestamp("opened_at").defaultNow(),
+  closedBy: text("closed_by"),
+  closedAt: timestamp("closed_at"),
+  floatCents: integer("float_cents").notNull().default(0), // fond de caisse
+  floatDenominations: jsonb("float_denominations"), // C2 — { "200": 2, "c5": 10, … }
+  declaredTenders: jsonb("declared_tenders"), // C3 — montants déclarés par mode
+  theoreticalTenders: jsonb("theoretical_tenders"), // C3 — snapshot théorique par mode
+  observation: text("observation"),
+});
+
 export const expenses = pgTable("expenses", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(), // ex: "Loyer magasin", "Électricité", "Transport pièces"
@@ -577,6 +666,7 @@ export const expenses = pgTable("expenses", {
   tvaAmountCents: integer("tva_amount_cents").notNull().default(0),
   expenseDate: timestamp("expense_date").defaultNow(),
   receiptPhotoUrl: text("receipt_photo_url"),
+  journeeId: integer("journee_id").references(() => cashierDays.id), // dépense faite à la caisse (C4)
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -591,6 +681,9 @@ export const users = pgTable("users", {
   // vérificateur : la base seule ne permet pas de retrouver le PIN.
   pinHmac: text("pin_hmac").notNull().unique(),
   role: text("role").notNull().default("CAISSIER"), // GERANT | CAISSIER
+  // C7 — plafond de caisse (liquidité) : au-delà, avertissement « versement ».
+  // null = pas de plafond. Hérite de legacy employe.plafond (erreur t=10).
+  plafondCents: integer("plafond_cents"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

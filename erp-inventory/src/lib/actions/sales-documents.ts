@@ -373,7 +373,10 @@ async function createAvoirImpl(data: {
     const already = credited.get(orig.id) ?? 0;
     const qty = Math.min(r.quantity, orig.quantity - already);
     if (qty <= 0) continue;
-    const lineHt = orig.unitPriceHtCents * qty;
+    // Prorata du total ligne NET (totalHt − remise ligne) — ne pas rembourser
+    // la remise : unit_price × qty ignorerait la remise ligne et sur-créditerait.
+    const netLineHt = orig.totalHtCents - (orig.discountAmountCents ?? 0);
+    const lineHt = Math.round((netLineHt * qty) / orig.quantity);
     const lineTva = Math.round((lineHt * orig.tvaRate) / 100);
     totalHt += lineHt;
     tvaAmount += lineTva;

@@ -26,6 +26,19 @@ const paymentMethod = z.enum(["ESPECES", "CHEQUE", "EFFET_LCN", "VIREMENT", "CAR
 const moneyMethod = z.enum(["ESPECES", "CHEQUE", "EFFET_LCN", "VIREMENT", "CARTE_BANCAIRE", "VERSEMENT"]);
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "format AAAA-MM-JJ attendu").optional();
 
+/** Jambe de règlement (split tender POS). Le crédit n'est PAS une jambe : c'est le reliquat non réglé. */
+const tenderSchema = z.object({
+  method: z.enum(["ESPECES", "CHEQUE", "EFFET_LCN", "VIREMENT", "CARTE_BANCAIRE", "VERSEMENT", "BON_REDUCTION", "AVOIR"]),
+  amountCents: positiveCents,
+  /** ESPECES : montant remis par le client (≥ amountCents) — le rendu est dérivé. */
+  cashReceivedCents: cents.optional(),
+  referenceNumber: optStr(80),
+  bankName: optStr(80),
+  payeeName: optStr(120),
+  issueDate: dateStr,
+  dueDate: dateStr,
+});
+
 // ---- Schémas par action ----
 
 export const createSalesDocumentSchema = z.object({
@@ -43,8 +56,15 @@ export const createSalesDocumentSchema = z.object({
         productName: z.string().trim().min(1).max(300),
         sku: z.string().trim().min(1).max(100),
         oemCode: optStr(100).nullish(),
-        unitPriceHTCents: positiveCents,
+        // Prix HT canonique (0 autorisé uniquement pour OFFERT, vérifié serveur) ;
+        // le comptoir peut joindre le TTC saisi pour le ticket + contrôle de cohérence.
+        unitPriceHTCents: cents,
+        unitPriceTtcCents: cents.optional(),
         quantity: qty,
+        customLabel: optStr(300),
+        isFree: z.boolean().optional(),
+        priceForced: z.boolean().optional(),
+        discountPercent: pct.optional(),
       })
     )
     .min(1)
@@ -52,6 +72,8 @@ export const createSalesDocumentSchema = z.object({
   discountPercent: pct,
   paymentMethod,
   paidAmountCents: cents.optional(),
+  /** Paiement fractionné POS : si présent, remplace paymentMethod/paidAmountCents. */
+  tenders: z.array(tenderSchema).min(1).max(10).optional(),
   notes: optStr(2000),
   businessLineCode: optStr(30),
   overrideReason: optStr(500),
@@ -142,4 +164,5 @@ export const saveUserSchema = z.object({
     .regex(/^\d{4,8}$/, "le PIN doit faire 4 à 8 chiffres")
     .optional(),
   role: z.enum(["GERANT", "CAISSIER"]),
+  plafondCents: z.number().int().min(0).nullable().optional(),
 });

@@ -232,6 +232,41 @@
       "when": 1794325703958,
       "tag": "0032_payment_terms",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794499543628,
+      "tag": "0033_youthful_ultragirl",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794582329188,
+      "tag": "0034_acoustic_black_panther",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794583507273,
+      "tag": "0035_damp_ultimates",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794667016323,
+      "tag": "0036_chunky_payback",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794668827663,
+      "tag": "0037_clumsy_princess_powerful",
+      "breakpoints": true
     }
   ]
 }

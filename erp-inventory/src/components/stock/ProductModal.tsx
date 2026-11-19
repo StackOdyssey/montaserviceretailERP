@@ -6,7 +6,7 @@ import { ProductItem, saveProduct, archiveProduct } from "@/lib/actions/products
 import { getBrands } from "@/lib/actions/brands";
 import { unwrap } from "@/lib/action-result";
 import { compressImageToWebP } from "@/lib/image-compressor";
-import { getPhotoUploadUrl } from "@/lib/actions/media";
+import { uploadPhoto } from "@/lib/actions/media";
 import { toCentimes, toDirhams } from "@/lib/money";
 import { useSettings } from "@/components/layout/SettingsProvider";
 
@@ -112,21 +112,13 @@ export function ProductModal({
         `Image WebP optimisée : ${result.sizeKb} Ko (${result.width}x${result.height}px)`
       );
 
-      // 2. Dépôt direct vers Cloudflare R2 via URL présignée
-      //    (les octets ne passent pas par Cloud Run)
+      // 2. Dépôt vers R2 via la Server Action (proxy serveur — pas de CORS
+      //    navigateur, fonctionne sur n'importe quel port/domaine local)
       setIsCompressing(false);
       setIsUploading(true);
-      const contentType = result.file.type || "image/webp";
-      const { uploadUrl, publicUrl } = await getPhotoUploadUrl({
-        contentType,
-        sizeBytes: result.file.size,
-      });
-      const put = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: { "content-type": contentType },
-        body: result.file,
-      });
-      if (!put.ok) throw new Error(`téléversement refusé (${put.status})`);
+      const formData = new FormData();
+      formData.append("file", result.file, "photo.webp");
+      const { publicUrl } = unwrap(await uploadPhoto(formData));
 
       // 3. On enregistre l'URL publique R2 (jamais de base64 en base)
       setPhotoUrl(publicUrl);
