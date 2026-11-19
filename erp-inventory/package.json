@@ -36,6 +36,7 @@
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "^16.4.5",
+    "mysql2": "^3.24.6",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
