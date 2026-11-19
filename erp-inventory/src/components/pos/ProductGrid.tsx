@@ -54,6 +54,11 @@ export function ProductGrid({ products, onAddToCart, disableOutOfStock = true, p
                 {product.brand}
               </div>
             )}
+            {product.shelfLocation && (
+              <div className="text-[9px] font-semibold text-[#0D9488]">
+                {product.shelfLocation}
+              </div>
+            )}
 
             {/* Price and Stock */}
             <div className="flex items-center justify-between pt-1 border-t border-gray-100">

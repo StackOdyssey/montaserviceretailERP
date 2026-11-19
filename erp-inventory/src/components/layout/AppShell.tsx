@@ -19,6 +19,7 @@ import {
   LogOut,
   Lock,
   Package,
+  Barcode,
   ChevronLeft,
   ChevronRight,
   Menu,
@@ -69,6 +70,11 @@ const navItems: NavItem[] = [
     label: "Catalogue & Stock",
     href: "/stock",
     icon: Boxes,
+  },
+  {
+    label: "Étiquettes",
+    href: "/etiquettes",
+    icon: Barcode,
   },
   {
     label: "Clients",

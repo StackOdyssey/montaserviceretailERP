@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Plus, Trash2, PackageCheck, Search, CheckCircle2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { X, Plus, Trash2, PackageCheck, Search, CheckCircle2, Barcode } from "lucide-react";
 import {
   SupplierItem,
   createSupplierReceipt,
@@ -41,6 +42,7 @@ export function SupplierReceiptModal({
   preselectedSupplierId,
   vatLiable = true,
 }: SupplierReceiptModalProps) {
+  const router = useRouter();
   const { defaultVatRate } = useSettings();
   // T2.1 — sélection recherchable, jamais d'anonyme (null = à sélectionner/créer)
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(
@@ -309,7 +311,7 @@ export function SupplierReceiptModal({
   const tvaAmountCents = Math.round((totalHtCents * tvaRate) / 100);
   const totalTtcCents = totalHtCents + tvaAmountCents;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent, redirectToLabels = false) => {
     e.preventDefault();
     if (lines.length === 0) {
       setError("Veuillez ajouter au moins une pièce à la réception.");
@@ -345,6 +347,12 @@ export function SupplierReceiptModal({
 
       onSaved();
       onClose();
+      if (redirectToLabels) {
+        const items = processedLines
+          .map((l) => `${encodeURIComponent(l.sku)}:${l.quantity}`)
+          .join(",");
+        router.push(`/etiquettes?items=${items}`);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur lors de la réception du stock.");
     } finally {
@@ -756,6 +764,16 @@ export function SupplierReceiptModal({
               className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md transition disabled:opacity-50 flex items-center gap-2"
             >
               {isSubmitting ? "Validation..." : "Valider l'entrée en stock"}
+            </button>
+            <button
+              type="button"
+              disabled={isSubmitting || selectedSupplierId == null}
+              onClick={(e) => handleSubmit(e, true)}
+              title="Valide la réception puis ouvre l'impression d'étiquettes pré-remplies (1 par pièce reçue)"
+              className="px-4 py-2.5 text-sm font-bold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-xl transition disabled:opacity-50 flex items-center gap-2"
+            >
+              <Barcode className="w-4 h-4" />
+              Valider + Étiquettes
             </button>
           </div>
         </form>
