@@ -7,6 +7,8 @@ import { generateInternalBarcode } from "@/lib/actions/barcodes";
 import { getBrands } from "@/lib/actions/brands";
 import { unwrap } from "@/lib/action-result";
 import { compressImageToWebP } from "@/lib/image-compressor";
+import { cropImageToFile, CropAreaPixels } from "@/lib/crop-image";
+import { ImageCropModal } from "@/components/ui/ImageCropModal";
 import { uploadPhoto } from "@/lib/actions/media";
 import { toCentimes, toDirhams } from "@/lib/money";
 import { useSettings } from "@/components/layout/SettingsProvider";
@@ -50,6 +52,7 @@ export function ProductModal({
   const [isCompressing, setIsCompressing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [compressionInfo, setCompressionInfo] = useState<string | null>(null);
+  const [cropSource, setCropSource] = useState<{ src: string; name: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingBarcode, setIsGeneratingBarcode] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -98,23 +101,39 @@ export function ProductModal({
 
   if (!isOpen) return null;
 
-  const handleImageCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
 
+    setErrorMessage(null);
+    setCompressionInfo(null);
+
+    // 1. Ouverture du cadre de recadrage sur la photo brute
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropSource({ src: reader.result as string, name: file.name });
+    };
+    reader.onerror = () => setErrorMessage("Échec de lecture de la photo");
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropValidate = async (crop: CropAreaPixels) => {
+    if (!cropSource) return;
+    const { src, name } = cropSource;
+    setCropSource(null);
+
     try {
       setIsCompressing(true);
-      setErrorMessage(null);
-      setCompressionInfo(null);
 
-      // 1. Compression WebP côté client
-      const result = await compressImageToWebP(file, 1000, 1000, 0.8);
+      // 2. Découpe de la zone validée puis compression WebP côté client
+      const croppedFile = await cropImageToFile(src, crop, name);
+      const result = await compressImageToWebP(croppedFile, 1000, 1000, 0.8);
       setCompressionInfo(
         `Image WebP optimisée : ${result.sizeKb} Ko (${result.width}x${result.height}px)`
       );
 
-      // 2. Dépôt vers R2 via la Server Action (proxy serveur — pas de CORS
+      // 3. Dépôt vers R2 via la Server Action (proxy serveur — pas de CORS
       //    navigateur, fonctionne sur n'importe quel port/domaine local)
       setIsCompressing(false);
       setIsUploading(true);
@@ -122,7 +141,7 @@ export function ProductModal({
       formData.append("file", result.file, "photo.webp");
       const { publicUrl } = unwrap(await uploadPhoto(formData));
 
-      // 3. On enregistre l'URL publique R2 (jamais de base64 en base)
+      // 4. On enregistre l'URL publique R2 (jamais de base64 en base)
       setPhotoUrl(publicUrl);
     } catch (err) {
       setErrorMessage(
@@ -179,6 +198,13 @@ export function ProductModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs overflow-y-auto">
+      {cropSource && (
+        <ImageCropModal
+          imageSrc={cropSource.src}
+          onValidate={handleCropValidate}
+          onCancel={() => setCropSource(null)}
+        />
+      )}
       <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-[#E5E7EB] my-8 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* En-tête */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5E7EB] bg-[#F8F9FA]">
@@ -444,7 +470,7 @@ export function ProductModal({
           {/* Ligne 7 : Photo avec compression WebP client */}
           <div>
             <label className="block text-xs font-bold text-[#374151] mb-1">
-              Photo de la pièce (WebP &lt; 80 Ko)
+              Photo de la pièce (recadrage carré, WebP &lt; 80 Ko)
             </label>
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] cursor-pointer shadow-xs active:scale-98 transition-all">
