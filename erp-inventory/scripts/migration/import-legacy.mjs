@@ -53,6 +53,7 @@ const warn = (msg) => report.anomalies.push(msg);
 async function main() {
   const conn = await mysql.createConnection({
     host: '127.0.0.1', port: 3307, user: 'root', database: 'Bestway_BMM',
+    password: process.env.LEGACY_MYSQL_PASSWORD ?? '',
     charset: 'utf8mb4',
   });
 
@@ -112,15 +113,15 @@ async function main() {
   const catMap = {};
   for (const c of categories) {
     const r = await ins(
-      `INSERT INTO categories (name, description) VALUES ($1,$2) RETURNING id`,
-      [c.libelle, `legacy categorie #${c.id}`]
+      `INSERT INTO categories (name, description, created_at) VALUES ($1,$2,$3) RETURNING id`,
+      [c.libelle, `legacy categorie #${c.id}`, NORM_DATE(c.date_add)]
     );
     catMap[c.id] = r ? r[0].id : null;
     if (!DRY) await mapId('category', c.id, r[0].id);
   }
   const brandMap = {};
   for (const m of marques) {
-    const r = await ins(`INSERT INTO brands (name) VALUES ($1) ON CONFLICT (name) DO NOTHING RETURNING id`, [m.libelle]);
+    const r = await ins(`INSERT INTO brands (name, created_at) VALUES ($1,$2) ON CONFLICT (name) DO NOTHING RETURNING id`, [m.libelle, NORM_DATE(m.date_add)]);
     const id = r?.[0]?.id ?? (await sql`SELECT id FROM brands WHERE name=${m.libelle}`)[0]?.id;
     brandMap[m.id] = id;
     if (!DRY) await mapId('brand', m.id, id);
@@ -131,7 +132,7 @@ async function main() {
   const staffMap = {};
   for (const e of employes) {
     const name = [e.nom, e.prenom].filter(Boolean).join(' ').trim() || e.login || `Employe ${e.id}`;
-    const r = await ins(`INSERT INTO staff (name, role) VALUES ($1,'COMMERCIAL') RETURNING id`, [name]);
+    const r = await ins(`INSERT INTO staff (name, role, created_at) VALUES ($1,'COMMERCIAL',$2) RETURNING id`, [name, NORM_DATE(e.date_add)]);
     staffMap[e.id] = r ? { id: r[0].id, name } : null;
     if (!DRY) await mapId('staff', e.id, r[0].id, { login: e.login, profile: e.profile });
   }
@@ -145,15 +146,15 @@ async function main() {
     const r = await ins(
       `INSERT INTO customers (name, phone, email, city, address, ice, identity_number,
         is_wholesale, is_professional, default_price_level_id, credit_limit_cents,
-        payment_terms, payment_term_days, representative, external_ref, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
+        payment_terms, payment_term_days, representative, external_ref, notes, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id`,
       [
         name, c.tel || c.gsm || null, c.email || null, c.ville || null, c.adresse || null,
         c.cod_ice || null, c.cin || null,
         c.type === 2, !!c.cod_ice, levelId,
         c.plafond_credit > 0 ? C(c.plafond_credit) : null,
         c.type_paiement || null, c.echeance || null, c.representant || null,
-        `L-${c.id}`, c.commentaire_blocage || null,
+        `L-${c.id}`, c.commentaire_blocage || null, NORM_DATE(c.date_add),
       ]
     );
     custMap[c.id] = r ? { id: r[0].id, name } : null;
@@ -192,12 +193,12 @@ async function main() {
       if (pid) {
         await sql`INSERT INTO product_stock (product_id, warehouse_id, quantity) VALUES (${pid},${WH_ID},${qty}) ON CONFLICT DO NOTHING`;
         if (qty !== 0)
-          await sql`INSERT INTO stock_movements (product_id, business_line_id, movement_type, quantity, unit_cost_cents, warehouse_id, reason)
-            VALUES (${pid},${lineId},'STOCK_INITIAL',${qty},${costTtc},${WH_ID},'Import legacy Bestway_BMM')`;
+          await sql`INSERT INTO stock_movements (product_id, business_line_id, movement_type, quantity, unit_cost_cents, warehouse_id, reason, created_at)
+            VALUES (${pid},${lineId},'STOCK_INITIAL',${qty},${costTtc},${WH_ID},'Import legacy Bestway_BMM',${NORM_DATE(p.date_add)})`;
         if (LVL_GROS && p.prix_grossiste_ht > 0)
-          await sql`INSERT INTO product_prices (product_id, price_level_id, price_ht_cents) VALUES (${pid},${LVL_GROS},${TTC(p.prix_grossiste_ht, p.taxe)}) ON CONFLICT DO NOTHING`;
+          await sql`INSERT INTO product_prices (product_id, price_level_id, price_ht_cents, created_at) VALUES (${pid},${LVL_GROS},${TTC(p.prix_grossiste_ht, p.taxe)},${NORM_DATE(p.date_add)}) ON CONFLICT DO NOTHING`;
         if (LVL_SEMI && p.prix_demi_grossiste_ht > 0)
-          await sql`INSERT INTO product_prices (product_id, price_level_id, price_ht_cents) VALUES (${pid},${LVL_SEMI},${TTC(p.prix_demi_grossiste_ht, p.taxe)}) ON CONFLICT DO NOTHING`;
+          await sql`INSERT INTO product_prices (product_id, price_level_id, price_ht_cents, created_at) VALUES (${pid},${LVL_SEMI},${TTC(p.prix_demi_grossiste_ht, p.taxe)},${NORM_DATE(p.date_add)}) ON CONFLICT DO NOTHING`;
       }
     }
   }
@@ -365,9 +366,10 @@ async function main() {
     const title = [a.fournisseur, a.libelle].filter(Boolean).join(' — ') || a.titre || 'Dépense';
     if (!DRY)
       await sql`INSERT INTO expenses (title, category, category_id, amount_cents, amount_ht_cents,
-        tva_rate, tva_amount_cents, expense_date, notes)
+        tva_rate, tva_amount_cents, expense_date, notes, created_at)
         VALUES (${title.slice(0, 200)},'AUTRE',${EXP_CAT},${amount},${amount},0,0,
-        ${NORM_DATE(a.date_dep) || NORM_DATE(a.date_add)},${`legacy achat #${a.id} · ${a.mode_paiement ?? ''} · ${a.compte ?? ''}`})`;
+        ${NORM_DATE(a.date_dep) || NORM_DATE(a.date_add)},${`legacy achat #${a.id} · ${a.mode_paiement ?? ''} · ${a.compte ?? ''}`},
+        ${NORM_DATE(a.date_add)})`;
     expCount++;
   }
   report.phases.push(`expenses: ${expCount}`);
