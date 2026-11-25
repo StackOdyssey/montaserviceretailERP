@@ -12,6 +12,9 @@ const ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID ?? "";
 const SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY ?? "";
 const BUCKET = process.env.R2_BUCKET ?? "";
 const PUBLIC_BASE_URL = (process.env.R2_PUBLIC_BASE_URL ?? "").replace(/\/+$/, "");
+// Endpoint S3 : global par défaut, mais les buckets à juridiction (ex. UE) ont
+// un host dédié — ex. https://<account>.eu.r2.cloudflarestorage.com
+const S3_ENDPOINT = (process.env.R2_S3_ENDPOINT ?? "").replace(/\/+$/, "");
 const MAX_BYTES = Number(process.env.MEDIA_MAX_UPLOAD_BYTES ?? 20 * 1024 * 1024); // 20 MB
 const TTL_SECONDS = Number(process.env.MEDIA_URL_TTL_SECONDS ?? 600);
 
@@ -53,7 +56,8 @@ function buildKey(contentType: string, prefix: string): string {
 }
 
 function objectUrl(key: string): string {
-  return `https://${ACCOUNT_ID}.r2.cloudflarestorage.com/${BUCKET}/${key}`;
+  const base = S3_ENDPOINT || `https://${ACCOUNT_ID}.r2.cloudflarestorage.com`;
+  return `${base}/${BUCKET}/${key}`;
 }
 
 export interface StoredUpload {
