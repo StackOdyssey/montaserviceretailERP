@@ -71,7 +71,12 @@ export async function uploadObject(
   const key = buildKey(contentType, prefix);
   const res = await r2Client().fetch(objectUrl(key), {
     method: "PUT",
-    headers: { "content-type": contentType },
+    headers: {
+      "content-type": contentType,
+      // Next.js patche fetch : sans Content-Length explicite le corps part en
+      // chunked et R2 répond 411 Length Required (R2_UPLOAD_411).
+      "content-length": String(bytes.byteLength),
+    },
     body: bytes,
   });
   if (!res.ok) {
