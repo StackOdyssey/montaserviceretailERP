@@ -197,3 +197,28 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 **Next step on resume:** (a) get owner's Gmail → add to IAP; (b) ask user whether to start M1–M3 on branch `feature/invoice-legal-mentions`.
 **State:** `main` clean & pushed; prod revision from last trigger deploy (check `gcloud run services describe erp-system --region europe-west1 --project erp-syste --format="value(status.traffic[0].revisionName)"`); latest tag `v1.9.3`.
+
+## Resume point — LATEST (saved 2026-11-25, retail ERP session)
+
+**Two systems — do not confuse:**
+- **Retail (this repo)** `StackOdyssey/montaserviceretailERP` → Cloud Run `montaserviceretailerp`, GCP `bricoleapp-7d2cb`, europe-west1, custom domain `erpretail.cloud.run`. Holds ONLY the legacy `D:\Montassir ERP Software\Apps` (Bestway PHP/MySQL `Bestway_BMM` on AMPPS `:3307`, creds in `config/_incl_connection.php`) import.
+- **Wholesale** = `erp-system` / `montaservice.cloud.run` / GCP `erp-syste` — separate DB + secrets, untouched.
+
+**Done this session (main @ `37643c9`, live rev `montaserviceretailerp-00010-bmb`):**
+1. **New dedicated Neon** `lingering-bar-02685121` (org `org-soft-band-63137300`, branch `production`, endpoint `ep-super-mountain-bgikmdkr`, eu-central-1). Secrets `erp-database-url`/`unpooled` repointed (old versions in Secret Manager history). `drizzle-kit migrate` + seeded reference rows migrations don't create: warehouses (Principal+Mobile_01), 5 vat_rates, PIECES price_levels (GROS/SEMI_GROS), accounting_period 2026-11 OPEN, user KAMAL COMMERCIAL (pin_hmac copied — same SESSION_SECRET → PIN still valid).
+2. **Legacy re-import on new DB** (`import-legacy.mjs --apply --wipe` + `MIGRATION_DATABASE_URL` + `LEGACY_MYSQL_PASSWORD`): 854 products / 67 customers / 844 docs / 197 expenses, BL next=944, same 3 known anomalies. Patched to **preserve legacy `date_add`** on created_at for customers/categories/brands/staff/stock_movements/product_prices/expenses (`237c490`).
+3. **Retail R2 bucket** `retailerp` (same CF account `d4c69c63…`) — **EU jurisdiction** → new `R2_S3_ENDPOINT` env (`5d42208`) + secret `erp-r2-s3-endpoint`=`https://….eu.r2.cloudflarestorage.com`; `R2_PUBLIC_BASE_URL`=`https://pub-407c5fb5eb6e45d7b22fa604c1fb2548.r2.dev`; same access keys work.
+4. **656 legacy photos uploaded** to `retailerp:products/<legacyId>.jpg` + `photo_url` backfilled (`37643c9`, script `scripts/migration/upload-legacy-photos.mjs` — idempotent). 198 products have no photo (files absent from legacy disk). Verified `200 image/jpeg` on public URL.
+5. **Earlier fixes live**: `aa0936f` R2 Content-Length (R2_UPLOAD_411), `5719b9d` etiquettes blank page, `c81140a` `/api/photos/[name]` dev route + POS category tabs removed. POS hides 0-stock (`sellableProducts` filter + scan guard) — verified.
+6. **Excel export delivered**: `D:\Dev\Inventaire_Legacy_Export\` (`export.mjs` → `output\` 7 files incl. `06_Totaux_globaux.xlsx`: stock 613 678 DH achat / 1 368 119 DH vente, 37 777 units over 735 products, 119 ruptures, CA net 858 951 DH, **marge brute 334 212 DH / 38,9%**).
+
+**Data caveat for owner:** 349/854 products have `prix_achat_ht=0` in legacy (never entered) → "valeur stock achat" is understated and "marge" overstated for those lines (fallback = catalog price). Fix = progressive data entry, not code.
+
+**Pending:**
+- Orphaned old Neon `empty-bird-81278327` (`ep-restless-silence`) — deletable once new prod confirmed stable.
+- `staging-checkpoint-2026-11-19` branch (`br-crimson-surf-b1wcayk2`, LSN 0/4E90138) — restore staging when local testing done.
+- `.env.local` still: DATABASE_URL→staging, R2_*→retailerp, LEGACY_PHOTOS_DIR set (dev photo route active).
+- Wholesale secrets `erp-r2-*` on retail Cloud Run: bucket+URL+endpoint now point at retailerp; keys shared (same account).
+- Legacy MySQL password in importer via `LEGACY_MYSQL_PASSWORD` env only — not committed in any file.
+
+**Verify:** `npx tsc --noEmit -p .` · prod rev check: `gcloud run services describe montaserviceretailerp --region europe-west1 --project bricoleapp-7d2cb --format="value(status.traffic[0].revisionName)"` · dev on `:3002`.
