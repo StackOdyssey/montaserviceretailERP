@@ -113,6 +113,13 @@ body {
   grid-template-columns: repeat(3, 62mm);
 }
 @media print {
+  /* La feuille d'étiquettes porte `page: labels` : sans cette règle, le flux
+     anonyme qui la précède (chrome applicatif masqué) produit une 1re page
+     vide avant le saut forcé vers la page nommée. Appliquer le nom de page
+     au body entier évite la transition. */
+  html:has(.label-sheet) {
+    page: labels;
+  }
   .label-sheet {
     page: labels;
     border: 0 !important;
@@ -121,5 +128,6 @@ body {
   }
   .barcode-label {
     border-color: #9ca3af;
+    break-inside: avoid;
   }
 }
