@@ -39,6 +39,21 @@ const findFile = (name) => {
   return null;
 };
 
+// NE PAS RÉUTILISER TEL QUEL — les dossiers produits0/produits contiennent le
+// catalogue photo du site grossiste montaservice.net, pas celui du retail.
+// produit.photo n'est qu'un motif « <id>.jpg » : pour les références du
+// catalogue montaservice (1001–1427) le fichier montre un produit DIFFÉRENT
+// du produit retail portant le même id (vérifié visuellement : retail 1001
+// SOUPAPE BASHAN → photo CDI LIFA MOTO ; 1007 CYLNDER BASHAN → piston LIFA).
+// Ces 427 images étrangères ont été supprimées de R2 et photo_url mis à NULL
+// (2026-11-27). Seules les images hors de cette plage (1428+) correspondent
+// réellement aux produits retail — elles sont déjà uploadées.
+const MONTA_CATALOG_RANGE = [1001, 1427]; // refs montaservice.net — photos étrangères
+const isContaminated = (reference) => {
+  const n = Number(reference);
+  return n >= MONTA_CATALOG_RANGE[0] && n <= MONTA_CATALOG_RANGE[1];
+};
+
 const client = new AwsClient({
   accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY,
   service: 's3', region: 'auto',
@@ -46,8 +61,10 @@ const client = new AwsClient({
 
 let uploaded = 0, missing = 0, updated = 0, errors = 0;
 const CONCURRENCY = 10;
-const queue = produits.filter((p) => findFile(p.photo));
-missing = produits.length - queue.length;
+const queue = produits.filter((p) => !isContaminated(p.reference) && findFile(p.photo));
+const skipped = produits.filter((p) => isContaminated(p.reference));
+missing = produits.length - queue.length - skipped.length;
+if (skipped.length) console.log(`${skipped.length} refs exclues (plage montaservice ${MONTA_CATALOG_RANGE.join('–')})`);
 
 for (let i = 0; i < queue.length; i += CONCURRENCY) {
   await Promise.all(queue.slice(i, i + CONCURRENCY).map(async (p) => {
