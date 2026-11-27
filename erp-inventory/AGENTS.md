@@ -244,3 +244,25 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - `produrl.tmp` (prod URL scratch) now gitignored.
 
 **Verify:** `npx tsc --noEmit -p .` · prod rev: `gcloud run services describe montaserviceretailerp --region europe-west1 --project bricoleapp-7d2cb --format="value(status.traffic[0].revisionName)"` · dev `:3002`.
+
+## Resume point — LATEST (saved 2026-11-27, session 2 end)
+
+**Done this session (main @ `8617980`, all pushed; auto-deploy per commit):**
+1. **Photo contamination root-caused + cleaned**: `produit.photo` was only a `<id>.jpg` pattern; `produits0`/`produits` dirs hold montaservice.net WHOLESALE images sharing id space 1001–1427. Cleared `photo_url` on 427 SKUs prod+staging (656→229), deleted 427 R2 objects, guard added in `upload-legacy-photos.mjs` (`4b87b6b`). Product rows legit (wholesale-branded = real retail stock w/ sales). 229 correct photos remain (refs 1428+).
+2. **Photos normalized** 1000×1000 product-focused (bbox crop, `square-photos.mjs` in `D:\Dev\Inventaire_Legacy_Export\`) + client catalogue PDF (`catalogue.mjs`) → regenerated after cleanup: 229 products, 12 pages.
+3. **In-app "Catalogue PDF"** button on /stock → R2 `catalogues/` (`24ff2e6` + pdfkit serverExternal fix `26dcf62`). ~22s, ~$0.001/gen.
+4. **Invoice print polish**: cachet.png on FACTURE only, watermark, no row separators, `@page a4doc` chrome suppression + page isolation (`ae79e91`,`26e701e`), payment line inline borderless (`e1638c1`).
+5. **Prix Vente Semi Gros** field → `product_prices` @ SEMI_GROS upsert; fixed silently-dropped Gros field + missing `priceLevelId` filter in `resolveCustomerPrices` (`46e63c6`).
+6. **/stock header** compact: labels removed, small h1, 7 equal buttons stacked (`d3eed3e`,`c7ea458`,`90dbaf6`,`5c3876d`).
+7. **Thermal roll labels** (`8617980`): `/etiquettes` format selector — A4 sheet (unchanged) | Rouleau 40×30 | 50×30 mm. Each sticker = one `@page` at exact roll size (named-page pattern, same as 80mm ticket); compact `BarcodeLabel` roll variant.
+
+**Test data on dev/staging:** FAC-2026-00001 (from BL_942); product 1148 semi-gros=145.
+
+**Pending:**
+- Owner checking which label printer he has → then test roll print in the real Chrome dialog (IronBee's save-as-pdf can't verify @page sizes — `prefer_css_page_size` off; CSS verified structurally).
+- Printer is just a Windows driver (Xprinter ~600-900 MAD common in MA); optional `--kiosk-printing` for one-click labels.
+- 625/854 products photo-less → shop re-shoot needed. 349 products `prix_achat=0` → margin/stock caveats.
+- Orphaned Neon `empty-bird-81278327` + `staging-checkpoint-2026-11-19` restore.
+- Excel export with stock counts delivered at `D:\Dev\Inventaire_Legacy_Export\output\` (854 cat. / 735 in stock / 119 rupture / 37 777 units).
+
+**Verify:** `npx tsc --noEmit -p .` · prod rev: `gcloud run services describe montaserviceretailerp --region europe-west1 --project bricoleapp-7d2cb --format="value(status.traffic[0].revisionName)"` · dev `:3002`.
