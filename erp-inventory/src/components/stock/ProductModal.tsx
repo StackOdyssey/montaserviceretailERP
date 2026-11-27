@@ -331,7 +331,7 @@ export function ProductModal({
           </div>
 
           {/* Ligne 4 : Prix en Dirhams */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-4 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
             <div>
               <label className="block text-xs font-bold text-[#374151] mb-1">
                 Prix Achat HT (DH)
