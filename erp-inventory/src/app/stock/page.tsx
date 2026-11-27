@@ -183,17 +183,15 @@ export default function StockCataloguePage() {
       {/* ======================================================== */}
       {/* 1. EN-TÊTE DE PAGE ET BOUTONS D'ACTION                  */}
       {/* ======================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 md:p-6 rounded-2xl border border-[#E5E7EB] shadow-xs">
-        <div className="shrink-0">
-          <h1 className="text-base md:text-lg font-bold text-[#111827] tracking-tight whitespace-nowrap">
-            Gestion du Stock & Catalogue
-          </h1>
-        </div>
+      <div className="flex flex-col gap-3 bg-white p-4 md:p-5 rounded-2xl border border-[#E5E7EB] shadow-xs">
+        <h1 className="text-base md:text-lg font-bold text-[#111827] tracking-tight whitespace-nowrap">
+          Gestion du Stock & Catalogue
+        </h1>
 
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end sm:gap-2.5 print:hidden">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-2.5 print:hidden">
           <Link
             href="/stock/inventaire"
-            className="flex items-center justify-center gap-2 min-w-[9.5rem] whitespace-nowrap px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
+            className="flex flex-1 items-center justify-center gap-1.5 min-w-0 overflow-hidden whitespace-nowrap px-2 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
           >
             <ClipboardList size={16} className="text-[#4338CA]" />
             <span>Inventaire</span>
@@ -201,7 +199,7 @@ export default function StockCataloguePage() {
 
           <Link
             href="/stock/mouvements"
-            className="flex items-center justify-center gap-2 min-w-[9.5rem] whitespace-nowrap px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
+            className="flex flex-1 items-center justify-center gap-1.5 min-w-0 overflow-hidden whitespace-nowrap px-2 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
           >
             <History size={16} className="text-[#0D9488]" />
             <span>Mouvements</span>
@@ -209,7 +207,7 @@ export default function StockCataloguePage() {
 
           <Link
             href="/stock/transferts"
-            className="flex items-center justify-center gap-2 min-w-[9.5rem] whitespace-nowrap px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
+            className="flex flex-1 items-center justify-center gap-1.5 min-w-0 overflow-hidden whitespace-nowrap px-2 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
           >
             <ArrowRightLeft size={16} className="text-[#7C3AED]" />
             <span>Historique</span>
@@ -217,7 +215,7 @@ export default function StockCataloguePage() {
 
           <button
             onClick={() => setIsTransferOpen(true)}
-            className="flex items-center justify-center gap-2 min-w-[9.5rem] whitespace-nowrap px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
+            className="flex flex-1 items-center justify-center gap-1.5 min-w-0 overflow-hidden whitespace-nowrap px-2 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
           >
             <ArrowRightLeft size={16} className="text-[#7C3AED]" />
             <span>Transfert</span>
@@ -225,7 +223,7 @@ export default function StockCataloguePage() {
 
           <button
             onClick={() => setIsCsvModalOpen(true)}
-            className="flex items-center justify-center gap-2 min-w-[9.5rem] whitespace-nowrap px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
+            className="flex flex-1 items-center justify-center gap-1.5 min-w-0 overflow-hidden whitespace-nowrap px-2 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all"
           >
             <FileSpreadsheet size={16} className="text-[#2563EB]" />
             <span>Import / Export CSV</span>
@@ -234,7 +232,7 @@ export default function StockCataloguePage() {
           <button
             onClick={handleGenerateCatalogue}
             disabled={catalogueLoading}
-            className="flex items-center justify-center gap-2 min-w-[9.5rem] whitespace-nowrap px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all disabled:opacity-60"
+            className="flex flex-1 items-center justify-center gap-1.5 min-w-0 overflow-hidden whitespace-nowrap px-2 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all disabled:opacity-60"
           >
             <BookOpen size={16} className="text-[#059669]" />
             <span>{catalogueLoading ? "Génération…" : "Catalogue PDF"}</span>
@@ -245,7 +243,7 @@ export default function StockCataloguePage() {
               setProductToEdit(null);
               setIsProductModalOpen(true);
             }}
-            className="flex items-center justify-center gap-2 min-w-[9.5rem] whitespace-nowrap bg-[#F7162D] hover:bg-[#D90E23] text-white font-bold text-xs px-3.5 py-2.5 rounded-xl shadow-xs transition-all active:scale-98"
+            className="flex flex-1 items-center justify-center gap-1.5 min-w-0 overflow-hidden whitespace-nowrap bg-[#F7162D] hover:bg-[#D90E23] text-white font-bold text-xs px-2 py-2.5 rounded-xl shadow-xs transition-all active:scale-98"
           >
             <PlusCircle size={16} />
             <span>Ajouter une pièce</span>
