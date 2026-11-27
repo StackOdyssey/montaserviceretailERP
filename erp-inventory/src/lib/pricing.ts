@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { customerProductPrices, customers, productPrices, products } from "@/db";
 import type { Tx } from "@/lib/stock-lock";
 
@@ -50,7 +50,9 @@ export async function resolveCustomerPrices(
     const levelRows = await conn
       .select({ productId: productPrices.productId, price: productPrices.priceHtCents })
       .from(productPrices)
-      .where(inArray(productPrices.productId, ids));
+      .where(
+        and(inArray(productPrices.productId, ids), eq(productPrices.priceLevelId, cust.levelId))
+      );
     for (const r of levelRows) {
       if (r.price <= 0) continue;
       const cur = map.get(r.productId);

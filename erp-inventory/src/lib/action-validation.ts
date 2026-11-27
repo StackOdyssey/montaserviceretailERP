@@ -124,6 +124,7 @@ export const saveProductSchema = z.object({
   purchasePriceCents: cents,
   salePriceRetailCents: cents,
   salePriceWholesaleCents: cents.optional(),
+  salePriceSemiWholesaleCents: cents.optional(),
   tvaRate: pct.optional(),
   minStockAlert: z.number().int().min(0).max(1_000_000),
   currentStock: z.number().int().min(-1_000_000).max(1_000_000),

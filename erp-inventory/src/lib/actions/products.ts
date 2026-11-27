@@ -1,7 +1,7 @@
 "use server";
 
-import { and, asc, eq, gte, ilike, or, sql } from "drizzle-orm";
-import { auditLogs, businessLines, categories, db, products, settings, stockMovements } from "@/db";
+import { and, asc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
+import { auditLogs, businessLines, categories, db, priceLevels, productPrices, products, settings, stockMovements } from "@/db";
 
 export interface CategoryItem {
   id: number;
@@ -27,6 +27,7 @@ export interface ProductItem {
   purchasePriceCents: number;
   salePriceRetailCents: number;
   salePriceWholesaleCents: number | null;
+  salePriceSemiWholesaleCents: number | null;
   tvaRate: number;
   minStockAlert: number;
   currentStock: number;
@@ -100,6 +101,7 @@ function rawToItem(r: ProductLike, lineCode: string, categoryName?: string | nul
     purchasePriceCents: r.cmupCents,
     salePriceRetailCents: r.salePriceHtCents,
     salePriceWholesaleCents: null,
+    salePriceSemiWholesaleCents: null,
     tvaRate: r.tvaRate,
     minStockAlert: r.minStockAlert,
     currentStock: r.currentStock,
@@ -204,7 +206,75 @@ export async function getProducts(options?: ProductFilters): Promise<ProductItem
     .limit(limit)
     .offset(offset);
 
-  return rows.map((r) => rawToItem(r, lineCode, r.categoryName));
+  const items = rows.map((r) => rawToItem(r, lineCode, r.categoryName));
+  await attachLevelPrices(items);
+  return items;
+}
+
+/** Renseigne les prix GROS / SEMI_GROS (product_prices) sur des items produit. */
+async function attachLevelPrices(items: ProductItem[]) {
+  if (items.length === 0) return;
+  const d = requireDb();
+  const rows = await d
+    .select({
+      productId: productPrices.productId,
+      code: priceLevels.code,
+      price: productPrices.priceHtCents,
+    })
+    .from(productPrices)
+    .innerJoin(priceLevels, eq(productPrices.priceLevelId, priceLevels.id))
+    .where(
+      and(
+        inArray(productPrices.productId, items.map((i) => i.id)),
+        inArray(priceLevels.code, ["GROS", "SEMI_GROS"])
+      )
+    );
+  for (const r of rows) {
+    const item = items.find((i) => i.id === r.productId);
+    if (!item) continue;
+    if (r.code === "GROS") item.salePriceWholesaleCents = r.price;
+    else if (r.code === "SEMI_GROS") item.salePriceSemiWholesaleCents = r.price;
+  }
+}
+
+/** Upsert/delete des lignes product_prices par code de niveau (GROS, SEMI_GROS). */
+async function upsertLevelPrices(
+  d: NonNullable<typeof db>,
+  productId: number,
+  businessLineId: number,
+  prices: Partial<Record<"GROS" | "SEMI_GROS", number | undefined>>
+) {
+  for (const [code, cents] of Object.entries(prices)) {
+    let level = (
+      await d
+        .select({ id: priceLevels.id })
+        .from(priceLevels)
+        .where(and(eq(priceLevels.businessLineId, businessLineId), eq(priceLevels.code, code)))
+        .limit(1)
+    )[0];
+    if (!level) {
+      if (!cents) continue; // niveau inexistant et rien à écrire
+      level = (
+        await d
+          .insert(priceLevels)
+          .values({ businessLineId, code, label: code === "GROS" ? "Gros" : "Semi-gros" })
+          .returning({ id: priceLevels.id })
+      )[0];
+    }
+    if (cents && cents > 0) {
+      await d
+        .insert(productPrices)
+        .values({ productId, priceLevelId: level.id, priceHtCents: cents })
+        .onConflictDoUpdate({
+          target: [productPrices.productId, productPrices.priceLevelId],
+          set: { priceHtCents: cents },
+        });
+    } else {
+      await d
+        .delete(productPrices)
+        .where(and(eq(productPrices.productId, productId), eq(productPrices.priceLevelId, level.id)));
+    }
+  }
 }
 
 /**
@@ -273,6 +343,7 @@ export async function saveProduct(data: {
   purchasePriceCents: number;
   salePriceRetailCents: number;
   salePriceWholesaleCents?: number;
+  salePriceSemiWholesaleCents?: number;
   tvaRate?: number;
   minStockAlert: number;
   currentStock: number;
@@ -343,6 +414,7 @@ async function saveProductImpl(data: {
   purchasePriceCents: number;
   salePriceRetailCents: number;
   salePriceWholesaleCents?: number;
+  salePriceSemiWholesaleCents?: number;
   tvaRate?: number;
   minStockAlert: number;
   currentStock: number;
@@ -397,6 +469,11 @@ async function saveProductImpl(data: {
     savedId = r[0].id;
   }
 
+  await upsertLevelPrices(d, savedId, lineId, {
+    GROS: data.salePriceWholesaleCents,
+    SEMI_GROS: data.salePriceSemiWholesaleCents,
+  });
+
   await d.insert(auditLogs).values({
     action: data.id ? "PRODUIT_MODIFIE" : "PRODUIT_CREE",
     entityType: "PRODUCT",
@@ -415,7 +492,8 @@ async function saveProductImpl(data: {
     categoryName: data.categoryName,
     purchasePriceCents: values.cmupCents,
     salePriceRetailCents: values.salePriceHtCents,
-    salePriceWholesaleCents: null,
+    salePriceWholesaleCents: data.salePriceWholesaleCents ?? null,
+    salePriceSemiWholesaleCents: data.salePriceSemiWholesaleCents ?? null,
     tvaRate: values.tvaRate,
     minStockAlert: values.minStockAlert,
     currentStock: values.currentStock,

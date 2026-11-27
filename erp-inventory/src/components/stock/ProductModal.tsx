@@ -43,6 +43,7 @@ export function ProductModal({
   const [purchasePriceDH, setPurchasePriceDH] = useState("");
   const [salePriceRetailDH, setSalePriceRetailDH] = useState("");
   const [salePriceWholesaleDH, setSalePriceWholesaleDH] = useState("");
+  const [salePriceSemiWholesaleDH, setSalePriceSemiWholesaleDH] = useState("");
   const [currentStock, setCurrentStock] = useState("0");
   const [minStockAlert, setMinStockAlert] = useState("2");
   const [shelfLocation, setShelfLocation] = useState("");
@@ -72,6 +73,11 @@ export function ProductModal({
             ? toDirhams(productToEdit.salePriceWholesaleCents).toString()
             : ""
         );
+        setSalePriceSemiWholesaleDH(
+          productToEdit.salePriceSemiWholesaleCents
+            ? toDirhams(productToEdit.salePriceSemiWholesaleCents).toString()
+            : ""
+        );
         setCurrentStock(productToEdit.currentStock.toString());
         setMinStockAlert(productToEdit.minStockAlert.toString());
         setShelfLocation(productToEdit.shelfLocation || "");
@@ -87,6 +93,7 @@ export function ProductModal({
         setPurchasePriceDH("");
         setSalePriceRetailDH("");
         setSalePriceWholesaleDH("");
+        setSalePriceSemiWholesaleDH("");
         setCurrentStock("0");
         setMinStockAlert("2");
         setShelfLocation("");
@@ -169,6 +176,7 @@ export function ProductModal({
       const purchaseDH = parseFloat(purchasePriceDH) || 0;
       const saleRetailDH = parseFloat(salePriceRetailDH) || 0;
       const saleWholesaleDH = parseFloat(salePriceWholesaleDH) || 0;
+      const saleSemiWholesaleDH = parseFloat(salePriceSemiWholesaleDH) || 0;
 
       await onSave({
         id: productToEdit?.id,
@@ -180,6 +188,7 @@ export function ProductModal({
         purchasePriceCents: toCentimes(purchaseDH),
         salePriceRetailCents: toCentimes(saleRetailDH),
         salePriceWholesaleCents: saleWholesaleDH > 0 ? toCentimes(saleWholesaleDH) : undefined,
+        salePriceSemiWholesaleCents: saleSemiWholesaleDH > 0 ? toCentimes(saleSemiWholesaleDH) : undefined,
         tvaRate: company.defaultVatRate,
         minStockAlert: parseInt(minStockAlert, 10) || 2,
         currentStock: parseInt(currentStock, 10) || 0,
@@ -322,7 +331,7 @@ export function ProductModal({
           </div>
 
           {/* Ligne 4 : Prix en Dirhams */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-4 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
             <div>
               <label className="block text-xs font-bold text-[#374151] mb-1">
                 Prix Achat HT (DH)
@@ -355,6 +364,25 @@ export function ProductModal({
                   onChange={(e) => setSalePriceRetailDH(e.target.value)}
                   placeholder="0.00"
                   className="w-full pl-3 pr-8 py-2 text-sm bg-white border border-[#E5E7EB] rounded-lg focus:border-[#F7162D] outline-none font-bold text-[#F7162D]"
+                />
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#6B7280]">
+                  DH
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#374151] mb-1">
+                Prix Vente Semi Gros (DH)
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.5"
+                  value={salePriceSemiWholesaleDH}
+                  onChange={(e) => setSalePriceSemiWholesaleDH(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full pl-3 pr-8 py-2 text-sm bg-white border border-[#E5E7EB] rounded-lg focus:border-[#F7162D] outline-none font-bold"
                 />
                 <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#6B7280]">
                   DH
