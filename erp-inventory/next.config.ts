@@ -14,6 +14,10 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "8mb",
     },
   },
+  // pdfkit (et fontkit/linebreak) lit ses fontes AFM embarquées via
+  // fs.readFileSync — incompatible avec le bundling Turbopack/webpack :
+  // il doit rester un require Node natif côté serveur.
+  serverExternalPackages: ["pdfkit", "fontkit", "linebreak", "sharp"],
   // Fige la racine du projet sur erp-inventory/ : le dossier parent
   // (C:\Dev\ERP_System) contient un autre lockfile et des fichiers de
   // référence (exemples, captures, vidéos), ce qui fausse l'inférence
