@@ -17,6 +17,7 @@ import {
   Package,
   ClipboardList,
   ArrowRightLeft,
+  BookOpen,
   LayoutGrid,
   List,
   Printer,
@@ -40,6 +41,8 @@ import { ProductHistoryModal } from "@/components/stock/ProductHistoryModal";
 import { CsvModal } from "@/components/stock/CsvModal";
 import { useBusinessLine } from "@/components/layout/BusinessLineProvider";
 import { useSettings } from "@/components/layout/SettingsProvider";
+import { useToast } from "@/components/ui/ToastProvider";
+import { generateCatalogue } from "@/lib/actions/catalogue";
 import { unwrap } from "@/lib/action-result";
 
 const PAGE_SIZE = 50;
@@ -72,6 +75,8 @@ export default function StockCataloguePage() {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [productToTrace, setProductToTrace] = useState<ProductItem | null>(null);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [catalogueLoading, setCatalogueLoading] = useState(false);
+  const toast = useToast();
   const [warehousesList, setWarehousesList] = useState<WarehouseItem[]>([]);
   const [warehouseFilter, setWarehouseFilter] = useState<number | null>(null); // null = vue globale
   const [whStock, setWhStock] = useState<Record<number, number>>({});
@@ -159,6 +164,20 @@ export default function StockCataloguePage() {
     fetchProducts(page);
   };
 
+  // Générer le catalogue PDF (déposé dans R2 → ouvert dans un nouvel onglet)
+  const handleGenerateCatalogue = async () => {
+    setCatalogueLoading(true);
+    try {
+      const { publicUrl } = unwrap(await generateCatalogue());
+      window.open(publicUrl, "_blank", "noopener");
+      toast.success("Catalogue PDF généré.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Échec de la génération du catalogue.");
+    } finally {
+      setCatalogueLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* ======================================================== */}
@@ -224,6 +243,15 @@ export default function StockCataloguePage() {
           >
             <FileSpreadsheet size={16} className="text-[#2563EB]" />
             <span>Import / Export CSV</span>
+          </button>
+
+          <button
+            onClick={handleGenerateCatalogue}
+            disabled={catalogueLoading}
+            className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-white border border-[#E5E7EB] hover:border-[#D1D5DB] rounded-xl text-xs font-bold text-[#374151] shadow-xs active:scale-98 transition-all disabled:opacity-60"
+          >
+            <BookOpen size={16} className="text-[#059669]" />
+            <span>{catalogueLoading ? "Génération…" : "Catalogue PDF"}</span>
           </button>
 
           <button

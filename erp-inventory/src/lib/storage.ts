@@ -89,6 +89,32 @@ export async function uploadObject(
   return { key, publicUrl: `${PUBLIC_BASE_URL}/${key}` };
 }
 
+/** Dépose un document non-image (PDF…) dans R2 depuis le serveur. */
+export async function uploadDocument(
+  key: string,
+  contentType: string,
+  bytes: ArrayBuffer
+): Promise<StoredUpload> {
+  if (!isStorageConfigured()) {
+    throw new BusinessError("STORAGE_NOT_CONFIGURED: configuration R2 manquante");
+  }
+  if (!Number.isFinite(bytes.byteLength) || bytes.byteLength <= 0) {
+    throw new BusinessError("TAILLE_INVALIDE: document vide");
+  }
+  const res = await r2Client().fetch(objectUrl(key), {
+    method: "PUT",
+    headers: {
+      "content-type": contentType,
+      "content-length": String(bytes.byteLength),
+    },
+    body: bytes,
+  });
+  if (!res.ok) {
+    throw new BusinessError(`R2_UPLOAD_${res.status}: dépôt refusé par le stockage`);
+  }
+  return { key, publicUrl: `${PUBLIC_BASE_URL}/${key}` };
+}
+
 export interface PresignedUpload {
   key: string;
   uploadUrl: string;
