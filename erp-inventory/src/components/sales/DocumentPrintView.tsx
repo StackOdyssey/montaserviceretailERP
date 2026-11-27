@@ -344,16 +344,12 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
             </p>
 
             {/* MODE DE PAIEMENT */}
-            <p className="mt-4 font-bold">Mode de Paiement :</p>
-            <div className="border border-black px-2 py-2">
+            <p className="mt-4">
+              <span className="font-bold">Mode de Paiement : </span>
               {paymentLabel}
-              {(conditionText || doc.dueDate) && (
-                <span>
-                  {conditionText ? ` — Conditions : ${conditionText}` : ""}
-                  {doc.dueDate ? ` — Échéance : ${new Date(doc.dueDate).toLocaleDateString("fr-FR")}` : ""}
-                </span>
-              )}
-            </div>
+              {conditionText ? ` — Conditions : ${conditionText}` : ""}
+              {doc.dueDate ? ` — Échéance : ${new Date(doc.dueDate).toLocaleDateString("fr-FR")}` : ""}
+            </p>
 
             {/* CACHET & SIGNATURE — factures uniquement */}
             {doc.docType === "FACTURE" && (
