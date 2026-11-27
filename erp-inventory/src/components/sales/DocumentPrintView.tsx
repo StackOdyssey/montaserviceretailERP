@@ -129,8 +129,8 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
   const fillerRows = Math.max(0, 14 - doc.lines.length);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-[#E5E7EB] my-6 flex flex-col max-h-[92vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto print:static print:overflow-visible print:bg-transparent print:backdrop-blur-none print:p-0">
+      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-[#E5E7EB] my-6 flex flex-col max-h-[92vh] overflow-hidden print:shadow-none print:border-0 print:rounded-none print:my-0 print:max-h-none print:overflow-visible">
         {/* Barre d'outils (non imprimée) */}
         <div className="print:hidden flex items-center justify-between px-6 py-3.5 bg-[#111827] text-white">
           <div className="flex items-center gap-2">
@@ -191,7 +191,9 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
 
         {/* Document imprimable (modèle papier BM Motors) */}
         <div className="flex-1 overflow-y-auto p-8 sm:p-12 print:p-0 print:overflow-visible bg-white text-[#000]">
-          <div className="max-w-[210mm] mx-auto text-[11px] leading-tight">
+          {/* doc-sheet = page nommée @page a4doc (marges 0 : pas d'en-tête/pied
+              navigateur) — les marges papier sont portées par le padding print */}
+          <div className="doc-sheet max-w-[210mm] mx-auto text-[11px] leading-tight print:p-[10mm]">
             {/* EN-TÊTE : logo + société (gauche) ; cartouche + client (droite) */}
             <div className="flex justify-between items-start gap-4">
               <div className="space-y-1">

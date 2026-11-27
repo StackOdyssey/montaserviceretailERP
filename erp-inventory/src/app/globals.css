@@ -131,3 +131,40 @@ body {
     break-inside: avoid;
   }
 }
+
+/* Documents A4 (BL / FACTURE / DEVIS) — page nommée à marge nulle :
+   sans zone de marge, le navigateur ne peut pas y imprimer ses en-têtes
+   et pieds automatiques (date, titre, URL). La marge est réintroduite
+   en padding sur .doc-sheet. */
+@page a4doc {
+  size: A4;
+  margin: 0;
+}
+@media print {
+  html:has(.doc-sheet) {
+    page: a4doc;
+  }
+  .doc-sheet {
+    page: a4doc;
+  }
+  /* N'imprimer que la modale : tout élément qui n'est ni un ancêtre de
+     .doc-sheet, ni le document lui-même, ni son contenu est retiré du
+     flux — sinon la page derrière la modale s'imprime sur des pages
+     supplémentaires. */
+  body:has(.doc-sheet) *:not(:has(.doc-sheet)):not(.doc-sheet):not(.doc-sheet *) {
+    display: none !important;
+  }
+  /* Ancêtres de la modale : neutraliser les dimensions écran (h-screen,
+     overflow, flex heights) qui sinon gonflent le flux d'impression et
+     créent des pages vides en surplus. */
+  html:has(.doc-sheet),
+  body:has(.doc-sheet),
+  body:has(.doc-sheet) *:has(.doc-sheet) {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+}
