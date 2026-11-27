@@ -245,8 +245,23 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
               </tbody>
             </table>
 
-            {/* ARTICLES */}
-            <table className="w-full border-collapse mt-3 border-2 border-black">
+            {/* ARTICLES (filigrane logo derrière le tableau) */}
+            <div className="relative mt-3">
+              <div
+                aria-hidden
+                className="absolute inset-0 z-0 flex items-center justify-center opacity-50 pointer-events-none select-none print:opacity-50"
+              >
+                <div className="relative w-2/3 h-2/3">
+                  <Image
+                    src="/bm-motors-logo-wide.png"
+                    alt=""
+                    fill
+                    sizes="500px"
+                    className="object-contain"
+                  />
+                </div>
+              </div>
+              <table className="relative w-full border-collapse border-2 border-black">
               <thead>
                 <tr className="font-bold">
                   <th className="border border-black py-1 px-2 text-left w-20">REF MVT</th>
@@ -260,26 +275,27 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
               <tbody>
                 {doc.lines.map((line, idx) => (
                   <tr key={idx}>
-                    <td className="border border-black py-1 px-2">{line.oemCode || ""}</td>
-                    <td className="border border-black py-1 px-2">{line.sku}</td>
-                    <td className="border border-black py-1 px-2">{line.productName}</td>
-                    <td className="border border-black py-1 px-2 text-center">{line.quantity}</td>
-                    <td className="border border-black py-1 px-2 text-right">{num(line.unitPriceHTCents)}</td>
-                    <td className="border border-black py-1 px-2 text-right">{num(line.totalHtCents)}</td>
+                    <td className="border-x border-black py-1 px-2">{line.oemCode || ""}</td>
+                    <td className="border-x border-black py-1 px-2">{line.sku}</td>
+                    <td className="border-x border-black py-1 px-2">{line.productName}</td>
+                    <td className="border-x border-black py-1 px-2 text-center">{line.quantity}</td>
+                    <td className="border-x border-black py-1 px-2 text-right">{num(line.unitPriceHTCents)}</td>
+                    <td className="border-x border-black py-1 px-2 text-right">{num(line.totalHtCents)}</td>
                   </tr>
                 ))}
                 {Array.from({ length: fillerRows }).map((_, i) => (
                   <tr key={`f${i}`}>
-                    <td className="border border-black py-1 px-2 h-6">&nbsp;</td>
-                    <td className="border border-black py-1 px-2">&nbsp;</td>
-                    <td className="border border-black py-1 px-2">&nbsp;</td>
-                    <td className="border border-black py-1 px-2">&nbsp;</td>
-                    <td className="border border-black py-1 px-2">&nbsp;</td>
-                    <td className="border border-black py-1 px-2">&nbsp;</td>
+                    <td className="border-x border-black py-1 px-2 h-6">&nbsp;</td>
+                    <td className="border-x border-black py-1 px-2">&nbsp;</td>
+                    <td className="border-x border-black py-1 px-2">&nbsp;</td>
+                    <td className="border-x border-black py-1 px-2">&nbsp;</td>
+                    <td className="border-x border-black py-1 px-2">&nbsp;</td>
+                    <td className="border-x border-black py-1 px-2">&nbsp;</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
             <p className="mt-1 font-semibold">PAGE NUMERO : 1</p>
 
             {/* OBSERVATIONS + TOTAL NET */}
@@ -336,6 +352,18 @@ export function DocumentPrintView({ document: doc, onClose }: DocumentPrintViewP
                 </span>
               )}
             </div>
+
+            {/* CACHET & SIGNATURE — factures uniquement */}
+            {doc.docType === "FACTURE" && (
+              <div className="mt-4 flex justify-end">
+                <div className="text-center">
+                  <p className="font-bold text-[10px] uppercase tracking-wide mb-1">Signature & Cachet</p>
+                  <div className="relative w-56 h-28">
+                    <Image src="/cachet.png" alt="Cachet et signature" fill sizes="224px" className="object-contain" />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* PIED DE PAGE */}
             <div className="mt-6 pt-2 border-t border-black flex items-start gap-3">
