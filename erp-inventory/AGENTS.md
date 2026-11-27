@@ -222,3 +222,25 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Legacy MySQL password in importer via `LEGACY_MYSQL_PASSWORD` env only — not committed in any file.
 
 **Verify:** `npx tsc --noEmit -p .` · prod rev check: `gcloud run services describe montaserviceretailerp --region europe-west1 --project bricoleapp-7d2cb --format="value(status.traffic[0].revisionName)"` · dev on `:3002`.
+
+## Resume point — LATEST (saved 2026-11-27, retail ERP session 2)
+
+**Done this session (main @ `e1638c1`, all pushed; each commit = auto Cloud Build deploy):**
+1. **Photo pipeline**: all 656 product photos re-processed to product-focused 1000×1000 (saliency bbox crop + white pad) and re-uploaded to `retailerp` — same keys, `photo_url` unchanged. Scripts in `D:\Dev\Inventaire_Legacy_Export\` (`square-photos.mjs --apply [--only=refs]`, `catalogue.mjs`).
+2. **Client catalogue PDF**: `output\Catalogue_Produits.pdf` — A4 grid, photo+name(Latin+Arabic)+Réf per card.
+3. **In-app catalogue button**: `/stock` → "Catalogue PDF" → `generateCatalogue()` (pdfkit+sharp, Amiri TTF in `public/fonts/`) → uploads R2 `catalogues/` + opens URL. ~22s/8.35MB, ~$0.001/gen. pdfkit Turbopack fix: `serverExternalPackages` in next.config.ts (`26dcf62`).
+4. **Invoice print**: `cachet.png` (owner stamp+signature, transparent-processed) shows on **FACTURE only**; logo watermark 50% behind articles on all docs; row separators removed; `@page a4doc` margin-0 kills browser chrome; print isolation hides page behind modal (`ae79e91`,`26e701e`); "Mode de Paiement : X" now inline borderless (`e1638c1`).
+5. **PHOTO CONTAMINATION FIXED — root cause**: legacy `produit.photo` = `<id>.jpg` pattern, and `produits0`/`produits` dirs hold **montaservice.net wholesale** images sharing id space 1001–1427 (verified: retail 1001 SOUPAPE→LIFA CDI photo). Cleared `photo_url` on 427 SKUs prod+staging (656→229), deleted 427 R2 objects, guard in `upload-legacy-photos.mjs` (`4b87b6b`). Product rows themselves are legit (wholesale-branded items have real retail sales — LIFA/JT/JMC). Refs 1428+ photos verified correct. Files still on local disk if wholesale project wants them (its scrape only got 295/427).
+6. **Prix Semi Gros**: `ProductModal` 4th price field → `product_prices` @ SEMI_GROS upsert (empty=delete row). ALSO fixed: Gros field was silently dropped on save; `resolveCustomerPrices` missed `priceLevelId` filter (GROS customer could get SEMI_GROS price). `46e63c6` + style `90dbaf6`,`5c3876d`.
+7. **/stock header**: badge/company/subtitle removed, small h1, 7 equal-width buttons stacked under title (`d3eed3e`,`c7ea458`).
+
+**Test data on dev/staging (harmless):** FAC-2026-00001 (converted from BL_942); product 1148 semi-gros edited to 145 during verification.
+
+**Pending:**
+- 625/854 products have NO photo now → owner must re-shoot in shop (POS upload path or bulk later).
+- 349 products still `prix_achat=0` → margin/stock-value caveats stand.
+- Orphaned Neon `empty-bird-81278327` + `staging-checkpoint-2026-11-19` restore — same as before.
+- Resend email body is a plain summary (no stamp/full layout) — owner hasn't asked yet.
+- `produrl.tmp` (prod URL scratch) now gitignored.
+
+**Verify:** `npx tsc --noEmit -p .` · prod rev: `gcloud run services describe montaserviceretailerp --region europe-west1 --project bricoleapp-7d2cb --format="value(status.traffic[0].revisionName)"` · dev `:3002`.
