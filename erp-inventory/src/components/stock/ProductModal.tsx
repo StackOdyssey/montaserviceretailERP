@@ -334,7 +334,7 @@ export function ProductModal({
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
             <div>
               <label className="block text-xs font-bold text-[#374151] mb-1">
-                Prix Achat HT (DH)
+                Prix Achat HT
               </label>
               <div className="relative">
                 <input
@@ -353,7 +353,7 @@ export function ProductModal({
 
             <div>
               <label className="block text-xs font-bold text-[#374151] mb-1">
-                Prix Vente Détail (DH) *
+                Prix Vente Détail *
               </label>
               <div className="relative">
                 <input
@@ -373,7 +373,7 @@ export function ProductModal({
 
             <div>
               <label className="block text-xs font-bold text-[#374151] mb-1">
-                Prix Vente Semi Gros (DH)
+                Prix Vente Semi Gros
               </label>
               <div className="relative">
                 <input
@@ -392,7 +392,7 @@ export function ProductModal({
 
             <div>
               <label className="block text-xs font-bold text-[#374151] mb-1">
-                Prix Vente Gros (DH)
+                Prix Vente Gros
               </label>
               <div className="relative">
                 <input
