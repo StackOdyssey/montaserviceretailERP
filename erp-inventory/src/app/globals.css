@@ -112,6 +112,35 @@ body {
 .label-sheet {
   grid-template-columns: repeat(3, 62mm);
 }
+
+/* Rouleau thermique (Xprinter/Zebra…) — chaque sticker est une « page » à la
+   taille exacte du rouleau ; le driver d'imprimante imprime N étiquettes. */
+@page roll40 {
+  size: 40mm 30mm;
+  margin: 0;
+}
+@page roll50 {
+  size: 50mm 30mm;
+  margin: 0;
+}
+@media print {
+  html:has(.label-roll40) {
+    page: roll40;
+  }
+  html:has(.label-roll50) {
+    page: roll50;
+  }
+  .label-roll40 {
+    page: roll40;
+  }
+  .label-roll50 {
+    page: roll50;
+  }
+  .roll-sticker:not(:last-child) {
+    break-after: page;
+  }
+}
+
 @media print {
   /* La feuille d'étiquettes porte `page: labels` : sans cette règle, le flux
      anonyme qui la précède (chrome applicatif masqué) produit une 1re page

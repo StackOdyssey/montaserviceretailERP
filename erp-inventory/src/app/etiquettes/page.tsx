@@ -29,6 +29,7 @@ export default function EtiquettesPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [format, setFormat] = useState<"a4" | "roll40" | "roll50">("a4");
   const [generatingFor, setGeneratingFor] = useState<number | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prefilled = useRef(false);
@@ -141,9 +142,18 @@ export default function EtiquettesPage() {
             Étiquettes Code-Barres
           </h1>
           <p className="text-xs text-[#6B7280] mt-0.5">
-            Recherchez les pièces, réglez le nombre d&apos;étiquettes, puis imprimez (feuille A4, 3 × 8).
+            Recherchez les pièces, réglez le nombre d&apos;étiquettes, puis imprimez (feuille A4 ou rouleau thermique).
           </p>
         </div>
+        <select
+          value={format}
+          onChange={(e) => setFormat(e.target.value as typeof format)}
+          className="px-3 py-2.5 text-xs font-bold bg-white border border-[#E5E7EB] rounded-xl text-[#374151] outline-none focus:border-[#F7162D]"
+        >
+          <option value="a4">Feuille A4 (63×30)</option>
+          <option value="roll40">Rouleau 40×30 mm</option>
+          <option value="roll50">Rouleau 50×30 mm</option>
+        </select>
         <button
           onClick={() => window.print()}
           disabled={totalLabels === 0}
@@ -302,15 +312,22 @@ export default function EtiquettesPage() {
         {/* Aperçu / feuille d'impression */}
         <div>
           <div className="text-[10px] font-bold text-[#9CA3AF] mb-1.5 print:hidden">
-            APERÇU — feuille A4, {Math.ceil(totalLabels / 24) || 0} page{totalLabels > 24 ? "s" : ""}
+            {format === "a4"
+              ? `APERÇU — feuille A4, ${Math.ceil(totalLabels / 24) || 0} page${totalLabels > 24 ? "s" : ""}`
+              : `APERÇU — rouleau ${format === "roll40" ? "40×30" : "50×30"} mm, ${totalLabels} étiquette${totalLabels > 1 ? "s" : ""}`}
           </div>
           <div
             id="etiquettes-sheet"
-            className="label-sheet bg-white border border-[#E5E7EB] rounded-xl p-[4mm] grid gap-[4mm] print:border-0 print:p-0 print:rounded-none"
+            className={
+              format === "a4"
+                ? "label-sheet bg-white border border-[#E5E7EB] rounded-xl p-[4mm] grid gap-[4mm] print:border-0 print:p-0 print:rounded-none"
+                : `${format === "roll40" ? "label-roll40" : "label-roll50"} inline-flex flex-col gap-3 bg-white border border-[#E5E7EB] rounded-xl p-4 print:border-0 print:p-0 print:rounded-none print:gap-0`
+            }
           >
             {sheet.length === 0 ? (
               <div className="col-span-3 py-16 text-center text-sm text-[#9CA3AF] print:hidden">
-                Les étiquettes s&apos;affichent ici au format réel (63 × 30 mm).
+                Les étiquettes s&apos;affichent ici au format réel
+                {format === "a4" ? " (63 × 30 mm)." : format === "roll40" ? " (40 × 30 mm)." : " (50 × 30 mm)."}
               </div>
             ) : (
               sheet.map((s, i) => (
@@ -321,6 +338,7 @@ export default function EtiquettesPage() {
                   priceCents={s.product.salePriceRetailCents}
                   shelfLocation={s.product.shelfLocation}
                   sku={s.product.sku}
+                  variant={format === "a4" ? "sheet" : format}
                 />
               ))
             )}
